@@ -51,7 +51,6 @@ export default function AIGeneratePage() {
   // Form state
   const [contentArea, setContentArea] = useState(CONTENT_AREAS[0]);
   const [grade, setGrade] = useState(GRADES[0]);
-  const [chapter, setChapter] = useState('');
   const [questionType, setQuestionType] = useState('SINGLE_SELECT');
   const [difficulty, setDifficulty] = useState('medium');
   const [count, setCount] = useState(5);
@@ -86,7 +85,6 @@ export default function AIGeneratePage() {
       const res = await aiAPI.generate({
         content_area: contentArea,
         grade,
-        chapter: chapter.trim() || undefined,
         question_type: questionType,
         difficulty,
         count,
@@ -240,29 +238,6 @@ export default function AIGeneratePage() {
             </select>
           </div>
 
-          {/* Chapter (optional) */}
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Chapter</span>
-              <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
-            </label>
-            <input
-              id="ai-chapter"
-              type="text"
-              placeholder="e.g. Fractions, Photosynthesis…"
-              value={chapter}
-              onChange={e => setChapter(e.target.value)}
-              style={{
-                ...selectStyle,
-                fontStyle: chapter ? 'normal' : 'italic',
-              }}
-            />
-            {chapter.trim() && (
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                🔍 Only chunks matching &ldquo;{chapter.trim()}&rdquo; will be used
-              </div>
-            )}
-          </div>
 
           {/* Question Type */}
           <div style={{ marginBottom: 18 }}>
