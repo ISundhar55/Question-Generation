@@ -11,7 +11,8 @@
   --color-text: #1a1d23;
   --color-text-muted: #6b7280;
   --color-success: #22c55e;
-  --color-danger: #ef4444;
+  --color-danger: #b91c1c; /* Darkened base red to #b91c1c for high contrast visibility */
+  --color-danger-dark: #991b1b;
   --color-warning: #f59e0b;
   --color-sidebar: #1a1d23;
   --color-sidebar-text: #c9cdd8;
@@ -45,7 +46,62 @@ a {
 button {
   font-family: var(--font);
   cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+button:hover:not(:disabled) {
+  filter: brightness(0.92) contrast(1.05);
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  filter: brightness(0.85);
+  transform: translateY(0);
+}
+
+/* Primary Button Enhancements */
+button[style*="var(--color-primary)"]:hover:not(:disabled),
+button[style*="#4f6ef7"]:hover:not(:disabled) {
+  filter: none;
+  background: var(--color-primary-dark, #3a55d4) !important;
+  box-shadow: 0 6px 18px rgba(79, 110, 247, 0.3) !important;
+  transform: translateY(-1.5px);
+}
+
+/* Outline / Cancel Button Enhancements */
+button[style*="background: 'transparent'"]:hover:not(:disabled),
+button[style*="background: transparent"]:hover:not(:disabled),
+button[style*="border: '1"]:hover:not(:disabled),
+button[style*="border: 1"]:hover:not(:disabled) {
+  filter: none;
+  background: var(--color-border, #f1f5f9) !important;
+  border-color: #94a3b8 !important;
+  color: var(--color-text, #1e293b) !important;
+  transform: translateY(-1px);
+}
+
+/* Solid Danger Button Hover */
+button[style*="background: 'var(--color-danger)'"]:hover:not(:disabled),
+button[style*="background: var(--color-danger)"]:hover:not(:disabled) {
+  filter: none;
+  background: var(--color-danger-dark, #b91c1c) !important;
+  color: #ffffff !important;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(185, 28, 28, 0.25) !important;
+}
+
+/* Transparent Trash/Delete Icon Hover (Keep icon/text red, apply soft pink/red background) */
+button[style*="color: 'var(--color-danger)'"]:hover:not(:disabled),
+button[style*="color: var(--color-danger)"]:hover:not(:disabled),
+button[title*="delete"]:hover:not(:disabled),
+button[title*="Delete"]:hover:not(:disabled) {
+  filter: none;
+  background: #fef2f2 !important; /* Soft light red fill */
+  color: var(--color-danger, #dc2626) !important; /* Keep original red text/icon */
+  border-color: #fca5a5 !important; /* Highlight border slightly */
+  transform: translateY(-1px);
+}
+
 
 input,
 select,

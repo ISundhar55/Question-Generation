@@ -8,7 +8,8 @@ const CONTENT_AREAS = ['English Language Arts', 'Mathematics', 'Science'];
 const GRADES = ['Grade 6', 'Grade 7', 'Grade 8', 'Grade 9'];
 
 const QUESTION_TYPES = [
-  { value: 'MCQ', label: 'Multiple Choice', icon: '🔘', desc: '4 options, one correct answer' },
+  { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', icon: '🔘', desc: '4 options, one correct answer' },
+  { value: 'MULTIPLE_SELECT', label: 'Multiple Choice (Multiple Select)', icon: '✅', desc: '4-6 options, one or more correct answers' },
   { value: 'TRUE_FALSE', label: 'True / False', icon: '⚖️', desc: 'Statement judged true or false' },
   { value: 'CONSTRUCTED_RESPONSE', label: 'Constructed Response', icon: '✏️', desc: 'Type the answer for each blank' },
   { value: 'DROPDOWN', label: 'Dropdown', icon: '📋', desc: 'Select answer for each blank from a list' },
@@ -22,6 +23,8 @@ const DIFFICULTIES = [
 ];
 
 const TYPE_META = {
+  SINGLE_SELECT: { color: '#4f6ef7', bg: '#eef1fe' },
+  MULTIPLE_SELECT: { color: '#3b82f6', bg: '#dbeafe' },
   MCQ: { color: '#4f6ef7', bg: '#eef1fe' },
   TRUE_FALSE: { color: '#22c55e', bg: '#f0fdf4' },
   SHORT_ANSWER: { color: '#f59e0b', bg: '#fffbeb' },
@@ -49,7 +52,7 @@ export default function AIGeneratePage() {
   const [contentArea, setContentArea] = useState(CONTENT_AREAS[0]);
   const [grade, setGrade] = useState(GRADES[0]);
   const [chapter, setChapter] = useState('');
-  const [questionType, setQuestionType] = useState('MCQ');
+  const [questionType, setQuestionType] = useState('SINGLE_SELECT');
   const [difficulty, setDifficulty] = useState('medium');
   const [count, setCount] = useState(5);
   const [customPrompt, setCustomPrompt] = useState('');
@@ -62,6 +65,12 @@ export default function AIGeneratePage() {
   const [savedIds, setSavedIds] = useState(new Set());
   const [savingId, setSavingId] = useState(null);
   const [showSource, setShowSource] = useState({});   // {idx: bool}
+
+  // Regenerate modal state
+  const [regenModal, setRegenModal] = useState(null); // null | { idx, question }
+  const [regenInstructions, setRegenInstructions] = useState('');
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState(null);
 
   // Stats from last generation
   const [genMeta, setGenMeta] = useState(null);
@@ -141,6 +150,53 @@ export default function AIGeneratePage() {
     setShowSource(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
+  const openRegenModal = (idx, question) => {
+    setRegenModal({ idx, question });
+    setRegenInstructions('');
+    setRegenError(null);
+  };
+
+  const closeRegenModal = () => {
+    setRegenModal(null);
+    setRegenInstructions('');
+    setRegenError(null);
+  };
+
+  const handleRegenerate = async () => {
+    if (!regenModal) return;
+    const { idx, question } = regenModal;
+    setRegenerating(true);
+    setRegenError(null);
+    try {
+      const res = await aiAPI.regenerate({
+        content_area: question.contentArea || contentArea,
+        grade: question.grade || grade,
+        question_type: question.questionType,
+        difficulty: question.difficulty,
+        original_question: question,
+        modification_instructions: regenInstructions.trim(),
+        source_chunk_ids: question.sourceChunkIds || [],
+      });
+      const newQuestion = res.data.question;
+      setQuestions(prev => {
+        const updated = [...prev];
+        updated[idx] = newQuestion;
+        return updated;
+      });
+      // Reset saved status for this index — it's a new question
+      setSavedIds(prev => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
+      closeRegenModal();
+    } catch (err) {
+      setRegenError(err.response?.data?.message || 'Regeneration failed. Please try again.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   const diffMeta = DIFFICULTIES.find(d => d.value === difficulty) || DIFFICULTIES[1];
   const typeMeta = TYPE_META[questionType] || TYPE_META.MCQ;
 
@@ -162,6 +218,7 @@ export default function AIGeneratePage() {
         <div style={{
           background: 'var(--color-surface)', border: '1px solid var(--color-border)',
           borderRadius: 12, padding: 24, boxShadow: 'var(--shadow)', position: 'sticky', top: 24,
+          maxHeight: 'calc(100vh - 100px)', overflowY: 'auto',
         }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 20, color: 'var(--color-text)' }}>
             Generation Parameters
@@ -275,7 +332,7 @@ export default function AIGeneratePage() {
             <textarea
               id="ai-custom-prompt"
               rows={4}
-              placeholder={`Examples:\n• Give 5 options for MCQ instead of 4\n• Include the word "photosynthesis"\n• Focus on Chapter 3`}
+              placeholder={`Examples:\n• Give 5 options for Multiple Choice instead of 4\n• Include the word "photosynthesis"\n• Focus on Chapter 3`}
               value={customPrompt}
               onChange={e => setCustomPrompt(e.target.value)}
               style={{
@@ -298,6 +355,7 @@ export default function AIGeneratePage() {
           {/* Generate Button */}
           <button
             id="generate-btn"
+            className="btn-generate"
             onClick={handleGenerate}
             disabled={generating}
             style={{
@@ -347,6 +405,7 @@ export default function AIGeneratePage() {
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   id="save-all-btn"
+                  className="btn-save-all"
                   onClick={saveAll}
                   disabled={savingAll || savedIds.size === questions.length}
                   style={{
@@ -354,6 +413,7 @@ export default function AIGeneratePage() {
                     border: 'none', borderRadius: 8, color: savedIds.size === questions.length ? 'var(--color-success)' : '#fff',
                     fontSize: 13, fontWeight: 600, cursor: savingAll || savedIds.size === questions.length ? 'default' : 'pointer',
                     boxShadow: savedIds.size === questions.length ? 'none' : '0 4px 12px rgba(79,110,247,0.25)',
+                    transition: 'all 0.15s',
                   }}
                 >
                   {savingAll ? 'Saving...' : savedIds.size === questions.length ? '✅ All Saved' : '💾 Save All to Bank'}
@@ -390,265 +450,483 @@ export default function AIGeneratePage() {
             </div>
           )}
 
-          {/* Question Cards */}
-          {questions.map((q, idx) => {
-            const isSaved = savedIds.has(idx);
-            const isSaving = savingId === idx;
-            const qType = TYPE_META[q.questionType] || TYPE_META.MCQ;
-            const qDiff = DIFFICULTIES.find(d => d.value === q.difficulty) || DIFFICULTIES[1];
-            const src = showSource[idx];
+          {/* Scrollable Questions Container */}
+          {questions.length > 0 && (
+            <div style={{
+              maxHeight: 'calc(100vh - 160px)',
+              overflowY: 'auto',
+              paddingRight: 12,
+              paddingTop: 6,
+              paddingBottom: 20,
+              marginTop: 10
+            }}>
+              {questions.map((q, idx) => {
+                const isSaved = savedIds.has(idx);
+                const isSaving = savingId === idx;
+                const qType = TYPE_META[q.questionType] || TYPE_META.MCQ;
+                const qDiff = DIFFICULTIES.find(d => d.value === q.difficulty) || DIFFICULTIES[1];
+                const src = showSource[idx];
 
-            return (
-              <div
-                key={idx}
-                style={{
-                  background: 'var(--color-surface)', border: `1px solid ${isSaved ? '#bbf7d0' : 'var(--color-border)'}`,
-                  borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)',
-                  transition: 'border-color 0.2s',
-                }}
-              >
-                {/* Card Header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#8b92a5' }}>Q{idx + 1}</span>
-                  <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: qType.bg, color: qType.color }}>
-                    {q.questionType?.replace('_', ' ')}
-                  </span>
-                  <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize' }}>
-                    {q.difficulty}
-                  </span>
-                  <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {/* Source toggle */}
-                    {q.sourceChunkIds?.length > 0 && (
-                      <button
-                        onClick={() => toggleSource(idx)}
-                        title="Show source chunks"
-                        style={{
-                          padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                          border: '1px solid var(--color-border)', background: src ? 'var(--color-primary-light)' : 'transparent',
-                          color: src ? 'var(--color-primary)' : 'var(--color-text-muted)', cursor: 'pointer',
-                        }}
-                      >
-                        📍 Chunks {q.sourceChunkIds.join(', ')}
-                      </button>
-                    )}
-                    {/* Save button */}
-                    <button
-                      id={`save-q-${idx}`}
-                      onClick={() => !isSaved && saveQuestion(q, idx)}
-                      disabled={isSaved || isSaving}
-                      style={{
-                        padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                        border: isSaved ? '1px solid #bbf7d0' : '1px solid var(--color-primary)',
-                        background: isSaved ? '#f0fdf4' : 'var(--color-primary-light)',
-                        color: isSaved ? 'var(--color-success)' : 'var(--color-primary)',
-                        cursor: isSaved ? 'default' : 'pointer', transition: 'all 0.12s',
-                      }}
-                    >
-                      {isSaving ? '...' : isSaved ? '✅ Saved' : '💾 Save'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Question text */}
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12, lineHeight: 1.5 }}>
-                  <MarkdownText text={q.text} />
-                </div>
-
-                {/* MCQ Options */}
-                {q.questionType === 'MCQ' && q.options && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                    {Object.entries(q.options).map(([letter, text]) => (
-                      <div key={letter} style={{
-                        display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px',
-                        borderRadius: 8, border: `1.5px solid ${letter === q.answer ? '#bbf7d0' : 'var(--color-border)'}`,
-                        background: letter === q.answer ? '#f0fdf4' : '#fafbfc',
-                      }}>
-                        <span style={{
-                          fontWeight: 700, fontSize: 12, color: letter === q.answer ? 'var(--color-success)' : 'var(--color-text-muted)',
-                          flexShrink: 0, marginTop: 1,
-                        }}>{letter}.</span>
-                        <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{text}</span>
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      background: 'var(--color-surface)', border: `1px solid ${isSaved ? '#bbf7d0' : 'var(--color-border)'}`,
+                      borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)',
+                      transition: 'border-color 0.2s',
+                    }}
+                  >
+                    {/* Card Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#8b92a5' }}>Q{idx + 1}</span>
+                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: qType.bg, color: qType.color }}>
+                        {q.questionType?.replace('_', ' ')}
+                      </span>
+                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize' }}>
+                        {q.difficulty}
+                      </span>
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {/* Source toggle */}
+                        {q.sourceChunkIds?.length > 0 && (
+                          <button
+                            className="btn-chunks"
+                            onClick={() => toggleSource(idx)}
+                            title="Show source chunks"
+                            style={{
+                              padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                              border: '1px solid var(--color-border)', background: src ? 'var(--color-primary-light)' : 'transparent',
+                              color: src ? 'var(--color-primary)' : 'var(--color-text-muted)', cursor: 'pointer',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            📍 Chunks {q.sourceChunkIds.join(', ')}
+                          </button>
+                        )}
+                        {/* Regenerate button */}
+                        <button
+                          id={`regen-q-${idx}`}
+                          className="btn-regen-card"
+                          onClick={() => openRegenModal(idx, q)}
+                          title="Regenerate this question with modifications"
+                          style={{
+                            padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            border: '1px solid #e0d7ff',
+                            background: '#f5f3ff',
+                            color: '#7c3aed',
+                            cursor: 'pointer', transition: 'all 0.12s',
+                          }}
+                        >
+                          🔄 Regenerate
+                        </button>
+                        {/* Save button */}
+                        <button
+                          id={`save-q-${idx}`}
+                          className="btn-save-card"
+                          onClick={() => !isSaved && saveQuestion(q, idx)}
+                          disabled={isSaved || isSaving}
+                          style={{
+                            padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            border: isSaved ? '1px solid #bbf7d0' : '1px solid var(--color-primary)',
+                            background: isSaved ? '#f0fdf4' : 'var(--color-primary-light)',
+                            color: isSaved ? 'var(--color-success)' : 'var(--color-primary)',
+                            cursor: isSaved ? 'default' : 'pointer', transition: 'all 0.12s',
+                          }}
+                        >
+                          {isSaving ? '...' : isSaved ? '✅ Saved' : '💾 Save'}
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
 
-                {/* Matching Lines columns */}
-                {q.questionType === 'MATCHING_LINES' && q.options?.left && q.options?.right && (() => {
-                  const correctPairs = parseMatchingAnswer(q.answer);
-                  const leftItems = Object.entries(q.options.left);
-                  const rightItems = Object.entries(q.options.right);
-                  return (
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4 }}>Column A</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4 }}>Column B</div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {leftItems.map(([key, label]) => (
-                            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#f8fafc' }}>
-                              <span style={{ fontWeight: 700, fontSize: 12, color: '#0891b2', flexShrink: 0, minWidth: 18 }}>{key}.</span>
-                              <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{label}</span>
+                    {/* Question text */}
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12, lineHeight: 1.5 }}>
+                      <MarkdownText text={q.text} />
+                    </div>
+
+                    {/* Multiple Choice Options */}
+                    {(q.questionType === 'SINGLE_SELECT' || q.questionType === 'MULTIPLE_SELECT' || q.questionType === 'MULTI_SELECT' || q.questionType === 'MCQ') && q.options && (() => {
+                      const correctAnswers = (q.answer || '').replace(/,/g, '|').split('|').map(s => s.trim());
+                      const isCorrect = (letter) => correctAnswers.includes(letter);
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                          {Object.entries(q.options).map(([letter, text]) => (
+                            <div key={letter} style={{
+                              display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px',
+                              borderRadius: q.questionType === 'MULTIPLE_SELECT' ? 6 : 8,
+                              border: `1.5px solid ${isCorrect(letter) ? '#bbf7d0' : 'var(--color-border)'}`,
+                              background: isCorrect(letter) ? '#f0fdf4' : '#fafbfc',
+                            }}>
+                              <span style={{
+                                fontWeight: 700, fontSize: 12, color: isCorrect(letter) ? 'var(--color-success)' : 'var(--color-text-muted)',
+                                flexShrink: 0, marginTop: 1,
+                              }}>{letter}.</span>
+                              <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{text}</span>
                             </div>
                           ))}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {rightItems.map(([key, label]) => (
-                            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#f8fafc' }}>
-                              <span style={{ fontWeight: 700, fontSize: 12, color: '#6b7280', flexShrink: 0, minWidth: 18 }}>{key}.</span>
-                              <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{label}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      {Object.keys(correctPairs).length > 0 && (
-                        <div style={{ marginTop: 12 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Answer Key</div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {leftItems.map(([leftKey]) => {
-                              const rightKey = correctPairs[leftKey];
-                              return (
-                                <div key={leftKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#ecfeff', border: '1px solid #a5f3fc', fontSize: 12, fontWeight: 600, color: '#0891b2' }}>
-                                  <span>{leftKey}</span><span style={{ color: '#94a3b8' }}>→</span><span>{rightKey}</span>
+                      );
+                    })()}
+
+                    {/* Matching Lines columns */}
+                    {q.questionType === 'MATCHING_LINES' && q.options?.left && q.options?.right && (() => {
+                      const correctPairs = parseMatchingAnswer(q.answer);
+                      const leftItems = Object.entries(q.options.left);
+                      const rightItems = Object.entries(q.options.right);
+                      return (
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4 }}>Column A</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4 }}>Column B</div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {leftItems.map(([key, label]) => (
+                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#f8fafc' }}>
+                                  <span style={{ fontWeight: 700, fontSize: 12, color: '#0891b2', flexShrink: 0, minWidth: 18 }}>{key}.</span>
+                                  <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{label}</span>
                                 </div>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {rightItems.map(([key, label]) => (
+                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#f8fafc' }}>
+                                  <span style={{ fontWeight: 700, fontSize: 12, color: '#6b7280', flexShrink: 0, minWidth: 18 }}>{key}.</span>
+                                  <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {Object.keys(correctPairs).length > 0 && (
+                            <div style={{ marginTop: 12 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Answer Key</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {leftItems.map(([leftKey]) => {
+                                  const rightKey = correctPairs[leftKey];
+                                  return (
+                                    <div key={leftKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#ecfeff', border: '1px solid #a5f3fc', fontSize: 12, fontWeight: 600, color: '#0891b2' }}>
+                                      <span>{leftKey}</span><span style={{ color: '#94a3b8' }}>→</span><span>{rightKey}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Constructed Response — inline text + answer chips */}
+                    {q.questionType === 'CONSTRUCTED_RESPONSE' && q.text && (() => {
+                      const parts = q.text.split('___');
+                      const answers = q.options?.answers || q.answer?.split('|') || [];
+                      return (
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontSize: 14, lineHeight: 2.2, color: 'var(--color-text)', fontWeight: 500, marginBottom: 8 }}>
+                            {parts.map((part, i) => {
+                              const rawVal = answers[i];
+                              const displayVal = Array.isArray(rawVal) ? (rawVal[0] || '') : rawVal;
+                              return (
+                                <span key={i}>
+                                  {part}
+                                  {i < parts.length - 1 && (
+                                    <span style={{
+                                      display: 'inline-block', padding: '2px 10px', margin: '0 4px',
+                                      background: '#f5f3ff', border: '1.5px solid #c4b5fd',
+                                      borderRadius: 6, color: '#7c3aed', fontWeight: 700, fontSize: 13,
+                                    }}>
+                                      {displayVal || '___'}
+                                    </span>
+                                  )}
+                                </span>
                               );
                             })}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
 
-                {/* Constructed Response — inline text + answer chips */}
-                {q.questionType === 'CONSTRUCTED_RESPONSE' && q.text && (() => {
-                  const parts = q.text.split('___');
-                  const answers = q.options?.answers || q.answer?.split('|') || [];
-                  return (
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 14, lineHeight: 2.2, color: 'var(--color-text)', fontWeight: 500, marginBottom: 8 }}>
-                        {parts.map((part, i) => {
-                          const rawVal = answers[i];
-                          const displayVal = Array.isArray(rawVal) ? (rawVal[0] || '') : rawVal;
-                          return (
+                          {/* Acceptable Alternatives list */}
+                          {(() => {
+                            const hasAlternatives = answers.some(ans => Array.isArray(ans) && ans.length > 1);
+                            if (!hasAlternatives) return null;
+                            return (
+                              <div style={{ marginTop: 10, padding: '10px 14px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #d8b4fe' }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Acceptable Answers</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  {answers.map((ans, idx) => {
+                                    const isArr = Array.isArray(ans);
+                                    const primary = isArr ? (ans[0] || '') : ans;
+                                    const alts = isArr ? ans.slice(1) : [];
+                                    return (
+                                      <div key={idx} style={{ fontSize: 12, color: 'var(--color-text)' }}>
+                                        Blank {idx + 1}: <strong>{primary}</strong>
+                                        {alts.length > 0 && (
+                                          <span> (acceptable alternatives: <span style={{ color: 'var(--color-text-muted)' }}>{alts.join(', ')}</span>)</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Dropdown — inline faux-select for each blank */}
+                    {q.questionType === 'DROPDOWN' && q.text && q.options?.blanks && (() => {
+                      const parts = q.text.split('___');
+                      return (
+                        <div style={{ marginBottom: 14, fontSize: 14, lineHeight: 2.8, color: 'var(--color-text)', fontWeight: 500 }}>
+                          {parts.map((part, i) => (
                             <span key={i}>
                               {part}
-                              {i < parts.length - 1 && (
-                                <span style={{
-                                  display: 'inline-block', padding: '2px 10px', margin: '0 4px',
-                                  background: '#f5f3ff', border: '1.5px solid #c4b5fd',
-                                  borderRadius: 6, color: '#7c3aed', fontWeight: 700, fontSize: 13,
-                                }}>
-                                  {displayVal || '___'}
+                              {i < parts.length - 1 && q.options.blanks[i] && (
+                                <span style={{ display: 'inline-flex', flexDirection: 'column', verticalAlign: 'middle', margin: '0 4px', gap: 2 }}>
+                                  {q.options.blanks[i].choices.map(choice => (
+                                    <span key={choice} style={{
+                                      display: 'inline-block', padding: '1px 8px', borderRadius: 4,
+                                      fontSize: 12, fontWeight: choice === q.options.blanks[i].correct ? 700 : 400,
+                                      background: choice === q.options.blanks[i].correct ? '#d1fae5' : '#f1f5f9',
+                                      color: choice === q.options.blanks[i].correct ? '#065f46' : '#64748b',
+                                      border: `1px solid ${choice === q.options.blanks[i].correct ? '#6ee7b7' : '#e2e8f0'}`,
+                                    }}>
+                                      {choice === q.options.blanks[i].correct ? '✓ ' : ''}{choice}
+                                    </span>
+                                  ))}
                                 </span>
                               )}
                             </span>
-                          );
-                        })}
-                      </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
-                      {/* Acceptable Alternatives list */}
-                      {(() => {
-                        const hasAlternatives = answers.some(ans => Array.isArray(ans) && ans.length > 1);
-                        if (!hasAlternatives) return null;
-                        return (
-                          <div style={{ marginTop: 10, padding: '10px 14px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #d8b4fe' }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Acceptable Answers</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              {answers.map((ans, idx) => {
-                                const isArr = Array.isArray(ans);
-                                const primary = isArr ? (ans[0] || '') : ans;
-                                const alts = isArr ? ans.slice(1) : [];
-                                return (
-                                  <div key={idx} style={{ fontSize: 12, color: 'var(--color-text)' }}>
-                                    Blank {idx + 1}: <strong>{primary}</strong>
-                                    {alts.length > 0 && (
-                                      <span> (acceptable alternatives: <span style={{ color: 'var(--color-text-muted)' }}>{alts.join(', ')}</span>)</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  );
-                })()}
-
-                {/* Dropdown — inline faux-select for each blank */}
-                {q.questionType === 'DROPDOWN' && q.text && q.options?.blanks && (() => {
-                  const parts = q.text.split('___');
-                  return (
-                    <div style={{ marginBottom: 14, fontSize: 14, lineHeight: 2.8, color: 'var(--color-text)', fontWeight: 500 }}>
-                      {parts.map((part, i) => (
-                        <span key={i}>
-                          {part}
-                          {i < parts.length - 1 && q.options.blanks[i] && (
-                            <span style={{ display: 'inline-flex', flexDirection: 'column', verticalAlign: 'middle', margin: '0 4px', gap: 2 }}>
-                              {q.options.blanks[i].choices.map(choice => (
-                                <span key={choice} style={{
-                                  display: 'inline-block', padding: '1px 8px', borderRadius: 4,
-                                  fontSize: 12, fontWeight: choice === q.options.blanks[i].correct ? 700 : 400,
-                                  background: choice === q.options.blanks[i].correct ? '#d1fae5' : '#f1f5f9',
-                                  color: choice === q.options.blanks[i].correct ? '#065f46' : '#64748b',
-                                  border: `1px solid ${choice === q.options.blanks[i].correct ? '#6ee7b7' : '#e2e8f0'}`,
-                                }}>
-                                  {choice === q.options.blanks[i].correct ? '✓ ' : ''}{choice}
-                                </span>
-                              ))}
-                            </span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  );
-                })()}
-
-                {/* Answer & Explanation */}
-                <div style={{
-                  background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
-                  borderLeft: '3px solid var(--color-primary)',
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                    Answer
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 8 : 0 }}>
-                    {q.answer}
-                  </div>
-                  {q.explanation && (
-                    <>
+                    {/* Answer & Explanation */}
+                    <div style={{
+                      background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
+                      borderLeft: '3px solid var(--color-primary)',
+                    }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                        Explanation
+                        Answer
                       </div>
-                      <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
-                        {q.explanation}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 8 : 0 }}>
+                        {q.answer}
                       </div>
-                    </>
-                  )}
-                </div>
+                      {q.explanation && (
+                        <>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                            Explanation
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
+                            {q.explanation}
+                          </div>
+                        </>
+                      )}
+                    </div>
 
-                {/* Source chunk detail (expandable) */}
-                {src && q.sourceChunkIds?.length > 0 && (
-                  <div style={{
-                    marginTop: 10, padding: '10px 14px', background: '#fffbeb',
-                    borderRadius: 8, border: '1px solid #fde68a', fontSize: 12,
-                    color: '#92400e',
-                  }}>
-                    <span style={{ fontWeight: 700 }}>Source Chunk IDs: </span>
-                    {q.sourceChunkIds.join(', ')} — these are the syllabus chunk indices used to generate this question.
+                    {/* Source chunk detail (expandable) */}
+                    {src && q.sourceChunkIds?.length > 0 && (
+                      <div style={{
+                        marginTop: 10, padding: '10px 14px', background: '#fffbeb',
+                        borderRadius: 8, border: '1px solid #fde68a', fontSize: 12,
+                        color: '#92400e',
+                      }}>
+                        <span style={{ fontWeight: 700 }}>Source Chunk IDs: </span>
+                        {q.sourceChunkIds.join(', ')} — these are the syllabus chunk indices used to generate this question.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ─── Regenerate Modal ─── */}
+      {regenModal && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) closeRegenModal(); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(10, 10, 20, 0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+            animation: 'fadeIn 0.15s ease',
+          }}
+        >
+          <div style={{
+            background: 'var(--color-surface)',
+            borderRadius: 16,
+            padding: 28,
+            width: '100%',
+            maxWidth: 560,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+            border: '1px solid var(--color-border)',
+            animation: 'slideUp 0.18s ease',
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>🔄 Regenerate Question</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                  Q{regenModal.idx + 1} — {regenModal.question.questionType?.replace(/_/g, ' ')}
+                </div>
+              </div>
+              <button
+                onClick={closeRegenModal}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--color-text-muted)', lineHeight: 1, padding: 4 }}
+              >✕</button>
+            </div>
+
+            {/* Original Question Preview */}
+            <div style={{
+              background: '#f8f9fb', borderRadius: 10, padding: '12px 16px',
+              marginBottom: 20, border: '1px solid var(--color-border)',
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                Original Question
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.5, fontWeight: 500 }}>
+                {regenModal.question.text}
+              </div>
+            </div>
+
+            {/* Modification Instructions */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>Modification Instructions</label>
+              <textarea
+                id="regen-instructions"
+                rows={4}
+                placeholder={'e.g. Make it harder\nFocus on ecosystems instead\nReword more clearly\nAdd a 5th option'}
+                value={regenInstructions}
+                onChange={e => setRegenInstructions(e.target.value)}
+                style={{
+                  width: '100%', padding: '10px 12px', borderRadius: 8,
+                  border: '1.5px solid var(--color-border)', fontSize: 13,
+                  background: 'var(--color-bg)', color: 'var(--color-text)',
+                  resize: 'vertical', outline: 'none', lineHeight: 1.5,
+                  fontFamily: 'inherit',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                Leave empty to let AI improve the question automatically.
+              </div>
+            </div>
+
+            {/* Error */}
+            {regenError && (
+              <div style={{
+                marginBottom: 16, padding: '10px 14px', borderRadius: 8,
+                background: '#fef2f2', border: '1px solid #fecaca',
+                color: '#991b1b', fontSize: 13,
+              }}>
+                ❌ {regenError}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                className="btn-modal-cancel"
+                onClick={closeRegenModal}
+                disabled={regenerating}
+                style={{
+                  padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  border: '1.5px solid var(--color-border)', background: 'transparent',
+                  color: 'var(--color-text-muted)', cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                id="regen-confirm-btn"
+                className="btn-modal-confirm"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                style={{
+                  padding: '9px 24px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                  border: 'none', background: regenerating ? '#c4b5fd' : '#7c3aed',
+                  color: '#fff', cursor: regenerating ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s',
+                }}
+              >
+                {regenerating ? (
+                  <>
+                    <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                    Regenerating…
+                  </>
+                ) : '🔄 Regenerate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .btn-generate:hover:not(:disabled) {
+          background: var(--color-primary-dark, #3a55d4) !important;
+          box-shadow: 0 6px 20px rgba(79,110,247,0.45) !important;
+          transform: translateY(-1px);
+        }
+        .btn-generate:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .btn-save-all:hover:not(:disabled) {
+          background: var(--color-primary-dark, #3a55d4) !important;
+          box-shadow: 0 6px 16px rgba(79,110,247,0.35) !important;
+          transform: translateY(-1px);
+        }
+        .btn-save-all:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .btn-chunks:hover {
+          background: var(--color-primary-light, #eef1fe) !important;
+          border-color: var(--color-primary, #4f6ef7) !important;
+          color: var(--color-primary, #4f6ef7) !important;
+        }
+
+        .btn-regen-card:hover {
+          background: #ebdffd !important;
+          border-color: #7c3aed !important;
+          color: #6d28d9 !important;
+          transform: translateY(-1px);
+        }
+        .btn-regen-card:active {
+          transform: translateY(0);
+        }
+
+        .btn-save-card:hover:not(:disabled) {
+          background: var(--color-primary, #4f6ef7) !important;
+          color: #fff !important;
+          border-color: var(--color-primary, #4f6ef7) !important;
+          transform: translateY(-1px);
+        }
+        .btn-save-card:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .btn-modal-cancel:hover {
+          background: var(--color-border, #f1f5f9) !important;
+          border-color: #94a3b8 !important;
+          color: var(--color-text, #1e293b) !important;
+        }
+
+        .btn-modal-confirm:hover:not(:disabled) {
+          background: #6d28d9 !important;
+          transform: translateY(-1px);
+        }
+        .btn-modal-confirm:active:not(:disabled) {
+          transform: translateY(0);
+        }
       `}</style>
     </Layout>
   );

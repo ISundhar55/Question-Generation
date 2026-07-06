@@ -24,6 +24,8 @@ from models import (
     GenerateResponse,
     QuestionResult,
     DeleteResponse,
+    RegenerateRequest,
+    RegenerateResponse,
 )
 from services.pdf_parser import extract_text, chunk_text
 from services.embedder import embed_texts, embed_query
@@ -39,7 +41,7 @@ from services.metadata_store import (
     get_all_faiss_vectors_map,
     get_document_by_id,
 )
-from services.llm import generate_questions
+from services.llm import generate_questions, regenerate_question
 from services.prompt_logger import log_generation
 
 load_dotenv()
@@ -232,7 +234,13 @@ async def generate(req: GenerateRequest):
         )
 
     # Step 2: Embed query + FAISS search within candidates
+    # Include custom_prompt in the query so topic-specific instructions
+    # (e.g. "Create only from: How do I use evidence to make inferences?")
+    # steer the FAISS retrieval toward the correct chunks.
     query_text = f"{req.content_area} {req.grade} {req.question_type} {req.difficulty}"
+    if req.custom_prompt and req.custom_prompt.strip():
+        query_text += f" {req.custom_prompt.strip()}"
+
     query_vector = embed_query(query_text)
     top_faiss_ids = search_within(query_vector, candidate_faiss_ids, k=5)
 
@@ -289,6 +297,68 @@ async def generate(req: GenerateRequest):
         retrieved_chunk_count=len(top_chunks),
         doc_ids_used=doc_ids_used,
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /regenerate
+# ---------------------------------------------------------------------------
+
+@app.post("/regenerate", response_model=RegenerateResponse)
+async def regenerate(req: RegenerateRequest):
+    """
+    Regenerate a single question based on:
+      - The original question JSON
+      - Teacher modification instructions
+      - The same syllabus chunks (identified by source_chunk_ids)
+    """
+    # Re-fetch the specific chunks used in the original question
+    if req.source_chunk_ids:
+        top_chunks = get_chunk_texts_by_faiss_ids(
+            req.source_chunk_ids, req.content_area, req.grade
+        )
+    else:
+        # Fallback: fetch top chunks by semantic search
+        candidate_faiss_ids, _ = get_chunks_for(req.content_area, req.grade)
+        if candidate_faiss_ids:
+            q_text = f"{req.content_area} {req.grade} {req.question_type} {req.difficulty}"
+            query_vector = embed_query(q_text)
+            fallback_ids = search_within(query_vector, candidate_faiss_ids, k=5)
+            top_chunks = get_chunk_texts_by_faiss_ids(fallback_ids, req.content_area, req.grade)
+        else:
+            top_chunks = []
+
+    question_dict, prompt_sent, raw_response, parse_success, error_msg = regenerate_question(
+        content_area=req.content_area,
+        grade=req.grade,
+        question_type=req.question_type,
+        difficulty=req.difficulty,
+        original_question=req.original_question,
+        modification_instructions=req.modification_instructions,
+        chunks=top_chunks,
+    )
+
+    log_generation(
+        request={
+            **req.model_dump(),
+            "action": "regenerate",
+        },
+        retrieved_chunk_ids=[c["chunk_id"] for c in top_chunks],
+        prompt_sent=prompt_sent,
+        raw_response=raw_response,
+        parse_success=parse_success,
+        error=error_msg,
+    )
+
+    if not parse_success or question_dict is None:
+        raise HTTPException(
+            status_code=422,
+            detail=error_msg or "Failed to regenerate question."
+        )
+
+    try:
+        return RegenerateResponse(question=QuestionResult(**question_dict))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Invalid question format returned by LLM: {str(e)}")
 
 
 # ---------------------------------------------------------------------------

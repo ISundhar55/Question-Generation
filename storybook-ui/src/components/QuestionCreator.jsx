@@ -2,7 +2,8 @@ import { useState } from 'react';
 import './styles.css';
 
 const QUESTION_TYPES = [
-  { value: 'MCQ', label: 'Multiple Choice (MCQ)', badge: 'qc-badge-mcq' },
+  { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', badge: 'qc-badge-mcq' },
+  { value: 'MULTIPLE_SELECT', label: 'Multiple Choice (Multiple Select)', badge: 'qc-badge-mcq' },
   { value: 'TRUE_FALSE', label: 'True / False', badge: 'qc-badge-tf' },
   { value: 'CONSTRUCTED_RESPONSE', label: 'Constructed Response', badge: 'qc-badge-cr' },
   { value: 'DROPDOWN', label: 'Dropdown', badge: 'qc-badge-dd' },
@@ -12,10 +13,35 @@ const QUESTION_TYPES = [
 const DEFAULT_MCQ_OPTIONS = ['', '', '', ''];
 
 export function QuestionCreator({ onSave, onClose, onPreview, initialData = null }) {
-  const [type, setType] = useState(initialData?.type || '');
+  const [type, setType] = useState(() => {
+    const rawType = initialData?.type || '';
+    if (rawType === 'MCQ') return 'SINGLE_SELECT'; // Map MCQ to SINGLE_SELECT in editor
+    return rawType;
+  });
   const [text, setText] = useState(initialData?.text || '');
-  const [options, setOptions] = useState(Array.isArray(initialData?.options) ? initialData.options : DEFAULT_MCQ_OPTIONS);
-  const [answer, setAnswer] = useState(initialData?.answer || '');
+  const [options, setOptions] = useState(() => {
+    if (!initialData?.options) return DEFAULT_MCQ_OPTIONS;
+    if (Array.isArray(initialData.options)) return initialData.options;
+    if (typeof initialData.options === 'object') {
+      // It's a dictionary (e.g. {"A": "option A text", ...})
+      return Object.values(initialData.options);
+    }
+    return DEFAULT_MCQ_OPTIONS;
+  });
+  const [answer, setAnswer] = useState(() => {
+    const rawAns = initialData?.answer || '';
+    if (!initialData?.options || Array.isArray(initialData.options)) {
+      return rawAns;
+    }
+    if (typeof initialData.options === 'object') {
+      // Map letter-based answers (e.g. 'A|C') to actual option text values
+      const opts = initialData.options;
+      const letters = rawAns.split('|').map(s => s.trim());
+      const mapped = letters.map(l => opts[l]).filter(Boolean);
+      return mapped.join('|');
+    }
+    return rawAns;
+  });
   const [difficulty, setDifficulty] = useState(initialData?.difficulty || 'medium');
   const [points, setPoints] = useState(initialData?.points || 1);
   const [tfAnswers, setTfAnswers] = useState(initialData?.answer || '');
@@ -73,7 +99,7 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
     const e = {};
     if (!type) e.type = 'Please select a question type';
     if (!text.trim()) e.text = 'Question text is required';
-    if (type === 'MCQ') {
+    if (type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT' || type === 'MCQ') {
       const filled = options.filter(o => o.trim());
       if (filled.length < 2) e.options = 'At least 2 options are required';
       if (!answer) e.answer = 'Please select the correct answer';
@@ -101,7 +127,7 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
   };
 
   const buildPayload = () => {
-    if (type === 'MCQ') {
+    if (type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT' || type === 'MCQ') {
       return { type, text, options: options.filter(o => o.trim()), answer, difficulty, points };
     }
     if (type === 'TRUE_FALSE') {
@@ -228,44 +254,106 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
         </div>
       )}
 
-      {/* MCQ Options */}
-      {type === 'MCQ' && (
-        <div className="qc-field">
-          <label className="qc-label">Answer Options</label>
-          {options.map((opt, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%',
-                background: answer === opt && opt.trim() ? 'var(--color-primary)' : 'var(--color-bg)',
-                border: '1.5px solid var(--color-border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 11, fontWeight: 700,
-                color: answer === opt && opt.trim() ? '#fff' : 'var(--color-text-muted)',
-                flexShrink: 0,
-                cursor: opt.trim() ? 'pointer' : 'default',
-              }}
-                onClick={() => opt.trim() && setAnswer(opt)}
-                title="Click to set as correct answer"
-              >
-                {['A', 'B', 'C', 'D'][i]}
+      {/* MCQ / Choice Options */}
+      {(type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT' || type === 'MCQ') && (() => {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+        const isCorrect = (opt) => {
+          if (!opt || !opt.trim()) return false;
+          if (type === 'MULTIPLE_SELECT') {
+            return answer.split('|').map(s => s.trim()).includes(opt.trim());
+          }
+          return answer.trim() === opt.trim();
+        };
+        const toggleCorrect = (opt) => {
+          if (!opt || !opt.trim()) return;
+          if (type === 'MULTIPLE_SELECT') {
+            const selected = answer ? answer.split('|').map(s => s.trim()) : [];
+            if (selected.includes(opt.trim())) {
+              setAnswer(selected.filter(x => x !== opt.trim()).join('|'));
+            } else {
+              setAnswer([...selected, opt.trim()].join('|'));
+            }
+          } else {
+            setAnswer(opt.trim());
+          }
+        };
+        return (
+          <div className="qc-field">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <label className="qc-label" style={{ marginBottom: 0 }}>Answer Options</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {options.length < 6 && (
+                  <button
+                    className="qc-btn qc-btn-ghost"
+                    style={{ padding: '4px 10px', fontSize: 11 }}
+                    onClick={() => setOptions(prev => [...prev, ''])}
+                  >
+                    + Add Option
+                  </button>
+                )}
+                {options.length > 2 && (
+                  <button
+                    className="qc-btn qc-btn-ghost"
+                    style={{ padding: '4px 10px', fontSize: 11, color: 'var(--color-danger)' }}
+                    onClick={() => {
+                      setOptions(prev => {
+                        const next = prev.slice(0, -1);
+                        // If deleted option was selected, clear it from answer
+                        const deletedVal = prev[prev.length - 1];
+                        if (deletedVal && deletedVal.trim()) {
+                          if (type === 'MULTIPLE_SELECT') {
+                            const selected = answer ? answer.split('|') : [];
+                            setAnswer(selected.filter(x => x !== deletedVal.trim()).join('|'));
+                          } else if (answer === deletedVal.trim()) {
+                            setAnswer('');
+                          }
+                        }
+                        return next;
+                      });
+                    }}
+                  >
+                    - Remove Option
+                  </button>
+                )}
               </div>
-              <input
-                className="qc-input"
-                placeholder={`Option ${['A', 'B', 'C', 'D'][i]}`}
-                value={opt}
-                onChange={(e) => updateOption(i, e.target.value)}
-                style={{ marginBottom: 0 }}
-              />
             </div>
-          ))}
-          <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-            Click the letter circle to mark the correct answer
-          </p>
-          {answer && <p style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 4 }}>✓ Correct answer: {answer}</p>}
-          {err('options')}
-          {err('answer')}
-        </div>
-      )}
+            {options.map((opt, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: type === 'MULTIPLE_SELECT' ? '4px' : '50%',
+                  background: isCorrect(opt) ? 'var(--color-primary)' : 'var(--color-bg)',
+                  border: '1.5px solid var(--color-border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700,
+                  color: isCorrect(opt) ? '#fff' : 'var(--color-text-muted)',
+                  flexShrink: 0,
+                  cursor: opt.trim() ? 'pointer' : 'default',
+                }}
+                  onClick={() => toggleCorrect(opt)}
+                  title={type === 'MULTIPLE_SELECT' ? 'Click to toggle correct answer' : 'Click to set as correct answer'}
+                >
+                  {letters[i] || i + 1}
+                </div>
+                <input
+                  className="qc-input"
+                  placeholder={`Option ${letters[i] || i + 1}`}
+                  value={opt}
+                  onChange={(e) => updateOption(i, e.target.value)}
+                  style={{ marginBottom: 0 }}
+                />
+              </div>
+            ))}
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              {type === 'MULTIPLE_SELECT'
+                ? 'Click option letters to toggle all correct answers (multiple select)'
+                : 'Click option letter to mark the single correct answer'}
+            </p>
+            {answer && <p style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 4 }}>✓ Correct answer(s): {answer.split('|').join(', ')}</p>}
+            {err('options')}
+            {err('answer')}
+          </div>
+        );
+      })()}
 
       {/* True / False */}
       {type === 'TRUE_FALSE' && (

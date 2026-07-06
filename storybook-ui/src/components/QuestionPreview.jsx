@@ -21,12 +21,15 @@ export function QuestionPreview({ question, onBack }) {
   const renderPreview = () => {
     switch (question.type) {
       case 'MCQ':
+      case 'SINGLE_SELECT':
+      case 'MULTIPLE_SELECT':
         return (
           <MCQQuestion
             question={question.text}
             options={question.options || []}
             correctAnswer={question.answer}
             mode="preview"
+            type={question.type}
           />
         );
       case 'TRUE_FALSE':

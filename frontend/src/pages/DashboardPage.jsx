@@ -4,7 +4,9 @@ import Layout from '../components/Layout';
 import { questionsAPI } from '../services/api';
 
 const TYPE_LABELS = {
-  MCQ: { label: 'MCQ', color: '#4f6ef7', bg: '#eef1fe' },
+  SINGLE_SELECT: { label: 'Multiple Choice (Single)', color: '#4f6ef7', bg: '#eef1fe' },
+  MULTIPLE_SELECT: { label: 'Multiple Choice (Multiple)', color: '#3b82f6', bg: '#dbeafe' },
+  MCQ: { label: 'MCQ (Legacy)', color: '#4f6ef7', bg: '#eef1fe' },
   TRUE_FALSE: { label: 'True / False', color: '#22c55e', bg: '#f0fdf4' },
   CONSTRUCTED_RESPONSE: { label: 'Constructed Response', color: '#7c3aed', bg: '#f5f3ff' },
   DROPDOWN: { label: 'Dropdown', color: '#0e7490', bg: '#ecfeff' },
@@ -14,7 +16,7 @@ const TYPE_LABELS = {
   FILL_IN_BLANK: { label: 'Fill in Blank', color: '#9ca3af', bg: '#f9fafb' },
 };
 
-const ACTIVE_TYPES = ['MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES'];
+const ACTIVE_TYPES = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES'];
 
 const DIFFICULTY_COLORS = {
   easy: { color: '#15803d', bg: '#f0fdf4' },
@@ -242,9 +244,19 @@ export default function DashboardPage() {
                     <button
                       onClick={() => handleDeleteClick(q.id, q.text)}
                       disabled={deleting === q.id}
-                      style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #fecaca', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)' }}
+                      style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Delete"
-                    >🗑</button>
+                    >
+                      {deleting === q.id ? '...' : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18"/>
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                          <line x1="10" x2="10" y1="11" y2="17"/>
+                          <line x1="14" x2="14" y1="11" y2="17"/>
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
               );

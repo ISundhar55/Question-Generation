@@ -345,14 +345,23 @@ export default function SyllabusPage() {
                         onClick={() => handleDeleteClick(s.id, s.filename)}
                         disabled={deleting === s.id}
                         style={{
-                          padding: '5px 10px', borderRadius: 6,
-                          border: '1px solid #fecaca', background: 'transparent',
+                          padding: '6px 10px', borderRadius: 6,
+                          border: '1px solid var(--color-border)', background: 'transparent',
                           fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)',
                           transition: 'all 0.12s',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
                         }}
                         title="Delete syllabus"
                       >
-                        {deleting === s.id ? '...' : '🗑'}
+                        {deleting === s.id ? '...' : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                            <line x1="10" x2="10" y1="11" y2="17"/>
+                            <line x1="14" x2="14" y1="11" y2="17"/>
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </div>
