@@ -1,0 +1,4 @@
+# Generated at runtime — do not commit these files
+faiss.index
+metadata.json
+prompt_logs/

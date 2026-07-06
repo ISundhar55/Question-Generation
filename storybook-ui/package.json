@@ -1,0 +1,22 @@
+{
+  "name": "question-storybook-ui",
+  "version": "1.0.0",
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "build": "vite build"
+  },
+  "main": "src/components/index.js",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@storybook/addon-essentials": "^8.2.9",
+    "@storybook/react": "^8.2.9",
+    "@storybook/react-vite": "^8.2.9",
+    "@vitejs/plugin-react": "^4.3.1",
+    "storybook": "^8.2.9",
+    "vite": "^5.3.5"
+  }
+}

@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Storybook build / build artifacts
+dist/
+storybook-static/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
