@@ -275,7 +275,7 @@ export default function AIGeneratePage() {
             <textarea
               id="ai-custom-prompt"
               rows={4}
-              placeholder={`Examples:\n• Give 5 options for MCQ instead of 4\n• Include the word "photosynthesis"\n• Focus on Chapter 3 diagrams`}
+              placeholder={`Examples:\n• Give 5 options for MCQ instead of 4\n• Include the word "photosynthesis"\n• Focus on Chapter 3`}
               value={customPrompt}
               onChange={e => setCustomPrompt(e.target.value)}
               style={{
