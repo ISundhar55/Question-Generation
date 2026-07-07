@@ -481,6 +481,50 @@ def normalize_question(q: dict) -> dict:
         if isinstance(ans, str):
             q["answer"] = ans.strip().upper()
 
+    # 4. Repair CONSTRUCTED_RESPONSE mismatch (more answers than "___" blanks in text)
+    elif q.get("questionType") == "CONSTRUCTED_RESPONSE":
+        text = q.get("text", "")
+        # Get primary answer strings
+        answers_list = []
+        options = q.get("options")
+        if isinstance(options, dict) and "answers" in options:
+            raw_answers = options["answers"]
+            if isinstance(raw_answers, list):
+                for ans in raw_answers:
+                    if isinstance(ans, list):
+                        answers_list.append(str(ans[0]).strip() if ans else "")
+                    else:
+                        answers_list.append(str(ans).strip())
+        
+        if not answers_list and q.get("answer"):
+            answers_list = [a.strip() for a in q["answer"].split("|") if a.strip()]
+
+        blank_count = text.count("___")
+        ans_count = len(answers_list)
+
+        if ans_count > blank_count:
+            # We have more answers than blanks! Search and replace extra answer words with "___"
+            parts = text.split("___")
+            last_part = parts[-1]
+            repaired_last_part = last_part
+            
+            for idx in range(blank_count, ans_count):
+                ans_word = answers_list[idx]
+                if not ans_word:
+                    continue
+                # Match full word/phrase case-insensitively using regex
+                escaped = re.escape(ans_word)
+                pattern = re.compile(rf"\b{escaped}\b", re.IGNORECASE)
+                
+                match = pattern.search(repaired_last_part)
+                if match:
+                    start_idx, end_idx = match.span()
+                    repaired_last_part = repaired_last_part[:start_idx] + "___" + repaired_last_part[end_idx:]
+                    
+            # Reassemble the text
+            new_text = "___".join(parts[:-1]) + "___" + repaired_last_part if len(parts) > 1 else repaired_last_part
+            q["text"] = new_text
+
     return q
 
 
