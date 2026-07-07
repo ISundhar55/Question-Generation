@@ -227,6 +227,25 @@ IMPORTANT for MATCHING_LINES:
 - Every left key must have exactly one matching right key.
 - The answer field must list all pairs in order, e.g. "A-2, B-4, C-1, D-3".
 - All items must be drawn strictly from the syllabus excerpts — no invented content.""",
+
+    "ORDERING": """Each question object must follow this exact format:
+{
+  "questionType": "ORDERING",
+  "difficulty": "<difficulty>",
+  "contentArea": "<content_area>",
+  "grade": "<grade>",
+  "text": "<instruction/stem, e.g. Put these steps of the scientific method in the correct sequence:>",
+  "options": ["<shuffled/incorrect ordered option 1>", "<shuffled/incorrect ordered option 2>", "<shuffled/incorrect ordered option 3>", "<shuffled/incorrect ordered option 4>"],
+  "answer": "<pipe-separated correct sequence of options, in correct order, e.g. Option 3|Option 2|Option 1>",
+  "explanation": "<brief explanation of the correct sequence using only syllabus content>",
+  "sourceChunkIds": [<list of chunk_id integers used>]
+}
+
+IMPORTANT for ORDERING:
+- Provide 3 to 6 options in the options array.
+- The options array MUST be in a shuffled/incorrect order.
+- The answer field MUST consist of all the options strings exactly as written, sorted in their correct sequence, joined by a pipe (|). E.g. "Step A|Step B|Step C".
+- All options must be drawn strictly from the syllabus excerpts — no invented content.""",
 }
 
 
@@ -468,6 +487,8 @@ def normalize_question(q: dict) -> dict:
         q["questionType"] = "DROPDOWN"
     elif q_type in ["MATCHING_LINES", "MATCHING"]:
         q["questionType"] = "MATCHING_LINES"
+    elif q_type in ["ORDERING", "ORDER", "SEQUENCE"]:
+        q["questionType"] = "ORDERING"
 
     # 2. Normalize answer representation for MULTIPLE_SELECT (comma/space -> pipes, sorted)
     if q.get("questionType") == "MULTIPLE_SELECT":
@@ -526,6 +547,24 @@ def normalize_question(q: dict) -> dict:
             # Reassemble the text
             new_text = "___".join(parts[:-1]) + "___" + repaired_last_part if len(parts) > 1 else repaired_last_part
             q["text"] = new_text
+
+    # 5. Normalize options and answers for ORDERING questions
+    elif q.get("questionType") == "ORDERING":
+        opts = q.get("options")
+        if isinstance(opts, dict):
+            q["options"] = list(opts.values())
+        elif not isinstance(opts, list):
+            q["options"] = []
+        q["options"] = [str(x).strip() for x in q["options"] if x is not None]
+
+        ans = q.get("answer")
+        if isinstance(ans, list):
+            q["answer"] = "|".join([str(x).strip() for x in ans if x is not None])
+        elif isinstance(ans, str):
+            if "," in ans and "|" not in ans:
+                q["answer"] = "|".join([x.strip() for x in ans.split(",")])
+            else:
+                q["answer"] = ans.strip()
 
     return q
 

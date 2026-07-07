@@ -1,5 +1,11 @@
 import { useState } from 'react';
 import './styles.css';
+import { McqEditor } from './McqEditor';
+import { TrueFalseEditor } from './TrueFalseEditor';
+import { ConstructedResponseEditor } from './ConstructedResponseEditor';
+import { DropdownEditor } from './DropdownEditor';
+import { MatchingLinesEditor } from './MatchingLinesEditor';
+import { OrderingEditor } from './OrderingEditor';
 
 const QUESTION_TYPES = [
   { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', badge: 'qc-badge-mcq' },
@@ -8,6 +14,7 @@ const QUESTION_TYPES = [
   { value: 'CONSTRUCTED_RESPONSE', label: 'Constructed Response', badge: 'qc-badge-cr' },
   { value: 'DROPDOWN', label: 'Dropdown', badge: 'qc-badge-dd' },
   { value: 'MATCHING_LINES', label: 'Matching Lines', badge: 'qc-badge-ml' },
+  { value: 'ORDERING', label: 'Ordering', badge: 'qc-badge-ord' },
 ];
 
 const DEFAULT_MCQ_OPTIONS = ['', '', '', ''];
@@ -69,6 +76,12 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
     initialData?.options?.right || { '1': '', '2': '', '3': '', '4': '' }
   );
   const [matchAnswer, setMatchAnswer] = useState(initialData?.answer || '');
+  const [correctOrder, setCorrectOrder] = useState(() => {
+    if (initialData?.type === 'ORDERING' && initialData?.answer) {
+      return initialData.answer.split('|').map(s => s.trim());
+    }
+    return [];
+  });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -76,24 +89,6 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
   const blankCount = (text.match(/___/g) || []).length;
   const effectiveDdBlanks = Array.from({ length: Math.max(blankCount, 1) }, (_, i) => ddBlanks[i] || { choices: '', correct: '' });
   const effectiveCrBlanks = Array.from({ length: Math.max(blankCount, 1) }, (_, i) => crBlanks[i] || { correct: '', acceptable: '' });
-
-  const updateDdBlank = (i, field, val) => {
-    setDdBlanks(prev => {
-      const next = [...prev];
-      while (next.length <= i) next.push({ choices: '', correct: '' });
-      next[i] = { ...next[i], [field]: val };
-      return next;
-    });
-  };
-
-  const updateCrBlank = (i, field, val) => {
-    setCrBlanks(prev => {
-      const next = [...prev];
-      while (next.length <= i) next.push({ correct: '', acceptable: '' });
-      next[i] = { ...next[i], [field]: val };
-      return next;
-    });
-  };
 
   const validate = () => {
     const e = {};
@@ -122,6 +117,10 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
       if (leftFilled < 2) e.matchLeft = 'Please fill in at least 2 left-column items';
       if (rightFilled < 2) e.matchRight = 'Please fill in at least 2 right-column items';
       if (!matchAnswer.trim()) e.answer = 'Please enter the correct matches (e.g. A-1, B-2, C-3, D-4)';
+    }
+    if (type === 'ORDERING') {
+      const filled = options.filter(o => o.trim());
+      if (filled.length < 3) e.options = 'At least 3 options are required';
     }
     return e;
   };
@@ -165,6 +164,16 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
       const right = Object.fromEntries(Object.entries(matchRight).filter(([, v]) => v.trim()));
       return { type, text, options: { left, right }, answer: matchAnswer.trim(), difficulty, points };
     }
+    if (type === 'ORDERING') {
+      const validOptions = options.filter(o => o.trim());
+      let finalOrder = correctOrder.filter(item => validOptions.includes(item));
+      validOptions.forEach(opt => {
+        if (!finalOrder.includes(opt)) {
+          finalOrder.push(opt);
+        }
+      });
+      return { type, text, options: validOptions, answer: finalOrder.join('|'), difficulty, points };
+    }
   };
 
   const handleSave = async () => {
@@ -185,9 +194,19 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
   };
 
   const updateOption = (i, val) => {
+    const oldVal = options[i];
     const next = [...options];
     next[i] = val;
     setOptions(next);
+
+    if (type === 'ORDERING') {
+      setCorrectOrder(prev => {
+        if (prev.length === 0) {
+          return next.filter(o => o.trim());
+        }
+        return prev.map(item => item === oldVal ? val : item);
+      });
+    }
   };
 
   const err = (field) => errors[field] && (
@@ -255,122 +274,25 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
       )}
 
       {/* MCQ / Choice Options */}
-      {(type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT' || type === 'MCQ') && (() => {
-        const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
-        const isCorrect = (opt) => {
-          if (!opt || !opt.trim()) return false;
-          if (type === 'MULTIPLE_SELECT') {
-            return answer.split('|').map(s => s.trim()).includes(opt.trim());
-          }
-          return answer.trim() === opt.trim();
-        };
-        const toggleCorrect = (opt) => {
-          if (!opt || !opt.trim()) return;
-          if (type === 'MULTIPLE_SELECT') {
-            const selected = answer ? answer.split('|').map(s => s.trim()) : [];
-            if (selected.includes(opt.trim())) {
-              setAnswer(selected.filter(x => x !== opt.trim()).join('|'));
-            } else {
-              setAnswer([...selected, opt.trim()].join('|'));
-            }
-          } else {
-            setAnswer(opt.trim());
-          }
-        };
-        return (
-          <div className="qc-field">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <label className="qc-label" style={{ marginBottom: 0 }}>Answer Options</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {options.length < 6 && (
-                  <button
-                    className="qc-btn qc-btn-ghost"
-                    style={{ padding: '4px 10px', fontSize: 11 }}
-                    onClick={() => setOptions(prev => [...prev, ''])}
-                  >
-                    + Add Option
-                  </button>
-                )}
-                {options.length > 2 && (
-                  <button
-                    className="qc-btn qc-btn-ghost"
-                    style={{ padding: '4px 10px', fontSize: 11, color: 'var(--color-danger)' }}
-                    onClick={() => {
-                      setOptions(prev => {
-                        const next = prev.slice(0, -1);
-                        // If deleted option was selected, clear it from answer
-                        const deletedVal = prev[prev.length - 1];
-                        if (deletedVal && deletedVal.trim()) {
-                          if (type === 'MULTIPLE_SELECT') {
-                            const selected = answer ? answer.split('|') : [];
-                            setAnswer(selected.filter(x => x !== deletedVal.trim()).join('|'));
-                          } else if (answer === deletedVal.trim()) {
-                            setAnswer('');
-                          }
-                        }
-                        return next;
-                      });
-                    }}
-                  >
-                    - Remove Option
-                  </button>
-                )}
-              </div>
-            </div>
-            {options.map((opt, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: type === 'MULTIPLE_SELECT' ? '4px' : '50%',
-                  background: isCorrect(opt) ? 'var(--color-primary)' : 'var(--color-bg)',
-                  border: '1.5px solid var(--color-border)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700,
-                  color: isCorrect(opt) ? '#fff' : 'var(--color-text-muted)',
-                  flexShrink: 0,
-                  cursor: opt.trim() ? 'pointer' : 'default',
-                }}
-                  onClick={() => toggleCorrect(opt)}
-                  title={type === 'MULTIPLE_SELECT' ? 'Click to toggle correct answer' : 'Click to set as correct answer'}
-                >
-                  {letters[i] || i + 1}
-                </div>
-                <input
-                  className="qc-input"
-                  placeholder={`Option ${letters[i] || i + 1}`}
-                  value={opt}
-                  onChange={(e) => updateOption(i, e.target.value)}
-                  style={{ marginBottom: 0 }}
-                />
-              </div>
-            ))}
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-              {type === 'MULTIPLE_SELECT'
-                ? 'Click option letters to toggle all correct answers (multiple select)'
-                : 'Click option letter to mark the single correct answer'}
-            </p>
-            {answer && <p style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 4 }}>✓ Correct answer(s): {answer.split('|').join(', ')}</p>}
-            {err('options')}
-            {err('answer')}
-          </div>
-        );
-      })()}
+      {(type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT' || type === 'MCQ') && (
+        <McqEditor
+          type={type}
+          options={options}
+          setOptions={setOptions}
+          answer={answer}
+          setAnswer={setAnswer}
+          updateOption={updateOption}
+          err={err}
+        />
+      )}
 
       {/* True / False */}
       {type === 'TRUE_FALSE' && (
-        <div className="qc-field">
-          <label className="qc-label">Correct Answer</label>
-          <div className="qc-tf-buttons">
-            <button
-              className={`qc-tf-btn${tfAnswers === 'true' ? ' selected-true' : ''}`}
-              onClick={() => setTfAnswers('true')}
-            >✓ True</button>
-            <button
-              className={`qc-tf-btn${tfAnswers === 'false' ? ' selected-false' : ''}`}
-              onClick={() => setTfAnswers('false')}
-            >✗ False</button>
-          </div>
-          {err('answer')}
-        </div>
+        <TrueFalseEditor
+          answer={tfAnswers}
+          setAnswer={setTfAnswers}
+          err={err}
+        />
       )}
 
       {/* Short Answer */}
@@ -389,143 +311,47 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
 
       {/* Fill in the Blank answers — CONSTRUCTED_RESPONSE */}
       {type === 'CONSTRUCTED_RESPONSE' && (
-        <div className="qc-field">
-          <label className="qc-label">Blank Responses</label>
-          {blankCount === 0 && (
-            <p style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 8 }}>
-              Add at least one ___ blank to your question text above.
-            </p>
-          )}
-          {effectiveCrBlanks.map((blank, i) => (
-            <div key={i} style={{ border: '1.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 10, background: '#fafbfc' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 }}>Blank {i + 1}</div>
-
-              <div style={{ marginBottom: 6 }}>
-                <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Correct Answer</label>
-                <input
-                  className="qc-input"
-                  placeholder="e.g. Paris"
-                  style={{ marginBottom: 0 }}
-                  value={blank.correct}
-                  onChange={(e) => updateCrBlank(i, 'correct', e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Acceptable Alternatives (comma-separated)</label>
-                <input
-                  className="qc-input"
-                  placeholder="e.g. capital of France, city of light"
-                  style={{ marginBottom: 0 }}
-                  value={blank.acceptable}
-                  onChange={(e) => updateCrBlank(i, 'acceptable', e.target.value)}
-                />
-              </div>
-            </div>
-          ))}
-          {err('answer')}
-        </div>
+        <ConstructedResponseEditor
+          text={text}
+          crBlanks={crBlanks}
+          setCrBlanks={setCrBlanks}
+          err={err}
+        />
       )}
 
       {/* DROPDOWN — per-blank choices + correct answer */}
       {type === 'DROPDOWN' && (
-        <div className="qc-field">
-          <label className="qc-label">Blank Options</label>
-          {blankCount === 0 && (
-            <p style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 8 }}>
-              Add at least one ___ blank to your question text above.
-            </p>
-          )}
-          {effectiveDdBlanks.map((blank, i) => (
-            <div key={i} style={{ border: '1.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 10, background: '#fafbfc' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 }}>Blank {i + 1}</div>
-              <div style={{ marginBottom: 6 }}>
-                <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Choices (comma-separated)</label>
-                <input
-                  className="qc-input"
-                  placeholder="e.g. mitochondria, nucleus, ribosome, vacuole"
-                  style={{ marginBottom: 0 }}
-                  value={blank.choices}
-                  onChange={e => updateDdBlank(i, 'choices', e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Correct Answer (must match one choice exactly)</label>
-                <input
-                  className="qc-input"
-                  placeholder="e.g. mitochondria"
-                  style={{ marginBottom: 0 }}
-                  value={blank.correct}
-                  onChange={e => updateDdBlank(i, 'correct', e.target.value)}
-                />
-              </div>
-            </div>
-          ))}
-          {err('answer')}
-        </div>
+        <DropdownEditor
+          text={text}
+          ddBlanks={ddBlanks}
+          setDdBlanks={setDdBlanks}
+          err={err}
+        />
       )}
 
       {/* Matching Lines */}
       {type === 'MATCHING_LINES' && (
-        <>
-          {/* Stem label override */}
-          <div className="qc-field">
-            <label className="qc-label">Stem / Instruction</label>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-              The instruction shown above the two columns, e.g. &ldquo;Match each item in Column A with Column B&rdquo;
-            </p>
-          </div>
+        <MatchingLinesEditor
+          matchLeft={matchLeft}
+          setMatchLeft={setMatchLeft}
+          matchRight={matchRight}
+          setMatchRight={setMatchRight}
+          matchAnswer={matchAnswer}
+          setMatchAnswer={setMatchAnswer}
+          err={err}
+        />
+      )}
 
-          {/* Two-column inputs */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
-            {/* Left column */}
-            <div className="qc-field" style={{ marginBottom: 0 }}>
-              <label className="qc-label" style={{ color: '#0891b2' }}>Column A (Left Items)</label>
-              {['A', 'B', 'C', 'D'].map(key => (
-                <input
-                  key={key}
-                  className="qc-input"
-                  placeholder={`A${key === 'A' ? ' — e.g. Numerator' : key === 'B' ? ' — e.g. Denominator' : ''}`}
-                  style={{ marginBottom: 6 }}
-                  value={matchLeft[key]}
-                  onChange={e => setMatchLeft(prev => ({ ...prev, [key]: e.target.value }))}
-                />
-              ))}
-              {err('matchLeft')}
-            </div>
-
-            {/* Right column */}
-            <div className="qc-field" style={{ marginBottom: 0 }}>
-              <label className="qc-label" style={{ color: '#6b7280' }}>Column B (Right Items)</label>
-              {['1', '2', '3', '4'].map(key => (
-                <input
-                  key={key}
-                  className="qc-input"
-                  placeholder={`${key} — e.g. Top number`}
-                  style={{ marginBottom: 6 }}
-                  value={matchRight[key]}
-                  onChange={e => setMatchRight(prev => ({ ...prev, [key]: e.target.value }))}
-                />
-              ))}
-              {err('matchRight')}
-            </div>
-          </div>
-
-          {/* Answer key */}
-          <div className="qc-field">
-            <label className="qc-label">Correct Matches</label>
-            <input
-              className="qc-input"
-              placeholder="e.g. A-1, B-3, C-2, D-4"
-              value={matchAnswer}
-              onChange={e => setMatchAnswer(e.target.value)}
-            />
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-              Format: Left letter – Right number, comma-separated (e.g. A-2, B-1, C-4, D-3)
-            </p>
-            {err('answer')}
-          </div>
-        </>
+      {/* Ordering */}
+      {type === 'ORDERING' && (
+        <OrderingEditor
+          options={options}
+          setOptions={setOptions}
+          correctOrder={correctOrder}
+          setCorrectOrder={setCorrectOrder}
+          updateOption={updateOption}
+          err={err}
+        />
       )}
 
       {/* Meta: Difficulty + Points */}

@@ -11,12 +11,13 @@ const TYPE_LABELS = {
   CONSTRUCTED_RESPONSE: { label: 'Constructed Response', color: '#7c3aed', bg: '#f5f3ff' },
   DROPDOWN: { label: 'Dropdown', color: '#0e7490', bg: '#ecfeff' },
   MATCHING_LINES: { label: 'Matching Lines', color: '#0891b2', bg: '#ecfeff' },
+  ORDERING: { label: 'Ordering', color: '#db2777', bg: '#fdf2f8' },
   // Legacy / Hidden types (still supported for rendering existing data):
   SHORT_ANSWER: { label: 'Short Answer', color: '#f59e0b', bg: '#fffbeb' },
   FILL_IN_BLANK: { label: 'Fill in Blank', color: '#9ca3af', bg: '#f9fafb' },
 };
 
-const ACTIVE_TYPES = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES'];
+const ACTIVE_TYPES = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING'];
 
 const DIFFICULTY_COLORS = {
   easy: { color: '#15803d', bg: '#f0fdf4' },
@@ -174,7 +175,7 @@ export default function DashboardPage() {
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'clip', boxShadow: 'var(--shadow)', width: '100%', minWidth: 0 }}>
         {/* Table Header — always visible, never scrolls */}
         <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 150px 110px 72px 80px',
+          display: 'grid', gridTemplateColumns: '1fr 140px 100px 60px 70px 80px',
           padding: '12px 20px', background: '#f8f9fb',
           borderBottom: '1px solid var(--color-border)',
           fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
@@ -184,6 +185,7 @@ export default function DashboardPage() {
           <span>Type</span>
           <span>Difficulty</span>
           <span>Points</span>
+          <span>Preview</span>
           <span>Actions</span>
         </div>
 
@@ -209,7 +211,7 @@ export default function DashboardPage() {
                 <div
                   key={q.id}
                   style={{
-                    display: 'grid', gridTemplateColumns: '1fr 150px 110px 72px 80px',
+                    display: 'grid', gridTemplateColumns: '1fr 140px 100px 60px 70px 80px',
                     padding: '14px 20px', alignItems: 'center',
                     borderBottom: i < paged.length - 1 ? '1px solid var(--color-border)' : 'none',
                     transition: 'background 0.1s',
@@ -234,6 +236,37 @@ export default function DashboardPage() {
                   </div>
                   <div style={{ fontSize: 14, color: 'var(--color-text-muted)', fontWeight: 600 }}>
                     {q.points} pt{q.points !== 1 ? 's' : ''}
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => navigate(`/edit/${q.id}`, { state: { startInPreview: true } })}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid var(--color-border)',
+                        background: 'transparent',
+                        fontSize: 14,
+                        cursor: 'pointer',
+                        color: 'var(--color-text-muted)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#eef2ff';
+                        e.currentTarget.style.borderColor = 'var(--color-primary-light)';
+                        e.currentTarget.style.color = 'var(--color-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.borderColor = 'var(--color-border)';
+                        e.currentTarget.style.color = 'var(--color-text-muted)';
+                      }}
+                      title="Preview question"
+                    >
+                      👁️
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button

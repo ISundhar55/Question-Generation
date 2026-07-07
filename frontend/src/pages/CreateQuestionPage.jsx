@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { questionsAPI } from '../services/api';
 
@@ -9,9 +9,10 @@ import { QuestionCreator, QuestionPreview } from 'question-storybook-ui';
 export default function CreateQuestionPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEditing = Boolean(id);
 
-  const [mode, setMode] = useState('create'); // 'create' | 'preview'
+  const [mode, setMode] = useState(location.state?.startInPreview ? 'preview' : 'create'); // 'create' | 'preview'
   const [previewData, setPreviewData] = useState(null);
   const [initialData, setInitialData] = useState(null);
   const [loadingEdit, setLoadingEdit] = useState(isEditing);
@@ -22,10 +23,13 @@ export default function CreateQuestionPage() {
   useEffect(() => {
     if (!isEditing) return;
     questionsAPI.getById(id)
-      .then(res => setInitialData(res.data))
+      .then(res => {
+        setInitialData(res.data);
+        setPreviewData(res.data);
+      })
       .catch(() => { setErrorMsg('Failed to load question'); })
       .finally(() => setLoadingEdit(false));
-  }, [id]);
+  }, [id, isEditing]);
 
   const handleSave = async (payload) => {
     setErrorMsg('');

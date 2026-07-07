@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Union
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ class GenerateRequest(BaseModel):
     chapter: Optional[str] = Field(None, description="Optional chapter filter, e.g. Fractions")
     question_type: str = Field(
         ...,
-        description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES"
+        description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING"
     )
     difficulty: str = Field(..., description="easy | medium | hard")
     count: int = Field(..., ge=1, le=20, description="Number of questions (1-20)")
@@ -61,7 +61,7 @@ class QuestionResult(BaseModel):
     grade: str
     chapter: Optional[str] = None    # Chapter filter used during generation
     text: str
-    options: Optional[dict] = None   # Only for SINGLE_SELECT or MULTIPLE_SELECT: {"A": "...", "B": "...", ...}
+    options: Optional[Union[dict, list]] = None   # Dictionary for MCQ/CR/DD/ML, List for ORDERING
     answer: str
     explanation: str
     sourceChunkIds: list[int]
@@ -89,7 +89,7 @@ class DeleteResponse(BaseModel):
 class RegenerateRequest(BaseModel):
     content_area: str = Field(..., description="e.g. Science")
     grade: str = Field(..., description="e.g. Grade 6")
-    question_type: str = Field(..., description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | ...")
+    question_type: str = Field(..., description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING")
     difficulty: str = Field(..., description="easy | medium | hard")
     original_question: dict = Field(..., description="The full original question JSON object")
     modification_instructions: str = Field(

@@ -54,7 +54,7 @@ const generateQuestions = async (req, res) => {
       });
     }
 
-    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES'];
+    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING'];
     const validDifficulties = ['easy', 'medium', 'hard'];
 
     if (!validTypes.includes(question_type)) {
@@ -120,7 +120,7 @@ const regenerateQuestion = async (req, res) => {
       normalizedType = 'MULTIPLE_SELECT';
     }
 
-    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES'];
+    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING'];
     if (!validTypes.includes(normalizedType)) {
       return res.status(400).json({ message: `Invalid question_type. Must be one of: ${validTypes.join(', ')}` });
     }

@@ -14,6 +14,7 @@ const QUESTION_TYPES = [
   { value: 'CONSTRUCTED_RESPONSE', label: 'Constructed Response', icon: '✏️', desc: 'Type the answer for each blank' },
   { value: 'DROPDOWN', label: 'Dropdown', icon: '📋', desc: 'Select answer for each blank from a list' },
   { value: 'MATCHING_LINES', label: 'Matching Lines', icon: '🔗', desc: 'Match Column A items to Column B' },
+  { value: 'ORDERING', label: 'Ordering', icon: '↕️', desc: 'Drag options to place them in correct order' },
 ];
 
 const DIFFICULTIES = [
@@ -32,6 +33,7 @@ const TYPE_META = {
   CONSTRUCTED_RESPONSE: { color: '#7c3aed', bg: '#f5f3ff' },
   DROPDOWN: { color: '#0e7490', bg: '#ecfeff' },
   MATCHING_LINES: { color: '#0891b2', bg: '#ecfeff' },
+  ORDERING: { color: '#db2777', bg: '#fdf2f8' },
 };
 
 /** Parse "A-2, B-4, C-1, D-3" → { A: '2', B: '4', C: '1', D: '3' } */
@@ -582,6 +584,38 @@ export default function AIGeneratePage() {
                                     </div>
                                   );
                                 })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Ordering preview */}
+                    {q.questionType === 'ORDERING' && Array.isArray(q.options) && (() => {
+                      const correct = q.answer ? q.answer.split('|').map(s => s.trim()) : [];
+                      return (
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 400, marginBottom: 12 }}>
+                            {q.options.map((opt, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#fff' }}>
+                                <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>{i + 1}</span>
+                                <span style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500 }}>{opt}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {correct.length > 0 && (
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Correct Order Key</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                {correct.map((item, i) => (
+                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ fontSize: 12, padding: '4px 10px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 20, color: '#db2777', fontWeight: 600 }}>
+                                      {i + 1}. {item}
+                                    </span>
+                                    {i < correct.length - 1 && <span style={{ color: '#db2777', opacity: 0.5 }}>➔</span>}
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           )}
