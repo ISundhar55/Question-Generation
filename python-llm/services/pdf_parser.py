@@ -41,7 +41,10 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
     for i, page in enumerate(doc):
         page_num = i + 1
         
-        # Check if the page contains images or tables
+        # Extract local text first (takes < 5ms)
+        local_text = (page.get_text() or "").strip()
+        
+        # Check if the page contains images or tables (for scanned OCR fallback)
         has_images = len(page.get_images()) > 0
         has_tables = False
         try:
@@ -49,14 +52,15 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         except Exception:
             pass
             
-        if not has_images and not has_tables:
-            # Plain text page: extract text locally in milliseconds
-            print(f"[pdf_parser] Page {page_num}/{len(doc)} is plain text. Extracted locally.")
-            page_text = page.get_text() or ""
-            pages.append(page_text)
+        # We only fall back to Gemini multimodal OCR if the page has no extractable text
+        # (scanned PDF page) but contains visual contents (images/tables).
+        is_scanned_ocr = len(local_text) < 150 and (has_images or has_tables)
+        
+        if not is_scanned_ocr:
+            print(f"[pdf_parser] Page {page_num}/{len(doc)} extracted locally in milliseconds.")
+            pages.append(local_text)
         else:
-            # Layout-rich page: send to Gemini for multimodal transcription
-            print(f"[pdf_parser] Page {page_num}/{len(doc)} is rich (contains images/tables). Ingesting via Gemini...")
+            print(f"[pdf_parser] Page {page_num}/{len(doc)} has low extractable text but contains images/tables. Ingesting via Gemini Multimodal...")
             try:
                 # Render page as PNG image at 150 DPI
                 pix = page.get_pixmap(dpi=150)
@@ -67,9 +71,8 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
                 pages.append(page_text)
             except Exception as e:
                 # Fallback to local text extraction for this page
-                print(f"[pdf_parser] ⚠️ Page {page_num} multimodal failed: {e}. Falling back to plain text extraction.")
-                fallback_text = page.get_text() or ""
-                pages.append(fallback_text)
+                print(f"[pdf_parser] ⚠️ Page {page_num} multimodal failed: {e}. Falling back to local text extraction.")
+                pages.append(local_text)
             
     return "\n\n".join(pages)
 
