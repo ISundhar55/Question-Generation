@@ -2,8 +2,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 
 const navItems = [
-  { label: 'Dashboard', path: '/dashboard', icon: '⊞' },
-  { label: 'New Question', path: '/create', icon: '+' },
+  { label: 'Dashboard', path: '/dashboard', icon: '📊' },
+  { label: 'New Question', path: '/create', icon: '➕' },
   { label: 'Knowledge Base', path: '/syllabus', icon: '📚' },
   { label: 'AI Generate', path: '/ai-generate', icon: '✨' },
 ];

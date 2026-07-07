@@ -175,7 +175,9 @@ IMPORTANT for MULTIPLE_SELECT:
 
 IMPORTANT for CONSTRUCTED_RESPONSE:
 - Create 1-3 blanks using ___ in the text.
-- Each element in options.answers MUST be an array of strings representing acceptable correct answers (synonyms, alternate spellings/formats) for that blank, in order. The first string in the array is the primary correct answer.
+- Each element in options.answers MUST be an array of strings representing acceptable correct answers (synonyms, alternate spellings, abbreviations, or alternative terminology) for that blank.
+- You MUST provide at least 2-3 acceptable alternatives inside the array for EACH blank (e.g. for "central idea", include synonyms like "main idea" and "primary concept"). Do NOT return a single-item array.
+- The first string in each array is the primary correct answer.
 - The answer field must list only the primary correct answers joined with | (pipe).""",
 
     "DROPDOWN": """Each question object must follow this exact format:

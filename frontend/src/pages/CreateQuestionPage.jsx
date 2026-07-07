@@ -55,14 +55,6 @@ export default function CreateQuestionPage() {
     <Layout>
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-        <button
-          onClick={handleClose}
-          style={{
-            padding: '8px 12px', background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)', borderRadius: 8,
-            fontSize: 13, cursor: 'pointer', color: 'var(--color-text-muted)',
-          }}
-        >← Back</button>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
             {isEditing ? 'Edit Question' : 'Create Question'}

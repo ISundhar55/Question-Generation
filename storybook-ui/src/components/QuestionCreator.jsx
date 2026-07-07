@@ -210,8 +210,8 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           </p>
         </div>
         {onClose && (
-          <button className="qc-btn qc-btn-ghost" onClick={onClose} style={{ padding: '6px 14px' }}>
-            ✕ Close
+          <button className="qc-btn qc-btn-ghost" onClick={onClose} style={{ padding: '6px 10px' }}>
+            X Close
           </button>
         )}
       </div>
@@ -399,7 +399,7 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           {effectiveCrBlanks.map((blank, i) => (
             <div key={i} style={{ border: '1.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 10, background: '#fafbfc' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 }}>Blank {i + 1}</div>
-              
+
               <div style={{ marginBottom: 6 }}>
                 <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Correct Answer</label>
                 <input
