@@ -96,6 +96,7 @@ export default function AIGeneratePage() {
       setGenMeta({
         retrieved_chunk_count: res.data.retrieved_chunk_count,
         doc_ids_used: res.data.doc_ids_used,
+        ungrounded_dropped: res.data.ungrounded_dropped || 0,
       });
     } catch (err) {
       setError(err.response?.data?.message || 'Generation failed. Please check that a syllabus has been uploaded for this Content Area and Grade.');
@@ -125,7 +126,7 @@ export default function AIGeneratePage() {
 
   const saveAll = async () => {
     setSavingAll(true);
-    const unsaved = questions.filter((_, i) => !savedIds.has(i));
+    const unsaved = questions.filter((q, i) => !savedIds.has(i) && q.grounded !== false);
     for (let i = 0; i < unsaved.length; i++) {
       const q = unsaved[i];
       const idx = questions.indexOf(q);
@@ -378,22 +379,25 @@ export default function AIGeneratePage() {
               <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
                 Generated <strong style={{ color: 'var(--color-text)' }}>{questions.length}</strong> questions
                 from <strong style={{ color: 'var(--color-text)' }}>{genMeta.retrieved_chunk_count}</strong> syllabus chunks
+                {genMeta.ungrounded_dropped > 0 && (
+                  <span style={{ color: '#b91c1c', fontWeight: 600 }}> · {genMeta.ungrounded_dropped} failed validation</span>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   id="save-all-btn"
                   className="btn-save-all"
                   onClick={saveAll}
-                  disabled={savingAll || savedIds.size === questions.length}
+                  disabled={savingAll || savedIds.size === questions.filter(q => q.grounded !== false).length}
                   style={{
-                    padding: '9px 20px', background: savedIds.size === questions.length ? '#f0fdf4' : 'var(--color-primary)',
-                    border: 'none', borderRadius: 8, color: savedIds.size === questions.length ? 'var(--color-success)' : '#fff',
-                    fontSize: 13, fontWeight: 600, cursor: savingAll || savedIds.size === questions.length ? 'default' : 'pointer',
-                    boxShadow: savedIds.size === questions.length ? 'none' : '0 4px 12px rgba(79,110,247,0.25)',
+                    padding: '9px 20px', background: savedIds.size === questions.filter(q => q.grounded !== false).length ? '#f0fdf4' : 'var(--color-primary)',
+                    border: 'none', borderRadius: 8, color: savedIds.size === questions.filter(q => q.grounded !== false).length ? 'var(--color-success)' : '#fff',
+                    fontSize: 13, fontWeight: 600, cursor: savingAll || savedIds.size === questions.filter(q => q.grounded !== false).length ? 'default' : 'pointer',
+                    boxShadow: savedIds.size === questions.filter(q => q.grounded !== false).length ? 'none' : '0 4px 12px rgba(79,110,247,0.25)',
                     transition: 'all 0.15s',
                   }}
                 >
-                  {savingAll ? 'Saving...' : savedIds.size === questions.length ? '✅ All Saved' : '💾 Save All to Bank'}
+                  {savingAll ? 'Saving...' : savedIds.size === questions.filter(q => q.grounded !== false).length ? '✅ All Saved' : '💾 Save All to Bank'}
                 </button>
               </div>
             </div>
@@ -448,7 +452,14 @@ export default function AIGeneratePage() {
                   <div
                     key={idx}
                     style={{
-                      background: 'var(--color-surface)', border: `1px solid ${isSaved ? '#bbf7d0' : 'var(--color-border)'}`,
+                      background: 'var(--color-surface)',
+                      border: `1.5px solid ${
+                        isSaved
+                          ? '#bbf7d0'
+                          : q.grounded === false
+                            ? '#fca5a5'
+                            : 'var(--color-border)'
+                      }`,
                       borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)',
                       transition: 'border-color 0.2s',
                     }}
@@ -462,13 +473,31 @@ export default function AIGeneratePage() {
                       <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize' }}>
                         {q.difficulty}
                       </span>
+
+                      {/* Grounding Status badge */}
+                      {q.grounded === false ? (
+                        <span style={{
+                          display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                          background: '#fee2e2', color: '#b91c1c', border: '1px solid #fee2e2'
+                        }}>
+                          Validation Failed
+                        </span>
+                      ) : (
+                        <span style={{
+                          display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                          background: '#dcfce7', color: '#15803d', border: '1px solid #dcfce7'
+                        }}>
+                          Passed
+                        </span>
+                      )}
+
                       <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
                         {/* Source toggle */}
-                        {q.sourceChunkIds?.length > 0 && (
+                        {(q.sources?.length > 0 || q.sourceChunkIds?.length > 0) && (
                           <button
                             className="btn-chunks"
                             onClick={() => toggleSource(idx)}
-                            title="Show source chunks"
+                            title="Show exactly where this question came from"
                             style={{
                               padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
                               border: '1px solid var(--color-border)', background: src ? 'var(--color-primary-light)' : 'transparent',
@@ -476,7 +505,7 @@ export default function AIGeneratePage() {
                               transition: 'all 0.15s',
                             }}
                           >
-                            📍 Chunks {q.sourceChunkIds.join(', ')}
+                            📍 Source{q.sources?.length > 1 ? 's' : ''}
                           </button>
                         )}
                         {/* Regenerate button */}
@@ -499,14 +528,14 @@ export default function AIGeneratePage() {
                         <button
                           id={`save-q-${idx}`}
                           className="btn-save-card"
-                          onClick={() => !isSaved && saveQuestion(q, idx)}
-                          disabled={isSaved || isSaving}
+                          onClick={() => !isSaved && q.grounded !== false && saveQuestion(q, idx)}
+                          disabled={isSaved || isSaving || q.grounded === false}
                           style={{
                             padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            border: isSaved ? '1px solid #bbf7d0' : '1px solid var(--color-primary)',
-                            background: isSaved ? '#f0fdf4' : 'var(--color-primary-light)',
-                            color: isSaved ? 'var(--color-success)' : 'var(--color-primary)',
-                            cursor: isSaved ? 'default' : 'pointer', transition: 'all 0.12s',
+                            border: q.grounded === false ? '1px solid #e2e8f0' : isSaved ? '1px solid #bbf7d0' : '1px solid var(--color-primary)',
+                            background: q.grounded === false ? '#f1f5f9' : isSaved ? '#f0fdf4' : 'var(--color-primary-light)',
+                            color: q.grounded === false ? '#94a3b8' : isSaved ? 'var(--color-success)' : 'var(--color-primary)',
+                            cursor: q.grounded === false ? 'not-allowed' : isSaved ? 'default' : 'pointer', transition: 'all 0.12s',
                           }}
                         >
                           {isSaving ? '...' : isSaved ? '✅ Saved' : '💾 Save'}
@@ -731,15 +760,63 @@ export default function AIGeneratePage() {
                       )}
                     </div>
 
-                    {/* Source chunk detail (expandable) */}
-                    {src && q.sourceChunkIds?.length > 0 && (
+                    {/* Source detail (expandable): exact file + page + chapter for cross-verification */}
+                    {src && (q.sources?.length > 0 || q.sourceChunkIds?.length > 0) && (
                       <div style={{
                         marginTop: 10, padding: '10px 14px', background: '#fffbeb',
                         borderRadius: 8, border: '1px solid #fde68a', fontSize: 12,
                         color: '#92400e',
                       }}>
-                        <span style={{ fontWeight: 700 }}>Source Chunk IDs: </span>
-                        {q.sourceChunkIds.join(', ')} — these are the syllabus chunk indices used to generate this question.
+                        <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                          Source{q.sources?.length > 1 ? 's' : ''} — for cross-verification against the syllabus
+                        </div>
+                        {q.sources?.length > 0 ? (
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {q.sources.map((s, si) => (
+                              <li key={si} style={{ marginBottom: 2 }}>
+                                <strong>{s.filename}</strong>
+                                {s.page ? `, page ${s.page}` : ''}
+                                {s.chapter ? ` — ${s.chapter}` : ''}
+                                {s.chunk_type === 'image' ? ' (image)' : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span>Chunk ids: {q.sourceChunkIds.join(', ')}</span>
+                        )}
+
+                        {/* Grounding / fact-check status */}
+                        <div style={{ marginTop: 8, fontSize: 11, color: q.grounded === false ? '#b91c1c' : '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span>
+                            {q.grounded === false
+                              ? `⚠️ Flagged: ${q.groundingNote || 'not clearly supported by the cited source.'}`
+                              : '✅ Passed automated fact-check against the cited source.'}
+                          </span>
+                          {typeof q.groundingScore === 'number' && (
+                            <span style={{
+                              padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+                              background: q.groundingScore >= 0.85 ? '#dcfce7' : q.groundingScore >= 0.6 ? '#fef9c3' : '#fee2e2',
+                              color: q.groundingScore >= 0.85 ? '#15803d' : q.groundingScore >= 0.6 ? '#854d0e' : '#b91c1c',
+                            }}>
+                              {Math.round(q.groundingScore * 100)}% confidence
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Source image thumbnails, if this question drew on a diagram/chart */}
+                        {q.imageRefs?.length > 0 && (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                            {q.imageRefs.map((url, ii) => (
+                              <a key={ii} href={url} target="_blank" rel="noreferrer">
+                                <img
+                                  src={url}
+                                  alt="Source diagram/chart"
+                                  style={{ height: 90, borderRadius: 6, border: '1px solid #fde68a', display: 'block' }}
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

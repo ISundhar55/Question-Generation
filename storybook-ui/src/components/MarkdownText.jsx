@@ -91,13 +91,56 @@ export function markdownToHtml(text) {
 }
 
 function renderParagraph(text) {
-  return text
-    .split('\n')
-    .map(line => {
-      const t = line.trim();
-      return t ? `<p class="md-p">${inlineMarkdown(t)}</p>` : '';
-    })
-    .join('');
+  const lines = text.split('\n');
+  const result = [];
+  let inList = false;
+  let listType = null; // 'ul' or 'ol'
+  let listItems = [];
+
+  const closeList = () => {
+    if (inList) {
+      const itemsHtml = listItems.map(item => `<li>${inlineMarkdown(item)}</li>`).join('');
+      result.push(`<${listType} class="md-${listType}">${itemsHtml}</${listType}>`);
+      inList = false;
+      listType = null;
+      listItems = [];
+    }
+  };
+
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      closeList();
+      continue;
+    }
+
+    // Check for bullet list item: starts with '- ' or '* ' or '• '
+    const bulletMatch = line.match(/^(\s*)([-*•])\s+(.+)$/);
+    // Check for numbered list item: starts with '1. ', '2. ', etc.
+    const numberMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+
+    if (bulletMatch) {
+      if (inList && listType !== 'ul') {
+        closeList();
+      }
+      inList = true;
+      listType = 'ul';
+      listItems.push(bulletMatch[3]);
+    } else if (numberMatch) {
+      if (inList && listType !== 'ol') {
+        closeList();
+      }
+      inList = true;
+      listType = 'ol';
+      listItems.push(numberMatch[3]);
+    } else {
+      closeList();
+      result.push(`<p class="md-p">${inlineMarkdown(trimmed)}</p>`);
+    }
+  }
+  closeList();
+
+  return result.join('');
 }
 
 /**

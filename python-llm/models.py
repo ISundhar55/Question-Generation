@@ -54,6 +54,15 @@ class GenerateRequest(BaseModel):
     custom_prompt: Optional[str] = Field(None, description="Optional additional instructions for the AI")
 
 
+class SourceRef(BaseModel):
+    """Traces a generated question back to the exact file + page it came from."""
+    doc_id: str
+    filename: str
+    chapter: Optional[str] = None
+    page: Optional[int] = None
+    chunk_type: str = "text"        # "text" | "image"
+
+
 class QuestionResult(BaseModel):
     questionType: str
     difficulty: str
@@ -65,12 +74,18 @@ class QuestionResult(BaseModel):
     answer: str
     explanation: str
     sourceChunkIds: list[int]
+    sources: list[SourceRef] = []    # Resolved file/page citations for sourceChunkIds
+    imageRefs: list[str] = []        # Servable URLs for any images used as source material
+    grounded: bool = True            # Result of the post-generation fact-check layer
+    groundingScore: float = 1.0      # 0.0-1.0 confidence from the fact-check layer
+    groundingNote: Optional[str] = None
 
 
 class GenerateResponse(BaseModel):
     questions: list[QuestionResult]
     retrieved_chunk_count: int
     doc_ids_used: list[str]
+    ungrounded_dropped: int = 0      # How many candidate questions failed the grounding check
 
 
 # ---------------------------------------------------------------------------

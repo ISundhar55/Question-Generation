@@ -1,7 +1,10 @@
 """
 pdf_parser.py
 -------------
-Extracts text from PDF and DOCX files, then splits into topic-aware chunks.
+Extracts text from PDF and DOCX files, then splits into topic-aware,
+page-tagged chunks. Also extracts embedded images/diagrams/charts as
+separate retrievable "image chunks" so the app can answer picture-based
+questions and show teachers exactly which page an image came from.
 
 Chunking strategy (priority order):
   1. Topic boundary detection — split at heading patterns (Chapter, Topic,
@@ -10,70 +13,225 @@ Chunking strategy (priority order):
      with 50-token overlap.
   3. Fallback — if no headings detected, pure sliding-window 500/50.
 
-Each chunk carries: chapter, topic, text.
+Every chunk carries: chapter, topic, text, page, chunk_type ("text" | "image"),
+and (for image chunks) image_path — so every generated question can be traced
+back to an exact file + page, and image-based questions can show the source
+image inline.
 """
 
+import io
+import os
 import re
+import uuid
 from typing import Optional
 
 import docx
 import fitz
-from services.llm import transcribe_page_image
+from services.llm import transcribe_page_image, describe_image
 
 
 # ---------------------------------------------------------------------------
-# Text extraction
+# Paths
 # ---------------------------------------------------------------------------
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+IMAGES_DIR = os.path.join(DATA_DIR, "images")
+
+# Sentinel line inserted between pages so downstream chunking can recover
+# which page any given line of text came from, without restructuring the
+# heading-detection algorithm around a list-of-pages data model.
+_PAGE_MARKER_RE = re.compile(r"^<<<PAGE:(\d+)>>>$")
+
+
+def _page_marker(page_num: int) -> str:
+    return f"<<<PAGE:{page_num}>>>"
+
+
+# ---------------------------------------------------------------------------
+# Image extraction (raw image bytes are preserved on disk for later display —
+# not just described text — so a picture-based question can show its source)
+# ---------------------------------------------------------------------------
+
+# Skip tiny images (logos, bullet icons, decorative rules) — not useful for
+# picture-based questions and just adds noise to the image chunk pool.
+MIN_IMAGE_DIMENSION = 120
+
+
+def _ensure_images_dir(doc_id: str) -> str:
+    path = os.path.join(IMAGES_DIR, doc_id)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def extract_images_from_pdf(file_bytes: bytes, doc_id: str) -> list[dict]:
+    """
+    Extract meaningful embedded images from a PDF, save them to
+    data/images/{doc_id}/, and return one "image chunk" record per image:
+      {chapter, topic, text, page, chunk_type: "image", image_path}
+
+    `image_path` is a relative path (doc_id/filename.png) suitable for
+    building a servable URL — never an absolute filesystem path.
+    `text` is a short AI-generated caption used for embedding/search so the
+    image can be retrieved when a teacher asks for a diagram/chart question.
+    """
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+    out_dir = _ensure_images_dir(doc_id)
+    image_chunks: list[dict] = []
+
+    for page_index, page in enumerate(doc):
+        page_num = page_index + 1
+        seen_xrefs = set()
+
+        for img_info in page.get_images(full=True):
+            xref = img_info[0]
+            if xref in seen_xrefs:
+                continue
+            seen_xrefs.add(xref)
+
+            try:
+                base_image = doc.extract_image(xref)
+                image_bytes = base_image["image"]
+                ext = base_image.get("ext", "png")
+                width = base_image.get("width", 0)
+                height = base_image.get("height", 0)
+
+                if width < MIN_IMAGE_DIMENSION or height < MIN_IMAGE_DIMENSION:
+                    continue  # skip icons/decorative graphics
+
+                filename = f"page{page_num}_{uuid.uuid4().hex[:8]}.{ext}"
+                out_path = os.path.join(out_dir, filename)
+                with open(out_path, "wb") as f:
+                    f.write(image_bytes)
+
+                # Short caption for embedding + retrieval — not a full page
+                # transcription, just enough to make the image searchable.
+                try:
+                    caption = describe_image(image_bytes, mime_type=f"image/{ext}")
+                except Exception:
+                    caption = f"Diagram/image on page {page_num}."
+
+                image_chunks.append({
+                    "chapter": "General",       # back-filled by caller using page position
+                    "topic": "General",
+                    "text": caption,
+                    "page": page_num,
+                    "chunk_type": "image",
+                    "image_path": f"{doc_id}/{filename}",
+                })
+            except Exception as e:
+                print(f"[pdf_parser] [WARNING] Failed to extract image xref={xref} on page {page_num}: {e}")
+
+    return image_chunks
+
+
+# ---------------------------------------------------------------------------
+# Text extraction (page-tagged)
+# ---------------------------------------------------------------------------
+
+def _extract_page_text_with_tables(page) -> str:
+    """
+    Extract text from a PyMuPDF page, detecting tables and formatting them
+    as Markdown tables while removing the duplicate raw text from the table cells
+    to prevent double parsing.
+    """
+    try:
+        tables = page.find_tables()
+    except Exception as e:
+        print(f"[pdf_parser] [WARNING] Table detection failed on page: {e}")
+        return page.get_text() or ""
+
+    if not tables or not tables.tables:
+        return page.get_text() or ""
+
+    # Get all blocks (b[4] is the text content)
+    blocks = page.get_text("blocks")
+    # A block is: (x0, y0, x1, y1, "text", block_no, block_type)
+
+    table_rects = [fitz.Rect(t.bbox) for t in tables.tables]
+
+    # Filter out blocks that are substantially inside any table rect
+    non_table_blocks = []
+    for b in blocks:
+        block_rect = fitz.Rect(b[0], b[1], b[2], b[3])
+        overlaps_table = False
+        for trect in table_rects:
+            intersection = block_rect & trect
+            if not intersection.is_empty:
+                intersect_area = intersection.get_area()
+                block_area = block_rect.get_area()
+                # If block overlaps by more than 50%, skip it as duplicate table cell text
+                if block_area > 0 and (intersect_area / block_area) > 0.5:
+                    overlaps_table = True
+                    break
+        if not overlaps_table:
+            non_table_blocks.append(b)
+
+    # Combine non-table text blocks and Markdown table representations
+    # Sort them vertically by coordinate to maintain readable page layout
+    items = []
+    for b in non_table_blocks:
+        items.append((b[1], b[0], b[4].strip(), "block"))
+
+    for t in tables.tables:
+        try:
+            md_table = t.to_markdown()
+            if md_table and md_table.strip():
+                items.append((t.bbox[1], t.bbox[0], md_table.strip(), "table"))
+        except Exception as e:
+            print(f"[pdf_parser] [WARNING] Failed to convert table to markdown: {e}")
+
+    # Sort by y0 (top coordinate) then x0 (left coordinate)
+    items.sort(key=lambda x: (x[0], x[1]))
+
+    return "\n\n".join(item[2] for item in items if item[2])
+
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     """
-    Extract text from a PDF file using multimodal Gemini transcription.
-    Renders pages as images to capture tables, diagrams, and graphs.
-    Falls back to normal PyMuPDF text extraction if the API call fails.
+    Extract text from a PDF file.
+    Uses fast local extraction for normal text pages; falls back to Gemini
+    multimodal transcription only for pages with little/no extractable text
+    but visible images/tables (scanned pages, rich diagrams).
+
+    Each page's text is wrapped with a <<<PAGE:N>>> marker line so that
+    chunk_text() can tag every resulting chunk with its source page.
     """
-    import io
-    
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     pages = []
-    
+
     print(f"[pdf_parser] Processing PDF with {len(doc)} pages")
-    
+
     for i, page in enumerate(doc):
         page_num = i + 1
-        
-        # Extract local text first (takes < 5ms)
+
         local_text = (page.get_text() or "").strip()
-        
-        # Check if the page contains images or tables (for scanned OCR fallback)
+
         has_images = len(page.get_images()) > 0
         has_tables = False
         try:
             has_tables = len(page.find_tables().tables) > 0
         except Exception:
             pass
-            
-        # We only fall back to Gemini multimodal OCR if the page has no extractable text
-        # (scanned PDF page) but contains visual contents (images/tables).
+
+        # Only fall back to Gemini multimodal OCR if the page has little
+        # extractable text (likely scanned) but visible images/tables.
         is_scanned_ocr = len(local_text) < 150 and (has_images or has_tables)
-        
+
         if not is_scanned_ocr:
             print(f"[pdf_parser] Page {page_num}/{len(doc)} extracted locally in milliseconds.")
-            pages.append(local_text)
+            page_text = _extract_page_text_with_tables(page)
         else:
             print(f"[pdf_parser] Page {page_num}/{len(doc)} has low extractable text but contains images/tables. Ingesting via Gemini Multimodal...")
             try:
-                # Render page as PNG image at 150 DPI
                 pix = page.get_pixmap(dpi=150)
                 image_bytes = pix.tobytes("png")
-                
-                # Send to Gemini for multimodal transcription
                 page_text = transcribe_page_image(image_bytes)
-                pages.append(page_text)
             except Exception as e:
-                # Fallback to local text extraction for this page
-                print(f"[pdf_parser] ⚠️ Page {page_num} multimodal failed: {e}. Falling back to local text extraction.")
-                pages.append(local_text)
-            
+                print(f"[pdf_parser] [WARNING] Page {page_num} multimodal failed: {e}. Falling back to local text extraction.")
+                page_text = local_text
+
+        pages.append(f"{_page_marker(page_num)}\n{page_text}")
+
     return "\n\n".join(pages)
 
 
@@ -83,39 +241,37 @@ def _format_docx_table_as_markdown(table) -> str:
     for row in table.rows:
         row_text = [cell.text.strip().replace("\n", " ") for cell in row.cells]
         rows.append(row_text)
-        
+
     if not rows:
         return ""
-        
-    # Build Markdown table
+
     col_count = len(rows[0])
     markdown_lines = []
-    
-    # Header
     markdown_lines.append("| " + " | ".join(rows[0]) + " |")
-    # Divider
     markdown_lines.append("| " + " | ".join(["---"] * col_count) + " |")
-    # Data Rows
     for row in rows[1:]:
         if len(row) < col_count:
             row.extend([""] * (col_count - len(row)))
         elif len(row) > col_count:
             row = row[:col_count]
         markdown_lines.append("| " + " | ".join(row) + " |")
-        
+
     return "\n" + "\n".join(markdown_lines) + "\n"
 
 
 def extract_text_from_docx(file_bytes: bytes) -> str:
-    """Extract all text from a DOCX file, including tables in Markdown format."""
-    import io
+    """
+    Extract all text from a DOCX file, including tables in Markdown format.
+    DOCX has no fixed "pages" (pagination is a rendering concern, not a
+    stored property), so every chunk is tagged page=None for this format —
+    the UI shows the filename/chapter for citation instead of a page number.
+    """
     from docx.text.paragraph import Paragraph
     from docx.table import Table
 
     doc = docx.Document(io.BytesIO(file_bytes))
     body_elements = []
-    
-    # Iterate through body elements in logical reading order
+
     for element in doc.element.body:
         if element.tag.endswith('p'):
             p = Paragraph(element, doc)
@@ -126,7 +282,7 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
             markdown_table = _format_docx_table_as_markdown(table)
             if markdown_table:
                 body_elements.append(markdown_table)
-                
+
     return "\n\n".join(body_elements)
 
 
@@ -146,22 +302,30 @@ def extract_text(file_bytes: bytes, filename: str) -> str:
 # ---------------------------------------------------------------------------
 # Heading detection
 # ---------------------------------------------------------------------------
+#
+# NOTE: patterns accept an optional hyphen/dash/em-dash between "chapter"/
+# "unit"/"lesson" and the number (e.g. "CHAPTER-4", not just "Chapter 4").
+# Real-world syllabus PDFs commonly use the hyphenated style, and the
+# original space-only pattern silently failed to detect chapter boundaries
+# for those files — every chunk fell back to the "Introduction" default,
+# which broke chapter-name display in citations (functionally chapters
+# still filtered correctly via the keyword fallback in metadata_store, but
+# the displayed label was wrong). Verified against a real 36-page syllabus.
 
-# Patterns that signal a new Chapter / Topic / Section heading
 _HEADING_PATTERNS = [
-    re.compile(r"^\s*chapter\s+\d+", re.IGNORECASE),
-    re.compile(r"^\s*unit\s+\d+", re.IGNORECASE),
+    re.compile(r"^\s*chapter[\s\-–—]*\d+", re.IGNORECASE),
+    re.compile(r"^\s*unit[\s\-–—]*\d+", re.IGNORECASE),
     re.compile(r"^\s*topic\s*[:\-–]", re.IGNORECASE),
-    re.compile(r"^\s*lesson\s+\d+", re.IGNORECASE),
+    re.compile(r"^\s*lesson[\s\-–—]*\d+", re.IGNORECASE),
     re.compile(r"^\s*learning\s+objective", re.IGNORECASE),
     re.compile(r"^\s*\d+\.\s+[A-Z]"),           # "1. Introduction"
     re.compile(r"^\s*\d+\.\d+\s+[A-Za-z]"),     # "1.1 Fractions"
-    re.compile(r"^[A-Z][A-Z\s]{5,}$"),           # ALL CAPS heading
+    re.compile(r"^[A-Z][A-Z\s'’\-]{5,}$"),       # ALL CAPS heading (apostrophes/hyphens OK)
 ]
 
 _CHAPTER_PATTERNS = [
-    re.compile(r"^\s*chapter\s+\d+", re.IGNORECASE),
-    re.compile(r"^\s*unit\s+\d+", re.IGNORECASE),
+    re.compile(r"^\s*chapter[\s\-–—]*\d+", re.IGNORECASE),
+    re.compile(r"^\s*unit[\s\-–—]*\d+", re.IGNORECASE),
 ]
 
 
@@ -193,15 +357,20 @@ MAX_TOKENS = 500
 OVERLAP_TOKENS = 50
 
 
-def _split_long_text(text: str, chapter: str, topic: str) -> list[dict]:
-    """Split text that exceeds MAX_TOKENS with overlap."""
+def _split_long_text(text: str, chapter: str, topic: str, page: Optional[int]) -> list[dict]:
+    """Split text that exceeds MAX_TOKENS with overlap. Page is inherited
+    (approximate — the section's first page) since precise per-word page
+    boundaries aren't tracked at this granularity."""
     words = text.split()
     chunks = []
     start = 0
     while start < len(words):
         end = min(start + MAX_TOKENS, len(words))
         chunk_text = " ".join(words[start:end])
-        chunks.append({"chapter": chapter, "topic": topic, "text": chunk_text})
+        chunks.append({
+            "chapter": chapter, "topic": topic, "text": chunk_text,
+            "page": page, "chunk_type": "text",
+        })
         if end == len(words):
             break
         start = end - OVERLAP_TOKENS
@@ -214,45 +383,75 @@ def _split_long_text(text: str, chapter: str, topic: str) -> list[dict]:
 
 def chunk_text(text: str) -> list[dict]:
     """
-    Split text into chunks using heading detection first,
-    then enforce the 500-token max with 50-token overlap.
+    Split text into chunks using heading detection first, then enforce the
+    500-token max with 50-token overlap. Tracks <<<PAGE:N>>> markers (if
+    present — PDFs only) so every chunk carries its source page number.
 
-    Returns list of dicts: {chapter, topic, text}
+    A bare chapter-number heading ("CHAPTER-4") immediately followed by its
+    descriptive title line ("CELLS AND ORGANISMS") is merged into one
+    readable chapter label ("CHAPTER-4 — CELLS AND ORGANISMS") rather than
+    showing the bare number in citations.
+
+    Returns list of dicts: {chapter, topic, text, page, chunk_type: "text"}
     """
     lines = text.splitlines()
 
-    sections = []          # [{chapter, topic, lines: []}]
+    sections = []          # [{chapter, topic, lines, page}]
     current_chapter = "Introduction"
     current_topic = "General"
     current_lines: list[str] = []
+    current_page: Optional[int] = None
+    section_start_page: Optional[int] = None
+    pending_chapter_number: Optional[str] = None
 
     for line in lines:
-        if _is_heading(line):
-            # Save previous section
-            if current_lines:
-                sections.append({
-                    "chapter": current_chapter,
-                    "topic": current_topic,
-                    "lines": current_lines,
-                })
-                current_lines = []
+        marker = _PAGE_MARKER_RE.match(line.strip())
+        if marker:
+            current_page = int(marker.group(1))
+            continue
 
+        if _is_heading(line):
             stripped = line.strip()
+
             if _is_chapter(stripped):
-                current_chapter = stripped
+                if current_lines:
+                    sections.append({
+                        "chapter": current_chapter, "topic": current_topic,
+                        "lines": current_lines, "page": section_start_page,
+                    })
+                    current_lines = []
+                pending_chapter_number = stripped
+                current_chapter = stripped   # placeholder until/unless a title line follows
                 current_topic = stripped
+                section_start_page = current_page
             else:
-                current_topic = stripped
+                if pending_chapter_number and not current_lines:
+                    # This heading immediately follows a bare chapter number
+                    # with no body text yet — treat it as that chapter's title.
+                    current_chapter = f"{pending_chapter_number} — {stripped}"
+                    current_topic = stripped
+                    pending_chapter_number = None
+                else:
+                    if current_lines:
+                        sections.append({
+                            "chapter": current_chapter, "topic": current_topic,
+                            "lines": current_lines, "page": section_start_page,
+                        })
+                        current_lines = []
+                    current_topic = stripped
+                    pending_chapter_number = None
+                section_start_page = current_page
         else:
             if line.strip():
+                if not current_lines:
+                    section_start_page = current_page
                 current_lines.append(line)
+                pending_chapter_number = None
 
-    # Don't forget the last section
     if current_lines:
         sections.append({
-            "chapter": current_chapter,
-            "topic": current_topic,
-            "lines": current_lines,
+            "chapter": current_chapter, "topic": current_topic,
+            "lines": current_lines, "page": section_start_page,
         })
 
     # Enforce 500-token max
@@ -265,14 +464,16 @@ def chunk_text(text: str) -> list[dict]:
                     "chapter": section["chapter"],
                     "topic": section["topic"],
                     "text": section_text.strip(),
+                    "page": section["page"],
+                    "chunk_type": "text",
                 })
         else:
             final_chunks.extend(
-                _split_long_text(section_text, section["chapter"], section["topic"])
+                _split_long_text(section_text, section["chapter"], section["topic"], section["page"])
             )
 
     # Fallback: if no structure found at all, sliding window
     if not final_chunks:
-        final_chunks = _split_long_text(text, "General", "General")
+        final_chunks = _split_long_text(text, "General", "General", None)
 
     return final_chunks

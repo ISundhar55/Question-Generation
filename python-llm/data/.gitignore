@@ -2,3 +2,5 @@
 faiss.index
 metadata.json
 prompt_logs/
+images/*
+!images/.gitkeep

@@ -33,10 +33,25 @@ import hashlib
 import re
 from typing import Optional
 
+from services.embedder import EMBEDDING_DIM
+
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 METADATA_PATH = os.path.join(DATA_DIR, "metadata.json")
 
 _lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# In-memory read cache
+# ---------------------------------------------------------------------------
+# metadata.json is re-read from disk on every single request in the naive
+# version of this module. That's fine for a handful of documents, but as a
+# school's syllabus library grows (multiple subjects × grades × chapters),
+# re-parsing a multi-MB JSON file on every /generate call becomes real,
+# avoidable latency. This cache keeps the parsed dict in memory and only
+# re-reads from disk when the file's mtime changes (i.e. after a write from
+# this or another process) — cheap correctness check, big read speedup.
+_cache: dict = {}
+_cache_mtime: float = -1.0
 
 
 def _ensure_data_dir():
@@ -44,17 +59,27 @@ def _ensure_data_dir():
 
 
 def _load() -> dict:
+    global _cache, _cache_mtime
     _ensure_data_dir()
     if not os.path.exists(METADATA_PATH):
+        _cache, _cache_mtime = {}, -1.0
         return {}
-    with open(METADATA_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+
+    mtime = os.path.getmtime(METADATA_PATH)
+    if mtime != _cache_mtime:
+        with open(METADATA_PATH, "r", encoding="utf-8") as f:
+            _cache = json.load(f)
+        _cache_mtime = mtime
+    return _cache
 
 
 def _save(data: dict):
+    global _cache, _cache_mtime
     _ensure_data_dir()
     with open(METADATA_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+    _cache = data
+    _cache_mtime = os.path.getmtime(METADATA_PATH)
 
 
 def compute_file_hash(file_bytes: bytes) -> str:
@@ -75,20 +100,27 @@ def check_duplicate(file_hash: str) -> Optional[str]:
         return None
 
 
+def new_doc_id() -> str:
+    """Generate a doc_id up-front (used when image extraction needs the
+    doc_id before metadata is otherwise ready to be saved)."""
+    return uuid.uuid4().hex[:12]
+
+
 def add_document(
     content_area: str,
     grade: str,
     filename: str,
     file_hash: str,
-    chunks: list[dict],       # each: {chunk_id, faiss_idx, chapter, topic, text}
+    chunks: list[dict],       # each: {chunk_id, faiss_idx, chapter, topic, text, page, chunk_type}
+    doc_id: Optional[str] = None,
 ) -> str:
     """
     Persist a new document's metadata.
-    Returns the generated doc_id.
+    Returns the doc_id (generated here if not supplied by the caller).
     """
-    doc_id = uuid.uuid4().hex[:12]
+    doc_id = doc_id or uuid.uuid4().hex[:12]
     enriched_chunks = [
-        {**chunk, "embedding_dimension": 384}
+        {**chunk, "embedding_dimension": EMBEDDING_DIM}
         for chunk in chunks
     ]
 
@@ -205,22 +237,48 @@ def get_chunk_texts_by_faiss_ids(faiss_ids: list[int], content_area: str, grade:
             and doc["grade"].lower() == grade.lower()
         ):
             for chunk in doc["chunks"]:
-                faiss_to_chunk[chunk["faiss_idx"]] = {**chunk, "doc_id": doc["doc_id"]}
+                faiss_to_chunk[chunk["faiss_idx"]] = {
+                    **chunk,
+                    "doc_id": doc["doc_id"],
+                    "filename": doc["filename"],
+                }
 
     return [faiss_to_chunk[fi] for fi in faiss_ids if fi in faiss_to_chunk]
 
 
-def delete_document(doc_id: str) -> Optional[dict]:
+def delete_document(doc_id: str) -> tuple[Optional[dict], set[int]]:
     """
-    Remove a document from metadata.json.
-    Returns the removed doc dict (to extract faiss_ids for index rebuild), or None.
+    Remove a document from metadata.json and shift remaining faiss_idx values
+    so they stay aligned with the rebuilt FAISS index.
+    Returns:
+      - removed_doc: the deleted document dict or None
+      - faiss_ids_to_remove: set of removed faiss_idx values
     """
     with _lock:
         data = _load()
         doc = data.pop(doc_id, None)
-        if doc is not None:
-            _save(data)
-        return doc
+        if doc is None:
+            return None, set()
+
+        faiss_ids_to_remove = {chunk["faiss_idx"] for chunk in doc["chunks"]}
+
+        # Collect all remaining chunk records to determine shift
+        all_remaining_chunks = []
+        for d in data.values():
+            for chunk in d["chunks"]:
+                all_remaining_chunks.append(chunk)
+
+        # Sorted old IDs that are being kept
+        kept_ids = sorted(chunk["faiss_idx"] for chunk in all_remaining_chunks)
+
+        # Update metadata to map old faiss_idx -> new position in rebuilt index
+        for chunk in all_remaining_chunks:
+            old_idx = chunk["faiss_idx"]
+            new_idx = kept_ids.index(old_idx)
+            chunk["faiss_idx"] = new_idx
+
+        _save(data)
+        return doc, faiss_ids_to_remove
 
 
 def get_all_faiss_vectors_map() -> dict[int, list]:

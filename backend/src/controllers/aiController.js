@@ -1,6 +1,16 @@
 const fetch = require('node-fetch');
 
 const PYTHON_SERVICE = process.env.PYTHON_LLM_URL || 'http://localhost:8000';
+const PYTHON_LLM_API_KEY = process.env.PYTHON_LLM_API_KEY || '';
+
+// Shared-secret header sent on every call to the Python RAG service — must
+// match INTERNAL_API_KEY in python-llm/.env. See services/security.py there
+// for details; if PYTHON_LLM_API_KEY is blank here, the header is just empty
+// and the Python side's own startup warning covers that case.
+const internalHeaders = () => ({
+  'Content-Type': 'application/json',
+  'X-Internal-Key': PYTHON_LLM_API_KEY,
+});
 
 const cleanErrorMessage = (errorMsg) => {
   if (!errorMsg || typeof errorMsg !== 'string') {
@@ -75,7 +85,7 @@ const generateQuestions = async (req, res) => {
     try {
       pyRes = await fetch(`${PYTHON_SERVICE}/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: internalHeaders(),
         body: JSON.stringify({ content_area, grade, chapter: chapter || null, question_type, difficulty, count: questionCount, custom_prompt: custom_prompt || null }),
       });
     } catch (err) {
@@ -135,7 +145,7 @@ const regenerateQuestion = async (req, res) => {
     try {
       pyRes = await fetch(`${PYTHON_SERVICE}/regenerate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: internalHeaders(),
         body: JSON.stringify({
           content_area,
           grade,
