@@ -52,6 +52,7 @@ export const syllabusAPI = {
 export const aiAPI = {
   generate: (params) => api.post('/ai/generate', params),
   regenerate: (params) => api.post('/ai/regenerate', params),
+  feedback: (params) => api.post('/ai/feedback', params),
 };
 
 export default api;

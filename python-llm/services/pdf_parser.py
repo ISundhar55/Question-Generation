@@ -328,6 +328,17 @@ _CHAPTER_PATTERNS = [
     re.compile(r"^\s*unit[\s\-–—]*\d+", re.IGNORECASE),
 ]
 
+# Words that commonly appear at the end of a truncated heading line when the
+# PDF text extractor splits a multi-word title across physical lines.
+# Detecting these lets chunk_text() merge the next short line before locking
+# in the chapter/topic label — e.g. "5. Integration of" + "Knowledge and Ideas"
+# becomes "5. Integration of Knowledge and Ideas" instead of "5. Integration of".
+_INCOMPLETE_HEADING_WORDS = {
+    "of", "and", "the", "in", "to", "a", "an", "for", "with", "at", "by",
+    "or", "but", "from", "on", "as", "into", "over", "about", "&",
+    "its", "their", "that", "which", "between", "among",
+}
+
 
 def _is_heading(line: str) -> bool:
     stripped = line.strip()
@@ -339,6 +350,27 @@ def _is_heading(line: str) -> bool:
 def _is_chapter(line: str) -> bool:
     stripped = line.strip()
     return any(p.match(stripped) for p in _CHAPTER_PATTERNS)
+
+
+def _heading_is_incomplete(heading: str) -> bool:
+    """Return True if a heading ends with a dangling word or a colon, indicating
+    the PDF split a multi-word title across physical lines.
+
+    Examples that return True:
+      '5. Integration of'             ← ends with preposition
+      'Chapter 6: Integration of'     ← ends with preposition
+      'knowledge and ideas:'          ← trailing colon = explicit continuation
+    """
+    stripped = heading.strip()
+    if not stripped:
+        return False
+    # A trailing colon explicitly signals that more text follows on the next line
+    # (e.g. "Integration of knowledge and ideas:" → "Long passage practice")
+    if stripped.endswith(':'):
+        return True
+    words = stripped.split()
+    last = words[-1].lower().rstrip(".,;:\"'")
+    return last in _INCOMPLETE_HEADING_WORDS
 
 
 # ---------------------------------------------------------------------------
@@ -403,6 +435,10 @@ def chunk_text(text: str) -> list[dict]:
     current_page: Optional[int] = None
     section_start_page: Optional[int] = None
     pending_chapter_number: Optional[str] = None
+    # True when the last detected topic heading ended with a dangling word
+    # (e.g. "of", "and") and the next short non-heading line should be merged
+    # into the topic label rather than treated as body text.
+    pending_topic_continuation: bool = False
 
     for line in lines:
         marker = _PAGE_MARKER_RE.match(line.strip())
@@ -412,6 +448,7 @@ def chunk_text(text: str) -> list[dict]:
 
         if _is_heading(line):
             stripped = line.strip()
+            pending_topic_continuation = False  # a new heading resets any pending merge
 
             if _is_chapter(stripped):
                 if current_lines:
@@ -424,6 +461,10 @@ def chunk_text(text: str) -> list[dict]:
                 current_chapter = stripped   # placeholder until/unless a title line follows
                 current_topic = stripped
                 section_start_page = current_page
+                # A chapter heading can itself be split across lines
+                # (e.g. "Chapter 6: Integration of" + "knowledge and ideas:").
+                # Apply the same incomplete-heading merging that topic headings use.
+                pending_topic_continuation = _heading_is_incomplete(current_chapter)
             else:
                 if pending_chapter_number and not current_lines:
                     # This heading immediately follows a bare chapter number
@@ -441,12 +482,32 @@ def chunk_text(text: str) -> list[dict]:
                     current_topic = stripped
                     pending_chapter_number = None
                 section_start_page = current_page
+                # Flag if this topic heading ends mid-phrase so the next line can extend it
+                pending_topic_continuation = _heading_is_incomplete(current_topic)
         else:
             if line.strip():
-                if not current_lines:
-                    section_start_page = current_page
-                current_lines.append(line)
-                pending_chapter_number = None
+                stripped_body = line.strip()
+                # If the previous heading ended mid-phrase (e.g. "5. Integration of")
+                # and no body lines have been collected yet, treat this short line as
+                # the continuation of the heading rather than as body text.
+                if pending_topic_continuation and not current_lines and len(stripped_body) <= 100:
+                    old_topic = current_topic
+                    current_topic = f"{current_topic} {stripped_body}"
+                    # Extend current_chapter if it was formed from or equals the old topic label.
+                    if current_chapter.endswith(old_topic):
+                        current_chapter = current_chapter[:-len(old_topic)] + current_topic
+                    # Also keep pending_chapter_number in sync so the chapter-title
+                    # merge logic (pending_chapter_number + next heading) stays correct.
+                    if pending_chapter_number == old_topic:
+                        pending_chapter_number = current_topic
+                    # Keep merging if the extended label still ends mid-phrase.
+                    pending_topic_continuation = _heading_is_incomplete(current_topic)
+                else:
+                    pending_topic_continuation = False
+                    if not current_lines:
+                        section_start_page = current_page
+                    current_lines.append(line)
+                    pending_chapter_number = None
 
     if current_lines:
         sections.append({

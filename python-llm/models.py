@@ -120,3 +120,27 @@ class RegenerateRequest(BaseModel):
 class RegenerateResponse(BaseModel):
     question: QuestionResult
 
+
+# ---------------------------------------------------------------------------
+# Feedback
+# ---------------------------------------------------------------------------
+
+class FeedbackRequest(BaseModel):
+    content_area: str = Field(..., description="e.g. ELA")
+    grade: str = Field(..., description="e.g. Grade 6")
+    question_type: str = Field(..., description="e.g. SINGLE_SELECT")
+    question_text: str = Field(..., description="The question that feedback refers to")
+    options: Optional[Union[dict, list]] = Field(None, description="Question options (dict for MCQ, list for ordering)")
+    answer: Optional[str] = Field(None, description="Correct answer(s) for the question")
+    sources: Optional[list] = Field(None, description="Source references (page, chapter, doc) for the question")
+    feedback_text: str = Field(..., description="Teacher's comment or suggestion")
+    rating: Optional[int] = Field(None, ge=1, le=5, description="1 (poor) to 5 (excellent)")
+    category: Optional[str] = Field(
+        None,
+        description="distractor_quality | difficulty | clarity | accuracy | topic | other"
+    )
+
+
+class FeedbackResponse(BaseModel):
+    id: str
+    message: str

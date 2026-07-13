@@ -175,12 +175,13 @@ export default function DashboardPage() {
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'clip', boxShadow: 'var(--shadow)', width: '100%', minWidth: 0 }}>
         {/* Table Header — always visible, never scrolls */}
         <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 140px 100px 60px 70px 80px',
+          display: 'grid', gridTemplateColumns: '90px 1fr 140px 100px 60px 70px 80px',
           padding: '12px 20px', background: '#f8f9fb',
           borderBottom: '1px solid var(--color-border)',
           fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
           color: 'var(--color-text-muted)',
         }}>
+          <span>ID</span>
           <span>Question</span>
           <span>Type</span>
           <span>Difficulty</span>
@@ -211,7 +212,7 @@ export default function DashboardPage() {
                 <div
                   key={q.id}
                   style={{
-                    display: 'grid', gridTemplateColumns: '1fr 140px 100px 60px 70px 80px',
+                    display: 'grid', gridTemplateColumns: '90px 1fr 140px 100px 60px 70px 80px',
                     padding: '14px 20px', alignItems: 'center',
                     borderBottom: i < paged.length - 1 ? '1px solid var(--color-border)' : 'none',
                     transition: 'background 0.1s',
@@ -219,6 +220,17 @@ export default function DashboardPage() {
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f8f9fb'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
+                  {/* Question ID — first column */}
+                  <div style={{ paddingRight: 8 }}>
+                    <span style={{
+                      fontFamily: 'monospace', fontSize: 11, color: 'var(--color-text-muted)',
+                      background: '#f1f5f9', border: '1px solid var(--color-border)',
+                      borderRadius: 4, padding: '2px 6px', display: 'inline-block',
+                      maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }} title={q.id}>
+                      {q.id}
+                    </span>
+                  </div>
                   <div style={{ paddingRight: 16, minWidth: 0, overflow: 'hidden' }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {q.text}

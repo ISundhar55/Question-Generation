@@ -37,11 +37,17 @@ export default function CreateQuestionPage() {
       if (isEditing) {
         await questionsAPI.update(id, payload);
         setSuccessMsg('Question updated successfully!');
+        setInitialData(payload);
+        setPreviewData(payload);
       } else {
-        await questionsAPI.create(payload);
+        const res = await questionsAPI.create(payload);
         setSuccessMsg('Question saved successfully!');
+        const savedQ = res.data;
+        setInitialData(savedQ);
+        setPreviewData(savedQ);
+        navigate(`/edit/${savedQ.id}`, { replace: true });
       }
-      setTimeout(() => navigate('/dashboard'), 1200);
+      setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'Failed to save question');
       throw err; // re-throw so QuestionCreator knows save failed
@@ -50,6 +56,7 @@ export default function CreateQuestionPage() {
 
   const handlePreview = (payload) => {
     setPreviewData(payload);
+    setInitialData(payload);
     setMode('preview');
   };
 
@@ -99,7 +106,8 @@ export default function CreateQuestionPage() {
             /* ── QuestionPreview from storybook-ui ── */
             <QuestionPreview
               question={previewData}
-              onBack={() => setMode('create')}
+              onBack={location.state?.startInPreview ? () => navigate('/dashboard') : () => setMode('create')}
+              backLabel={location.state?.startInPreview ? 'Go to Dashboard' : 'Back to Editor'}
             />
           )}
         </div>

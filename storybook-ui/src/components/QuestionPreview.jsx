@@ -10,7 +10,7 @@ import { FillBlankQuestion } from './FillBlankQuestion';
  * Renders the correct preview component based on question type.
  * Pass the full question payload from QuestionCreator.
  */
-export function QuestionPreview({ question, onBack }) {
+export function QuestionPreview({ question, onBack, backLabel }) {
   const [studentOrder, setStudentOrder] = useState([]);
   const [draggedItemIdx, setDraggedItemIdx] = useState(null);
   const [dragOverItemIdx, setDragOverItemIdx] = useState(null);
@@ -33,16 +33,31 @@ export function QuestionPreview({ question, onBack }) {
     switch (question.type) {
       case 'MCQ':
       case 'SINGLE_SELECT':
-      case 'MULTIPLE_SELECT':
+      case 'MULTIPLE_SELECT': {
+        const rawOpts = question.options || [];
+        const isDict = typeof rawOpts === 'object' && !Array.isArray(rawOpts);
+        const processedOptions = isDict ? Object.values(rawOpts) : rawOpts;
+
+        let processedAnswer = question.answer || '';
+        if (isDict && typeof processedAnswer === 'string') {
+          // Map letter-based answers (e.g. 'A|C') to actual option text values
+          const letters = processedAnswer.split('|').map(s => s.trim());
+          const mapped = letters.map(l => rawOpts[l]).filter(Boolean);
+          if (mapped.length > 0) {
+            processedAnswer = mapped.join('|');
+          }
+        }
+
         return (
           <MCQQuestion
             question={question.text}
-            options={question.options || []}
-            correctAnswer={question.answer}
+            options={processedOptions}
+            correctAnswer={processedAnswer}
             mode="preview"
             type={question.type}
           />
         );
+      }
       case 'TRUE_FALSE':
         return (
           <TrueFalseQuestion
@@ -236,7 +251,7 @@ export function QuestionPreview({ question, onBack }) {
         </div>
         {onBack && (
           <button className="qc-btn qc-btn-ghost" onClick={onBack} style={{ fontSize: 12 }}>
-            ← Back to Editor
+            ← {backLabel || 'Back to Editor'}
           </button>
         )}
       </div>

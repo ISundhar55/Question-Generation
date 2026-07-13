@@ -112,9 +112,13 @@ def search_within_scored(query_vector: np.ndarray, candidate_faiss_ids: list[int
         if index.ntotal == 0 or not candidate_faiss_ids:
             return []
 
-        # Search broader to improve recall after filtering
-        search_k = min(index.ntotal, max(k * 10, len(candidate_faiss_ids)))
-        distances, indices = index.search(query_vector, search_k)
+        # Always search the full index so that chapter-filtered candidates are
+        # never silently missed because they ranked below an arbitrary cap.
+        # IndexFlatIP is brute-force (O(n)) regardless of search_k, so there
+        # is zero performance difference between searching k*10 vs. ntotal —
+        # but the cap was causing empty results when a small chapter filter
+        # returns candidates that are outranked by other-chapter vectors.
+        distances, indices = index.search(query_vector, index.ntotal)
 
         candidate_set = set(candidate_faiss_ids)
         filtered = [

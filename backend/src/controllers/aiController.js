@@ -36,8 +36,15 @@ const cleanErrorMessage = (errorMsg) => {
     return 'The syllabus content is too large to process. Please reduce the number of selected chapters or topics and try again.';
   }
   
-  // Auth / Key issues
-  if (low.includes('api_key') || low.includes('api key') || low.includes('auth') || low.includes('unauthorized') || low.includes('key')) {
+  // Auth / Key issues — be specific to avoid false positives from Python errors
+  // like "KeyError: 'field'", "keyword argument", or field names containing "key".
+  if (
+    low.includes('api_key') ||
+    low.includes('api key') ||
+    low.includes('unauthorized') ||
+    /\bkey\b.*(not set|is missing|invalid|expired)/.test(low) ||
+    /invalid.*(api|auth).*\bkey\b/.test(low)
+  ) {
     return 'AI service configuration error. Please contact the administrator to verify the API keys.';
   }
   
@@ -174,5 +181,57 @@ const regenerateQuestion = async (req, res) => {
 };
 
 
-module.exports = { generateQuestions, regenerateQuestion };
+// ---------------------------------------------------------------------------
+// POST /api/ai/feedback
+// ---------------------------------------------------------------------------
+
+const submitFeedback = async (req, res) => {
+  try {
+    const { content_area, grade, question_type, question_text, feedback_text, rating, category, options, answer, sources } = req.body;
+
+    if (!content_area || !grade || !question_type || !question_text || !feedback_text) {
+      return res.status(400).json({
+        message: 'content_area, grade, question_type, question_text, and feedback_text are required.',
+      });
+    }
+
+    if (rating !== undefined && rating !== null && (typeof rating !== 'number' || rating < 1 || rating > 5)) {
+      return res.status(400).json({ message: 'rating must be an integer between 1 and 5.' });
+    }
+
+    let pyRes;
+    try {
+      pyRes = await fetch(`${PYTHON_SERVICE}/feedback`, {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({
+          content_area,
+          grade,
+          question_type,
+          question_text,
+          feedback_text,
+          rating: rating || null,
+          category: category || null,
+          options: options || null,
+          answer: answer || null,
+          sources: sources || []
+        }),
+      });
+    } catch (err) {
+      return res.status(503).json({ message: 'Python LLM service is unavailable.', detail: err.message });
+    }
+
+    const pyData = await pyRes.json();
+    if (!pyRes.ok) {
+      return res.status(pyRes.status).json({ message: cleanErrorMessage(pyData.detail) });
+    }
+    res.json(pyData);
+  } catch (err) {
+    console.error('[aiController] submitFeedback error:', err);
+    res.status(500).json({ message: 'Server error while saving feedback.' });
+  }
+};
+
+
+module.exports = { generateQuestions, regenerateQuestion, submitFeedback };
 

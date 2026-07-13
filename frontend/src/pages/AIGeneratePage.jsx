@@ -73,6 +73,15 @@ export default function AIGeneratePage() {
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState(null);
 
+  // Feedback modal state
+  const [feedbackModal, setFeedbackModal] = useState(null); // null | { question }
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackCategory, setFeedbackCategory] = useState('general');
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [feedbackError, setFeedbackError] = useState(null);
+
   // Stats from last generation
   const [genMeta, setGenMeta] = useState(null);
 
@@ -195,6 +204,49 @@ export default function AIGeneratePage() {
       setRegenError(err.response?.data?.message || 'Regeneration failed. Please try again.');
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const openFeedbackModal = (question) => {
+    setFeedbackModal({ question });
+    setFeedbackRating(0);
+    setFeedbackCategory('general');
+    setFeedbackText('');
+    setFeedbackError(null);
+    setFeedbackSuccess(false);
+  };
+
+  const closeFeedbackModal = () => {
+    setFeedbackModal(null);
+    setFeedbackSuccess(false);
+    setFeedbackError(null);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackModal || !feedbackText.trim()) return;
+    const { question } = feedbackModal;
+    setFeedbackSubmitting(true);
+    setFeedbackError(null);
+    try {
+      await aiAPI.feedback({
+        content_area: question.contentArea || contentArea,
+        grade: question.grade || grade,
+        question_type: question.questionType,
+        question_text: question.text,
+        options: question.options || null,
+        answer: question.answer || null,
+        sources: question.sources || [],
+        feedback_text: feedbackText.trim(),
+        rating: feedbackRating || null,
+        category: feedbackCategory,
+      });
+      setFeedbackSuccess(true);
+      setFeedbackText('');
+      setFeedbackRating(0);
+    } catch (err) {
+      setFeedbackError(err.response?.data?.message || 'Failed to submit feedback. Please try again.');
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
 
@@ -474,22 +526,29 @@ export default function AIGeneratePage() {
                         {q.difficulty}
                       </span>
 
-                      {/* Grounding Status badge */}
-                      {q.grounded === false ? (
-                        <span style={{
-                          display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                          background: '#fee2e2', color: '#b91c1c', border: '1px solid #fee2e2'
-                        }}>
-                          Validation Failed
-                        </span>
-                      ) : (
-                        <span style={{
-                          display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                          background: '#dcfce7', color: '#15803d', border: '1px solid #dcfce7'
-                        }}>
-                          Passed
-                        </span>
-                      )}
+                      {/* Grounding Status badge — 3-tier classification */}
+                      {(() => {
+                        const score = typeof q.groundingScore === 'number'
+                          ? q.groundingScore
+                          : (q.grounded === false ? 0 : 1);
+                        let label, bg, color, border;
+                        if (score >= 0.6) {
+                          label = 'Passed';  bg = '#dcfce7'; color = '#15803d'; border = '#bbf7d0';
+                        } else if (score >= 0.4) {
+                          label = 'Fair';    bg = '#fef9c3'; color = '#854d0e'; border = '#fde68a';
+                        } else {
+                          label = 'Failed';  bg = '#fee2e2'; color = '#b91c1c'; border = '#fecaca';
+                        }
+                        return (
+                          <span style={{
+                            display: 'inline-flex', padding: '3px 10px', borderRadius: 20,
+                            fontSize: 11, fontWeight: 700,
+                            background: bg, color, border: `1px solid ${border}`,
+                          }}>
+                            {label}
+                          </span>
+                        );
+                      })()}
 
                       <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
                         {/* Source toggle */}
@@ -508,6 +567,19 @@ export default function AIGeneratePage() {
                             📍 Source{q.sources?.length > 1 ? 's' : ''}
                           </button>
                         )}
+                        {/* Feedback button */}
+                        <button
+                          id={`feedback-q-${idx}`}
+                          onClick={() => openFeedbackModal(q)}
+                          title="Submit feedback to improve future question generation"
+                          style={{
+                            padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            border: '1px solid #e0f2fe', background: '#f0f9ff', color: '#0369a1',
+                            cursor: 'pointer', transition: 'all 0.12s',
+                          }}
+                        >
+                          💬 Feedback
+                        </button>
                         {/* Regenerate button */}
                         <button
                           id={`regen-q-${idx}`}
@@ -654,7 +726,7 @@ export default function AIGeneratePage() {
 
                     {/* Constructed Response — inline text + answer chips */}
                     {q.questionType === 'CONSTRUCTED_RESPONSE' && q.text && (() => {
-                      const parts = q.text.split('___');
+                      const parts = q.text.split(/_{2,}/);
                       const answers = q.options?.answers || q.answer?.split('|') || [];
                       return (
                         <div style={{ marginBottom: 14 }}>
@@ -710,7 +782,7 @@ export default function AIGeneratePage() {
 
                     {/* Dropdown — inline faux-select for each blank */}
                     {q.questionType === 'DROPDOWN' && q.text && q.options?.blanks && (() => {
-                      const parts = q.text.split('___');
+                      const parts = q.text.split(/_{2,}/);
                       return (
                         <div style={{ marginBottom: 14, fontSize: 14, lineHeight: 2.8, color: 'var(--color-text)', fontWeight: 500 }}>
                           {parts.map((part, i) => (
@@ -786,22 +858,19 @@ export default function AIGeneratePage() {
                         )}
 
                         {/* Grounding / fact-check status */}
-                        <div style={{ marginTop: 8, fontSize: 11, color: q.grounded === false ? '#b91c1c' : '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span>
-                            {q.grounded === false
-                              ? `⚠️ Flagged: ${q.groundingNote || 'not clearly supported by the cited source.'}`
-                              : '✅ Passed automated fact-check against the cited source.'}
-                          </span>
-                          {typeof q.groundingScore === 'number' && (
-                            <span style={{
-                              padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
-                              background: q.groundingScore >= 0.85 ? '#dcfce7' : q.groundingScore >= 0.6 ? '#fef9c3' : '#fee2e2',
-                              color: q.groundingScore >= 0.85 ? '#15803d' : q.groundingScore >= 0.6 ? '#854d0e' : '#b91c1c',
-                            }}>
-                              {Math.round(q.groundingScore * 100)}% confidence
-                            </span>
-                          )}
-                        </div>
+                         <div style={{ marginTop: 8, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                           <span style={{ color: (() => {
+                             const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
+                             return s >= 0.6 ? '#15803d' : s >= 0.4 ? '#854d0e' : '#b91c1c';
+                           })() }}>
+                             {(() => {
+                               const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
+                               if (s >= 0.6) return '✅ Passed automated fact-check against the cited source.';
+                               if (s >= 0.4) return `⚠️ Fair: ${q.groundingNote || 'partially supported by the cited source — review before use.'}`;
+                               return `⚠️ Failed: ${q.groundingNote || 'not clearly supported by the cited source.'}`;
+                             })()}
+                           </span>
+                         </div>
 
                         {/* Source image thumbnails, if this question drew on a diagram/chart */}
                         {q.imageRefs?.length > 0 && (
@@ -1013,7 +1082,215 @@ export default function AIGeneratePage() {
         .btn-modal-confirm:active:not(:disabled) {
           transform: translateY(0);
         }
+
+        .star-btn:hover { transform: scale(1.2); }
+        .feedback-cat-pill:hover { opacity: 0.85; }
       `}</style>
+
+      {/* ── Feedback Modal ── */}
+      {feedbackModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, backdropFilter: 'blur(3px)',
+          animation: 'fadeIn 0.15s ease',
+        }}>
+          <div style={{
+            background: 'var(--color-surface, #fff)', borderRadius: 16,
+            padding: '32px 28px', width: '100%', maxWidth: 520,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
+            animation: 'slideUp 0.2s ease',
+            position: 'relative',
+          }}>
+            {/* X close button */}
+            <button
+              onClick={closeFeedbackModal}
+              aria-label="Close feedback modal"
+              style={{
+                position: 'absolute', top: 14, right: 14,
+                width: 30, height: 30, borderRadius: '50%',
+                border: '1px solid var(--color-border)',
+                background: 'transparent',
+                color: 'var(--color-text-muted)',
+                fontSize: 16, fontWeight: 700, lineHeight: 1,
+                cursor: 'pointer', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = 'var(--color-text)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+            >
+              &#x2715;
+            </button>
+            {feedbackSuccess ? (
+              /* ── Success state ── */
+              <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>
+                  Thank you for your feedback!
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
+                  Your comments have been saved and will be used to improve future question generation for{' '}
+                  <strong>{feedbackModal.question.contentArea} {feedbackModal.question.grade}</strong>.
+                </div>
+                <button
+                  onClick={closeFeedbackModal}
+                  style={{
+                    padding: '10px 28px', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                    background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              /* ── Form state ── */
+              <>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)', marginBottom: 4 }}>
+                    💬 Question Feedback
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                    Your feedback helps the AI generate better questions for future sessions.
+                  </div>
+                </div>
+
+                {/* Question preview */}
+                <div style={{
+                  padding: '10px 14px', borderRadius: 8, background: '#f8fafc',
+                  border: '1px solid var(--color-border)', marginBottom: 20,
+                  fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5,
+                }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>Question: </span>
+                  {feedbackModal.question.text?.slice(0, 160)}{feedbackModal.question.text?.length > 160 ? '…' : ''}
+                </div>
+
+                {/* Star rating */}
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    Overall Quality Rating
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        className="star-btn"
+                        onClick={() => setFeedbackRating(star === feedbackRating ? 0 : star)}
+                        style={{
+                          fontSize: 24, background: 'none', border: 'none', cursor: 'pointer',
+                          padding: '2px 4px', transition: 'transform 0.15s',
+                          opacity: star <= feedbackRating ? 1 : 0.3,
+                          filter: star <= feedbackRating ? 'none' : 'grayscale(1)',
+                        }}
+                        title={`${star} star${star > 1 ? 's' : ''}`}
+                      >
+                        ⭐
+                      </button>
+                    ))}
+                    {feedbackRating > 0 && (
+                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)', alignSelf: 'center', marginLeft: 4 }}>
+                        {['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'][feedbackRating]}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category pills */}
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    Feedback Category
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {[
+                      { value: 'general',             label: 'General' },
+                      { value: 'distractor_quality',  label: 'Distractor Quality' },
+                      { value: 'difficulty',          label: 'Difficulty' },
+                      { value: 'clarity',             label: 'Clarity' },
+                      { value: 'accuracy',            label: 'Accuracy' },
+                      { value: 'topic',               label: 'Topic / Coverage' },
+                    ].map(cat => {
+                      const active = feedbackCategory === cat.value;
+                      return (
+                        <button
+                          key={cat.value}
+                          className="feedback-cat-pill"
+                          onClick={() => setFeedbackCategory(cat.value)}
+                          style={{
+                            padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                            cursor: 'pointer', transition: 'all 0.15s',
+                            background: active ? '#0369a1' : '#f1f5f9',
+                            color: active ? '#fff' : 'var(--color-text-muted)',
+                            border: active ? '1px solid #0369a1' : '1px solid var(--color-border)',
+                          }}
+                        >
+                          {cat.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Free text */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    Comments <span style={{ color: '#ef4444' }}>*</span>
+                  </div>
+                  <textarea
+                    id="feedback-text"
+                    rows={4}
+                    placeholder="e.g. The distractors were too easy to eliminate. Consider using concepts from the same chapter as plausible wrong answers."
+                    value={feedbackText}
+                    onChange={e => setFeedbackText(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 13,
+                      border: '1.5px solid var(--color-border)', background: 'var(--color-surface)',
+                      color: 'var(--color-text)', resize: 'vertical', fontFamily: 'inherit',
+                      outline: 'none', boxSizing: 'border-box', lineHeight: 1.5,
+                    }}
+                  />
+                </div>
+
+                {feedbackError && (
+                  <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#b91c1c', fontSize: 12 }}>
+                    {feedbackError}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button
+                    className="btn-modal-cancel"
+                    onClick={closeFeedbackModal}
+                    disabled={feedbackSubmitting}
+                    style={{
+                      padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                      border: '1.5px solid var(--color-border)', background: 'transparent',
+                      color: 'var(--color-text-muted)', cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="submit-feedback-btn"
+                    onClick={handleSubmitFeedback}
+                    disabled={feedbackSubmitting || !feedbackText.trim()}
+                    style={{
+                      padding: '9px 22px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                      border: 'none',
+                      background: !feedbackText.trim() ? '#e2e8f0' : '#0369a1',
+                      color: !feedbackText.trim() ? '#94a3b8' : '#fff',
+                      cursor: !feedbackText.trim() ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {feedbackSubmitting ? 'Submitting…' : '📤 Submit Feedback'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

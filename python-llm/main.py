@@ -10,7 +10,9 @@ Routes:
   POST /generate        — RAG pipeline: retrieve chunks → Gemini → questions
 """
 
+import asyncio
 import os
+import re
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +30,8 @@ from models import (
     DeleteResponse,
     RegenerateRequest,
     RegenerateResponse,
+    FeedbackRequest,
+    FeedbackResponse,
 )
 from services.pdf_parser import extract_text, chunk_text, extract_images_from_pdf, IMAGES_DIR
 from services.embedder import embed_texts, embed_query
@@ -47,10 +51,55 @@ from services.metadata_store import (
 from services.llm import generate_questions, regenerate_question, verify_grounding_batch, sanitize_user_text
 from services.prompt_logger import log_generation
 from services.security import verify_internal_key, rate_limit, validate_upload
+from services.feedback_store import add_feedback as _store_feedback, get_all_feedback
 
 load_dotenv()
 
 RETRIEVAL_K = int(os.getenv("RETRIEVAL_K", "5"))
+
+# ---------------------------------------------------------------------------
+# Chapter extraction from natural-language instructions
+# ---------------------------------------------------------------------------
+# Teachers write instructions like:
+#   "Create the question from the chapter: Integration of Knowledge and Ideas"
+#   "Only use chapter Key Ideas and Details"
+#   "from chapter: Fractions"
+# We parse the chapter name out and apply it as a real chunk filter in
+# get_chunks_for(), not just as an LLM hint — so the FAISS search is already
+# restricted to the right chapter before generation begins.
+
+_CHAPTER_INSTRUCTION_PATTERNS = [
+    # "from the chapter/topic: / - / – / — / <nothing> <name>"
+    re.compile(r'from\s+the\s+(?:chapter|topic)\s*[:\-\u2013\u2014]?\s*["\']?([^.!?\n"\' ][^.!?\n"\']{1,120}?)["\']?\s*[.!?]?\s*$',
+               re.IGNORECASE | re.MULTILINE),
+    # "from chapter/topic: / - / – / — / <nothing> <name>"
+    re.compile(r'from\s+(?:chapter|topic)\s*[:\-\u2013\u2014]?\s*["\']?([^.!?\n"\' ][^.!?\n"\']{1,120}?)["\']?\s*[.!?]?\s*$',
+               re.IGNORECASE | re.MULTILINE),
+    # "chapter/topic: / - / – / — / <nothing> <name>"  and  "only from/use chapter/topic ..."
+    re.compile(r'(?:only\s+(?:from|use)\s+)?(?:chapter|topic)\s*[:\-\u2013\u2014]?\s*["\']?([^.!?\n"\' ][^.!?\n"\']{1,120}?)["\']?\s*[.!?]?\s*$',
+               re.IGNORECASE | re.MULTILINE),
+]
+
+
+def _extract_chapter_from_instruction(instruction: str | None) -> str | None:
+    """
+    Parse a chapter name from a free-text teacher instruction.
+    Returns the trimmed chapter name if found, otherwise None.
+
+    Handles patterns like:
+      "Create questions from the chapter: Integration of Knowledge and Ideas"
+      "from chapter Key Ideas and Details"
+      "chapter: Fractions"
+    """
+    if not instruction or not instruction.strip():
+        return None
+    for pattern in _CHAPTER_INSTRUCTION_PATTERNS:
+        m = pattern.search(instruction)
+        if m:
+            extracted = m.group(1).strip().rstrip('."\'').strip()
+            if len(extracted) >= 3:   # sanity-check: at least 3 chars
+                return extracted
+    return None
 
 app = FastAPI(
     title="Question Generation — RAG Service",
@@ -311,15 +360,25 @@ async def generate(req: GenerateRequest):
       7. Resolve each question's sourceChunkIds → exact file/page/image citation
       8. Return structured questions
     """
-    # Step 1: Filter metadata by content_area + grade (+ optional chapter)
+    # Security guardrail: cap length + flag obvious prompt-injection
+    # patterns in the teacher-supplied free-text field before it touches
+    # the query embedding or the LLM prompt.
+    clean_custom_prompt = sanitize_user_text(req.custom_prompt, field_name="custom_prompt")
+
+    # Parse a chapter filter from the instruction if the teacher wrote something
+    # like "from the chapter: Integration of Knowledge and Ideas".
+    # This is applied as a real FAISS-level chunk filter, not just an LLM hint.
+    chapter_filter = req.chapter or _extract_chapter_from_instruction(clean_custom_prompt)
+
+    # Step 1: Filter metadata by content_area + grade (+ parsed chapter if any)
     candidate_faiss_ids, all_chunk_records = get_chunks_for(
         req.content_area,
         req.grade,
-        chapter=req.chapter or None,
+        chapter=chapter_filter,
     )
 
     if not candidate_faiss_ids:
-        chapter_hint = f" / chapter '{req.chapter}'" if req.chapter else ""
+        chapter_hint = f" / chapter '{chapter_filter}'" if chapter_filter else ""
         raise HTTPException(
             status_code=404,
             detail=(
@@ -328,17 +387,14 @@ async def generate(req: GenerateRequest):
             )
         )
 
-    # Security guardrail: cap length + flag obvious prompt-injection
-    # patterns in the teacher-supplied free-text field before it touches
-    # the query embedding or the LLM prompt.
-    clean_custom_prompt = sanitize_user_text(req.custom_prompt, field_name="custom_prompt")
-
     # Step 2: Embed query + FAISS search within candidates
     query_text = f"{req.content_area} {req.grade} {req.question_type} {req.difficulty}"
     if clean_custom_prompt:
         query_text += f" {clean_custom_prompt}"
 
-    query_vector = embed_query(query_text)
+    # Run blocking Gemini embedding call off the event loop so uvicorn stays
+    # responsive while the API round-trip completes (avoids CancelledError on Windows).
+    query_vector = await asyncio.to_thread(embed_query, query_text)
     scored_results = search_within_scored(query_vector, candidate_faiss_ids, k=RETRIEVAL_K)
     top_faiss_ids = [fid for fid, _score in scored_results]
 
@@ -367,8 +423,10 @@ async def generate(req: GenerateRequest):
     chunks_for_prompt = [{**c, "chunk_id": c["faiss_idx"]} for c in top_chunks]
     chunks_by_faiss_id = {c["faiss_idx"]: c for c in top_chunks}
 
-    # Step 4: Generate questions via Gemini
-    questions_raw, prompt_sent, raw_response, parse_success, error_msg = generate_questions(
+    # Step 4: Generate questions via Gemini — runs in thread pool so the
+    # synchronous google.generativeai call doesn't block the event loop.
+    questions_raw, prompt_sent, raw_response, parse_success, error_msg = await asyncio.to_thread(
+        generate_questions,
         content_area=req.content_area,
         grade=req.grade,
         question_type=req.question_type,
@@ -392,8 +450,8 @@ async def generate(req: GenerateRequest):
             detail=error_msg or "Failed to generate valid questions from Gemini."
         )
 
-    # Step 5: Evaluation layer — batched grounding check
-    grounding_results = verify_grounding_batch(questions_raw, chunks_by_faiss_id)
+    # Step 5: Evaluation layer — batched grounding check (also blocking; runs in thread)
+    grounding_results = await asyncio.to_thread(verify_grounding_batch, questions_raw, chunks_by_faiss_id)
 
     processed_questions = []
     ungrounded_dropped = 0
@@ -404,6 +462,26 @@ async def generate(req: GenerateRequest):
         if not g["grounded"]:
             ungrounded_dropped += 1
         processed_questions.append(q)
+
+    # ── Per-question console report ──────────────────────────────────────────
+    # Always printed regardless of whether the grounding LLM call succeeded or
+    # fell back to fail-open (score=1.0).  Gives the developer full visibility
+    # into what was generated and how each question scored.
+    passed = sum(1 for q in processed_questions if q["_grounded"])
+    print(
+        f"[main] 📋 Generation report: {len(processed_questions)} question(s) generated | "
+        f"{passed} passed grounding | {ungrounded_dropped} will be dropped"
+    )
+    for i, q in enumerate(processed_questions):
+        flag = "✅ PASS" if q["_grounded"] else "❌ DROP"
+        score = q["_grounding_score"]
+        q_text = q.get("text", "")
+        preview = (q_text[:90] + "…") if len(q_text) > 90 else q_text
+        print(f"[main]   Q{i+1} [{flag}] score={score:.2f} | {preview!r}")
+        if not q["_grounded"] and q.get("_grounding_note"):
+            print(f"[main]        reason: {q['_grounding_note']}")
+    # ────────────────────────────────────────────────────────────────────────
+
 
     # Sort questions so passed ones are first, failed ones are at the end
     passed_questions = [q for q in processed_questions if q["_grounded"]]
@@ -476,7 +554,7 @@ async def regenerate(req: RegenerateRequest):
         candidate_faiss_ids, _ = get_chunks_for(req.content_area, req.grade)
         if candidate_faiss_ids:
             q_text = f"{req.content_area} {req.grade} {req.question_type} {req.difficulty}"
-            query_vector = embed_query(q_text)
+            query_vector = await asyncio.to_thread(embed_query, q_text)
             fallback_ids = [fid for fid, _score in search_within_scored(query_vector, candidate_faiss_ids, k=RETRIEVAL_K)]
             top_chunks = get_chunk_texts_by_faiss_ids(fallback_ids, req.content_area, req.grade)
         else:
@@ -491,7 +569,9 @@ async def regenerate(req: RegenerateRequest):
     # Security guardrail: same sanitization as custom_prompt in /generate.
     clean_mod_instructions = sanitize_user_text(req.modification_instructions, field_name="modification_instructions")
 
-    question_dict, prompt_sent, raw_response, parse_success, error_msg = regenerate_question(
+    # Regenerate — same blocking-call concern as generate; run in thread pool.
+    question_dict, prompt_sent, raw_response, parse_success, error_msg = await asyncio.to_thread(
+        regenerate_question,
         content_area=req.content_area,
         grade=req.grade,
         question_type=req.question_type,
@@ -505,7 +585,7 @@ async def regenerate(req: RegenerateRequest):
         # Same lightweight fact-check applied to fresh generations — keeps
         # the "passed automated fact-check" signal consistent regardless of
         # whether a question came from /generate or a regenerate pass.
-        grounding_results = verify_grounding_batch([question_dict], chunks_by_faiss_id)
+        grounding_results = await asyncio.to_thread(verify_grounding_batch, [question_dict], chunks_by_faiss_id)
         g = grounding_results[0] if grounding_results else {"grounded": True, "reason": None}
         question_dict["_grounded"] = g["grounded"]
         question_dict["_grounding_score"] = g.get("score", 1.0)
@@ -531,8 +611,16 @@ async def regenerate(req: RegenerateRequest):
 
     sources, image_refs = _resolve_sources_and_images(question_dict, chunks_by_faiss_id)
     try:
+        # The LLM may echo back fields from the original_question JSON it saw in
+        # the prompt (grounded, groundingScore, sources, imageRefs). Strip them
+        # before unpacking so we don't get "multiple values for keyword argument".
+        _exclude = {
+            "_grounded", "_grounding_score", "_grounding_note",
+            "sources", "imageRefs", "grounded", "groundingScore", "groundingNote",
+        }
+        clean_dict = {k: v for k, v in question_dict.items() if k not in _exclude}
         return RegenerateResponse(question=QuestionResult(
-            **{k: v for k, v in question_dict.items() if k not in ("_grounded", "_grounding_score", "_grounding_note")},
+            **clean_dict,
             sources=sources,
             imageRefs=image_refs,
             grounded=question_dict.get("_grounded", True),
@@ -550,3 +638,44 @@ async def regenerate(req: RegenerateRequest):
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "python-llm"}
+
+
+# ---------------------------------------------------------------------------
+# POST /feedback
+# ---------------------------------------------------------------------------
+
+@app.post("/feedback", response_model=FeedbackResponse, dependencies=[Depends(verify_internal_key)])
+async def submit_feedback(req: FeedbackRequest):
+    """
+    Persist teacher feedback about a generated question.
+    Feedback is stored in data/feedback.json and injected into future
+    generation prompts so the LLM learns from past corrections.
+    """
+    clean_text = sanitize_user_text(req.feedback_text, field_name="feedback_text")
+    if not clean_text.strip():
+        raise HTTPException(status_code=400, detail="feedback_text must not be empty.")
+
+    entry = await asyncio.to_thread(
+        _store_feedback,
+        content_area=req.content_area,
+        grade=req.grade,
+        question_type=req.question_type,
+        question_text=req.question_text,
+        feedback_text=clean_text,
+        rating=req.rating,
+        category=req.category,
+        options=req.options,
+        answer=req.answer,
+        sources=[s.model_dump() if hasattr(s, 'model_dump') else s for s in (req.sources or [])],
+    )
+    return FeedbackResponse(
+        id=entry["id"],
+        message="Feedback recorded. It will be considered in the next generation request.",
+    )
+
+
+@app.get("/feedback", dependencies=[Depends(verify_internal_key)])
+async def get_feedback():
+    """Return all stored feedback (admin/debug use)."""
+    entries = await asyncio.to_thread(get_all_feedback)
+    return {"count": len(entries), "entries": entries}
