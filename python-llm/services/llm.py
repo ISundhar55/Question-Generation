@@ -331,10 +331,10 @@ IMPORTANT: If the instruction restricts questions to a specific topic, use the c
 matching content in the syllabus excerpts. Do NOT return an error for missing topic.
 """
 
-    # Teacher feedback from past sessions — injected so the LLM avoids repeating
-    # mistakes that teachers have already flagged.
-    _raw_feedback = _get_feedback_block(content_area, grade)
-    feedback_block = f"\n{_raw_feedback}\n" if _raw_feedback else ""
+    # Teacher feedback from past sessions — disabled for now (support can be re-enabled in a future enhancement)
+    # _raw_feedback = _get_feedback_block(content_area, grade)
+    # feedback_block = f"\n{_raw_feedback}\n" if _raw_feedback else ""
+    feedback_block = ""
 
     return f"""You are an assessment question generator for {grade} {content_area}.
 
