@@ -223,9 +223,8 @@ export default function DashboardPage() {
                   {/* Question ID — first column */}
                   <div style={{ paddingRight: 8 }}>
                     <span style={{
-                      fontFamily: 'monospace', fontSize: 11, color: 'var(--color-text-muted)',
-                      background: '#f1f5f9', border: '1px solid var(--color-border)',
-                      borderRadius: 4, padding: '2px 6px', display: 'inline-block',
+                      fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: 'var(--color-text)',
+                      display: 'inline-block',
                       maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }} title={q.id}>
                       {q.id}
