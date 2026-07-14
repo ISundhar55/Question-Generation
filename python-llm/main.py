@@ -13,6 +13,7 @@ Routes:
 import asyncio
 import os
 import re
+import difflib
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -343,6 +344,17 @@ async def delete_syllabus(doc_id: str):
     )
 
 
+def calculate_similarity(text1: str, text2: str) -> float:
+    """Calculate the similarity ratio between two text strings (0.0 - 1.0) after cleaning."""
+    if not text1 or not text2:
+        return 0.0
+    t1 = " ".join(re.sub(r'[^a-zA-Z0-9\s]', '', text1).lower().split())
+    t2 = " ".join(re.sub(r'[^a-zA-Z0-9\s]', '', text2).lower().split())
+    if not t1 or not t2:
+        return 0.0
+    return difflib.SequenceMatcher(None, t1, t2).ratio()
+
+
 # ---------------------------------------------------------------------------
 # POST /generate
 # ---------------------------------------------------------------------------
@@ -450,6 +462,28 @@ async def generate(req: GenerateRequest):
             detail=error_msg or "Failed to generate valid questions from Gemini."
         )
 
+    # Step 4.5: Deduplicate within the generated batch
+    unique_questions = []
+    duplicate_dropped = 0
+    for q in questions_raw:
+        q_text = q.get("text", "").strip()
+        if not q_text:
+            continue
+        is_dup = False
+        for accepted_q in unique_questions:
+            sim = calculate_similarity(q_text, accepted_q.get("text", ""))
+            if sim > 0.80:
+                is_dup = True
+                print(f"[main] ⚠️ Duplicate detected inside batch: similarity {sim:.3f}")
+                print(f"   Q1: {accepted_q.get('text')!r}")
+                print(f"   Q2: {q_text!r}")
+                break
+        if is_dup:
+            duplicate_dropped += 1
+        else:
+            unique_questions.append(q)
+    questions_raw = unique_questions
+
     # Step 5: Evaluation layer — batched grounding check (also blocking; runs in thread)
     grounding_results = await asyncio.to_thread(verify_grounding_batch, questions_raw, chunks_by_faiss_id)
 
@@ -489,13 +523,19 @@ async def generate(req: GenerateRequest):
     sorted_questions = passed_questions + failed_questions
 
     # Step 6: Log everything
+    error_parts = []
+    if duplicate_dropped:
+        error_parts.append(f"{duplicate_dropped} duplicate(s) dropped")
+    if ungrounded_dropped:
+        error_parts.append(f"{ungrounded_dropped} ungrounded dropped")
+
     log_generation(
         request=req.model_dump(),
         retrieved_chunk_ids=[c["faiss_idx"] for c in top_chunks],
         prompt_sent=prompt_sent,
         raw_response=raw_response,
         parse_success=parse_success,
-        error=(f"{ungrounded_dropped} question(s) failed grounding check" if ungrounded_dropped else None),
+        error=", ".join(error_parts) if error_parts else None,
     )
 
     # Step 7: Resolve citations (file/page/chapter) + image refs, build QuestionResult
@@ -525,6 +565,7 @@ async def generate(req: GenerateRequest):
         retrieved_chunk_count=len(top_chunks),
         doc_ids_used=doc_ids_used,
         ungrounded_dropped=ungrounded_dropped,
+        duplicate_dropped=duplicate_dropped,
     )
 
 

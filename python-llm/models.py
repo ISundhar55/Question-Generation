@@ -86,6 +86,7 @@ class GenerateResponse(BaseModel):
     retrieved_chunk_count: int
     doc_ids_used: list[str]
     ungrounded_dropped: int = 0      # How many candidate questions failed the grounding check
+    duplicate_dropped: int = 0       # How many candidate questions failed the in-batch duplicate check
 
 
 # ---------------------------------------------------------------------------

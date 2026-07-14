@@ -32,10 +32,11 @@ QUALITY STANDARDS — apply to every question in this batch:
    medium -> Inference or cause-effect connecting two or more text ideas.
    hard   -> Synthesis across multiple excerpts; all distractors tempting even to prepared students.
 
-6. BATCH VARIETY
-   - No two questions test the same fact or concept.
+6. BATCH VARIETY AND DEDUPLICATION
+   - No two questions test the same fact, concept, or aspect of the syllabus. Each question in the generated set must be completely unique.
+   - Avoid duplicate or highly similar questions in terms of phrasing, meaning, or topic.
    - Vary question stems (not all "Which of the following...").
-   - Distribute questions across different parts of the provided excerpts.
+   - Distribute questions across different parts of the provided excerpts to cover different concepts or aspects of the selected content.
 
 7. LANGUAGE
    - Reading level and vocabulary must match the specified grade.
