@@ -505,13 +505,12 @@ export default function AIGeneratePage() {
                     key={idx}
                     style={{
                       background: 'var(--color-surface)',
-                      border: `1.5px solid ${
-                        isSaved
+                      border: `1.5px solid ${isSaved
                           ? '#bbf7d0'
                           : q.grounded === false
                             ? '#fca5a5'
                             : 'var(--color-border)'
-                      }`,
+                        }`,
                       borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)',
                       transition: 'border-color 0.2s',
                     }}
@@ -533,11 +532,11 @@ export default function AIGeneratePage() {
                           : (q.grounded === false ? 0 : 1);
                         let label, bg, color, border;
                         if (score >= 0.6) {
-                          label = 'Passed';  bg = '#dcfce7'; color = '#15803d'; border = '#bbf7d0';
+                          label = 'Passed'; bg = '#dcfce7'; color = '#15803d'; border = '#bbf7d0';
                         } else if (score >= 0.4) {
-                          label = 'Fair';    bg = '#fef9c3'; color = '#854d0e'; border = '#fde68a';
+                          label = 'Fair'; bg = '#fef9c3'; color = '#854d0e'; border = '#fde68a';
                         } else {
-                          label = 'Failed';  bg = '#fee2e2'; color = '#b91c1c'; border = '#fecaca';
+                          label = 'Failed'; bg = '#fee2e2'; color = '#b91c1c'; border = '#fecaca';
                         }
                         return (
                           <span style={{
@@ -858,19 +857,21 @@ export default function AIGeneratePage() {
                         )}
 
                         {/* Grounding / fact-check status */}
-                         <div style={{ marginTop: 8, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
-                           <span style={{ color: (() => {
-                             const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
-                             return s >= 0.6 ? '#15803d' : s >= 0.4 ? '#854d0e' : '#b91c1c';
-                           })() }}>
-                             {(() => {
-                               const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
-                               if (s >= 0.6) return '✅ Passed automated fact-check against the cited source.';
-                               if (s >= 0.4) return `⚠️ Fair: ${q.groundingNote || 'partially supported by the cited source — review before use.'}`;
-                               return `⚠️ Failed: ${q.groundingNote || 'not clearly supported by the cited source.'}`;
-                             })()}
-                           </span>
-                         </div>
+                        <div style={{ marginTop: 8, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{
+                            color: (() => {
+                              const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
+                              return s >= 0.6 ? '#15803d' : s >= 0.4 ? '#854d0e' : '#b91c1c';
+                            })()
+                          }}>
+                            {(() => {
+                              const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
+                              if (s >= 0.6) return '✅ Passed automated fact-check against the cited source.';
+                              if (s >= 0.4) return `⚠️ Fair: ${q.groundingNote || 'partially supported by the cited source — review before use.'}`;
+                              return `⚠️ Failed: ${q.groundingNote || 'not clearly supported by the cited source.'}`;
+                            })()}
+                          </span>
+                        </div>
 
                         {/* Source image thumbnails, if this question drew on a diagram/chart */}
                         {q.imageRefs?.length > 0 && (
@@ -1202,12 +1203,12 @@ export default function AIGeneratePage() {
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {[
-                      { value: 'general',             label: 'General' },
-                      { value: 'distractor_quality',  label: 'Distractor Quality' },
-                      { value: 'difficulty',          label: 'Difficulty' },
-                      { value: 'clarity',             label: 'Clarity' },
-                      { value: 'accuracy',            label: 'Accuracy' },
-                      { value: 'topic',               label: 'Topic / Coverage' },
+                      { value: 'general', label: 'General' },
+                      { value: 'distractor_quality', label: 'Distractor Quality' },
+                      { value: 'difficulty', label: 'Difficulty' },
+                      { value: 'clarity', label: 'Clarity' },
+                      { value: 'accuracy', label: 'Accuracy' },
+                      { value: 'topic', label: 'Topic / Coverage' },
                     ].map(cat => {
                       const active = feedbackCategory === cat.value;
                       return (

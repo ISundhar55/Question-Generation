@@ -236,12 +236,12 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div>
-                    <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: typeMeta.bg, color: typeMeta.color }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: typeMeta.color }}>
                       {typeMeta.label}
                     </span>
                   </div>
                   <div>
-                    <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: diffMeta.bg, color: diffMeta.color, textTransform: 'capitalize' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: diffMeta.color, textTransform: 'capitalize' }}>
                       {q.difficulty}
                     </span>
                   </div>
