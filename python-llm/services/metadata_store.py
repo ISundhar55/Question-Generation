@@ -48,10 +48,16 @@ _lock = threading.Lock()
 # school's syllabus library grows (multiple subjects × grades × chapters),
 # re-parsing a multi-MB JSON file on every /generate call becomes real,
 # avoidable latency. This cache keeps the parsed dict in memory and only
-# re-reads from disk when the file's mtime changes (i.e. after a write from
-# this or another process) — cheap correctness check, big read speedup.
+# re-reads from disk when the file's mtime OR size changes.
+#
+# NOTE: On Windows, NTFS timestamps have ~100ms resolution. A generate
+# request arriving immediately after an ingest (within the same ~100ms
+# window) could read a stale mtime and return the pre-ingest cache.
+# We guard against this by ALSO comparing file size — any write that adds
+# content will change the size even if the mtime appears unchanged.
 _cache: dict = {}
 _cache_mtime: float = -1.0
+_cache_size: int = -1          # extra guard against Windows mtime granularity
 
 
 def _ensure_data_dir():
@@ -59,27 +65,50 @@ def _ensure_data_dir():
 
 
 def _load() -> dict:
-    global _cache, _cache_mtime
+    global _cache, _cache_mtime, _cache_size
     _ensure_data_dir()
     if not os.path.exists(METADATA_PATH):
-        _cache, _cache_mtime = {}, -1.0
+        _cache, _cache_mtime, _cache_size = {}, -1.0, -1
         return {}
 
-    mtime = os.path.getmtime(METADATA_PATH)
-    if mtime != _cache_mtime:
-        with open(METADATA_PATH, "r", encoding="utf-8") as f:
-            _cache = json.load(f)
-        _cache_mtime = mtime
+    try:
+        stat = os.stat(METADATA_PATH)
+        mtime = stat.st_mtime
+        size  = stat.st_size
+    except OSError:
+        # File disappeared between exists() and stat() — return empty
+        return {}
+
+    # Invalidate cache if mtime OR size changed (guards against Windows
+    # NTFS ~100ms timestamp granularity causing stale reads after ingest).
+    if mtime != _cache_mtime or size != _cache_size:
+        try:
+            with open(METADATA_PATH, "r", encoding="utf-8") as f:
+                _cache = json.load(f)
+            _cache_mtime = mtime
+            _cache_size  = size
+        except (json.JSONDecodeError, OSError) as e:
+            # If the file is mid-write (partial JSON), keep the previous
+            # cache and log — next request will retry once the file is stable.
+            print(f"[metadata_store] WARNING: failed to read metadata.json ({e}); using cached version.")
     return _cache
 
 
 def _save(data: dict):
-    global _cache, _cache_mtime
+    global _cache, _cache_mtime, _cache_size
     _ensure_data_dir()
     with open(METADATA_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+    # Update cache immediately so the next _load() call within the same
+    # ~100ms mtime window still sees the freshly written data.
+    try:
+        stat = os.stat(METADATA_PATH)
+        _cache_mtime = stat.st_mtime
+        _cache_size  = stat.st_size
+    except OSError:
+        _cache_mtime = -1.0
+        _cache_size  = -1
     _cache = data
-    _cache_mtime = os.path.getmtime(METADATA_PATH)
 
 
 def compute_file_hash(file_bytes: bytes) -> str:
@@ -181,8 +210,8 @@ def get_chunks_for(
 
     for doc_id, doc in data.items():
         if (
-            doc["content_area"].lower() == content_area.lower()
-            and doc["grade"].lower() == grade.lower()
+            doc["content_area"].strip().lower() == content_area.strip().lower()
+            and doc["grade"].strip().lower() == grade.strip().lower()
         ):
             for chunk in doc["chunks"]:
                 # Apply optional chapter filter (case-insensitive, keyword/phrase matching across chapter, topic, and text)
