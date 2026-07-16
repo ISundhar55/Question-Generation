@@ -96,36 +96,59 @@ def search_within(query_vector: np.ndarray, candidate_faiss_ids: list[int], k: i
     This implements the metadata-filter-then-FAISS pattern.
     Returns up to k faiss_idx values ranked by cosine similarity.
     """
+    return [fid for fid, _score in search_within_scored(query_vector, candidate_faiss_ids, k)]
+
+
+def search_within_scored(query_vector: np.ndarray, candidate_faiss_ids: list[int], k: int = 5) -> list[tuple[int, float]]:
+    """
+    Same filtered search as search_within, but also returns each result's
+    cosine similarity score (IndexFlatIP on normalized vectors = cosine
+    similarity, range roughly -1 to 1, higher is more relevant). Used for
+    the console-level retrieval quality report — callers who only need the
+    ids can keep using search_within.
+    """
     with _lock:
         index = _get_index()
         if index.ntotal == 0 or not candidate_faiss_ids:
             return []
 
-        # Search broader to improve recall after filtering
-        search_k = min(index.ntotal, max(k * 10, len(candidate_faiss_ids)))
-        distances, indices = index.search(query_vector, search_k)
+        # Always search the full index so that chapter-filtered candidates are
+        # never silently missed because they ranked below an arbitrary cap.
+        # IndexFlatIP is brute-force (O(n)) regardless of search_k, so there
+        # is zero performance difference between searching k*10 vs. ntotal —
+        # but the cap was causing empty results when a small chapter filter
+        # returns candidates that are outranked by other-chapter vectors.
+        distances, indices = index.search(query_vector, index.ntotal)
 
         candidate_set = set(candidate_faiss_ids)
         filtered = [
-            idx for idx in indices[0].tolist()
+            (idx, float(score)) for idx, score in zip(indices[0].tolist(), distances[0].tolist())
             if idx in candidate_set and idx != -1
         ]
         return filtered[:k]
 
 
-def rebuild_index_without(faiss_ids_to_remove: set[int], all_vectors_by_id: dict[int, np.ndarray]):
+def rebuild_index_without(faiss_ids_to_remove: set[int]):
     """
-    Rebuild the FAISS index excluding the given faiss_ids.
-    Called when deleting a syllabus document.
-    all_vectors_by_id: {faiss_idx: vector (shape 1,384)}
+    Rebuild the FAISS index excluding the given faiss_ids by reconstructing
+    kept vectors from the current index in memory.
     """
     global _index
     with _lock:
+        index = _get_index()
+        ntotal = index.ntotal
         new_index = faiss.IndexFlatIP(EMBEDDING_DIM)
-        kept_ids = sorted(k for k in all_vectors_by_id if k not in faiss_ids_to_remove)
-        if kept_ids:
-            matrix = np.vstack([all_vectors_by_id[i] for i in kept_ids])
+
+        kept_vectors = []
+        for i in range(ntotal):
+            if i not in faiss_ids_to_remove:
+                vec = index.reconstruct(i).reshape(1, -1)
+                kept_vectors.append(vec)
+
+        if kept_vectors:
+            matrix = np.vstack(kept_vectors)
             new_index.add(matrix)
+
         _index = new_index
         _save_index()
 

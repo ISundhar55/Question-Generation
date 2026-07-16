@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import './styles.css';
 import { MCQQuestion } from './MCQQuestion';
 import { TrueFalseQuestion } from './TrueFalseQuestion';
@@ -9,7 +10,17 @@ import { FillBlankQuestion } from './FillBlankQuestion';
  * Renders the correct preview component based on question type.
  * Pass the full question payload from QuestionCreator.
  */
-export function QuestionPreview({ question, onBack }) {
+export function QuestionPreview({ question, onBack, backLabel }) {
+  const [studentOrder, setStudentOrder] = useState([]);
+  const [draggedItemIdx, setDraggedItemIdx] = useState(null);
+  const [dragOverItemIdx, setDragOverItemIdx] = useState(null);
+
+  useEffect(() => {
+    if (question?.type === 'ORDERING' && Array.isArray(question.options)) {
+      setStudentOrder(question.options.filter(o => o.trim()));
+    }
+  }, [question]);
+
   if (!question) {
     return (
       <div className="qc-preview" style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 48 }}>
@@ -21,14 +32,32 @@ export function QuestionPreview({ question, onBack }) {
   const renderPreview = () => {
     switch (question.type) {
       case 'MCQ':
+      case 'SINGLE_SELECT':
+      case 'MULTIPLE_SELECT': {
+        const rawOpts = question.options || [];
+        const isDict = typeof rawOpts === 'object' && !Array.isArray(rawOpts);
+        const processedOptions = isDict ? Object.values(rawOpts) : rawOpts;
+
+        let processedAnswer = question.answer || '';
+        if (isDict && typeof processedAnswer === 'string') {
+          // Map letter-based answers (e.g. 'A|C') to actual option text values
+          const letters = processedAnswer.split('|').map(s => s.trim());
+          const mapped = letters.map(l => rawOpts[l]).filter(Boolean);
+          if (mapped.length > 0) {
+            processedAnswer = mapped.join('|');
+          }
+        }
+
         return (
           <MCQQuestion
             question={question.text}
-            options={question.options || []}
-            correctAnswer={question.answer}
+            options={processedOptions}
+            correctAnswer={processedAnswer}
             mode="preview"
+            type={question.type}
           />
         );
+      }
       case 'TRUE_FALSE':
         return (
           <TrueFalseQuestion
@@ -131,6 +160,81 @@ export function QuestionPreview({ question, onBack }) {
           </div>
         );
       }
+      case 'ORDERING': {
+        const correct = question.answer ? question.answer.split('|').map(s => s.trim()) : [];
+        return (
+          <div className="qc-preview" style={{ fontFamily: 'inherit' }}>
+            <div className="qc-preview-title" style={{ marginBottom: 12 }}>
+              <span className="qc-badge qc-badge-ord">Ordering</span>
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{question.text}</p>
+            
+            <div style={{ maxWidth: 480 }}>
+              {studentOrder.map((item, idx) => {
+                const isDragging = draggedItemIdx === idx;
+                const isOver = dragOverItemIdx === idx;
+                return (
+                  <div
+                    key={item}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedItemIdx(idx);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDragEnter={() => setDragOverItemIdx(idx)}
+                    onDragEnd={() => {
+                      setDraggedItemIdx(null);
+                      setDragOverItemIdx(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedItemIdx === null || draggedItemIdx === idx) return;
+                      const next = [...studentOrder];
+                      const [moved] = next.splice(draggedItemIdx, 1);
+                      next.splice(idx, 0, moved);
+                      setStudentOrder(next);
+                      setDraggedItemIdx(null);
+                      setDragOverItemIdx(null);
+                    }}
+                    className={`qc-order-item ${isDragging ? 'dragging' : ''}`}
+                    style={{
+                      borderTop: isOver && draggedItemIdx > idx ? '2px solid var(--color-primary)' : undefined,
+                      borderBottom: isOver && draggedItemIdx < idx ? '2px solid var(--color-primary)' : undefined,
+                      background: '#fff',
+                      margin: '6px 0',
+                    }}
+                  >
+                    <div className="qc-order-item-num">{idx + 1}</div>
+                    <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{item}</div>
+                    <div style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>☰</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+              💡 Practice drag-and-dropping the items to test the ordering.
+            </p>
+
+            {correct.length > 0 && (
+              <div style={{ marginTop: 16, padding: '12px 14px', background: '#fdf2f8', borderRadius: 'var(--radius-sm)', border: '1px solid #fbcfe8' }}>
+                <div style={{ fontSize: 13, color: '#db2777', fontWeight: 600 }}>Correct Answer Order:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, alignItems: 'center' }}>
+                  {correct.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12, padding: '4px 10px', background: '#fff', border: '1px solid #fbcfe8', borderRadius: 20, color: '#db2777', fontWeight: 600 }}>
+                        {i + 1}. {item}
+                      </span>
+                      {i < correct.length - 1 && <span style={{ color: '#db2777', opacity: 0.5 }}>➔</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return <div>Unknown question type</div>;
     }
@@ -147,7 +251,7 @@ export function QuestionPreview({ question, onBack }) {
         </div>
         {onBack && (
           <button className="qc-btn qc-btn-ghost" onClick={onBack} style={{ fontSize: 12 }}>
-            ← Back to Editor
+            ← {backLabel || 'Back to Editor'}
           </button>
         )}
       </div>

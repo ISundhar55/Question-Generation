@@ -5,6 +5,7 @@ const FormData = require('form-data');
 const path = require('path');
 
 const PYTHON_SERVICE = process.env.PYTHON_LLM_URL || 'http://localhost:8000';
+const PYTHON_LLM_API_KEY = process.env.PYTHON_LLM_API_KEY || '';
 
 // Multer — store in memory, validate file type
 const upload = multer({
@@ -52,7 +53,7 @@ const uploadSyllabus = [
         pyRes = await fetch(`${PYTHON_SERVICE}/ingest`, {
           method: 'POST',
           body: form,
-          headers: form.getHeaders(),
+          headers: { ...form.getHeaders(), 'X-Internal-Key': PYTHON_LLM_API_KEY },
         });
       } catch (err) {
         return res.status(503).json({ message: 'Python LLM service is unavailable.', detail: err.message });
@@ -166,7 +167,10 @@ const deleteSyllabus = async (req, res) => {
 
     // Call Python service to remove from FAISS + metadata.json
     try {
-      const pyRes = await fetch(`${PYTHON_SERVICE}/syllabi/${doc_id}`, { method: 'DELETE' });
+      const pyRes = await fetch(`${PYTHON_SERVICE}/syllabi/${doc_id}`, {
+        method: 'DELETE',
+        headers: { 'X-Internal-Key': PYTHON_LLM_API_KEY },
+      });
       if (!pyRes.ok && pyRes.status !== 404) {
         const pyData = await pyRes.json();
         return res.status(pyRes.status).json({ message: pyData.detail || 'Python deletion failed.' });

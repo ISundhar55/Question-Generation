@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { questionsAPI } from '../services/api';
 
@@ -9,9 +9,10 @@ import { QuestionCreator, QuestionPreview } from 'question-storybook-ui';
 export default function CreateQuestionPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEditing = Boolean(id);
 
-  const [mode, setMode] = useState('create'); // 'create' | 'preview'
+  const [mode, setMode] = useState(location.state?.startInPreview ? 'preview' : 'create'); // 'create' | 'preview'
   const [previewData, setPreviewData] = useState(null);
   const [initialData, setInitialData] = useState(null);
   const [loadingEdit, setLoadingEdit] = useState(isEditing);
@@ -22,10 +23,13 @@ export default function CreateQuestionPage() {
   useEffect(() => {
     if (!isEditing) return;
     questionsAPI.getById(id)
-      .then(res => setInitialData(res.data))
+      .then(res => {
+        setInitialData(res.data);
+        setPreviewData(res.data);
+      })
       .catch(() => { setErrorMsg('Failed to load question'); })
       .finally(() => setLoadingEdit(false));
-  }, [id]);
+  }, [id, isEditing]);
 
   const handleSave = async (payload) => {
     setErrorMsg('');
@@ -33,11 +37,17 @@ export default function CreateQuestionPage() {
       if (isEditing) {
         await questionsAPI.update(id, payload);
         setSuccessMsg('Question updated successfully!');
+        setInitialData(payload);
+        setPreviewData(payload);
       } else {
-        await questionsAPI.create(payload);
+        const res = await questionsAPI.create(payload);
         setSuccessMsg('Question saved successfully!');
+        const savedQ = res.data;
+        setInitialData(savedQ);
+        setPreviewData(savedQ);
+        navigate(`/edit/${savedQ.id}`, { replace: true });
       }
-      setTimeout(() => navigate('/dashboard'), 1200);
+      setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'Failed to save question');
       throw err; // re-throw so QuestionCreator knows save failed
@@ -46,6 +56,7 @@ export default function CreateQuestionPage() {
 
   const handlePreview = (payload) => {
     setPreviewData(payload);
+    setInitialData(payload);
     setMode('preview');
   };
 
@@ -55,14 +66,6 @@ export default function CreateQuestionPage() {
     <Layout>
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-        <button
-          onClick={handleClose}
-          style={{
-            padding: '8px 12px', background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)', borderRadius: 8,
-            fontSize: 13, cursor: 'pointer', color: 'var(--color-text-muted)',
-          }}
-        >← Back</button>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
             {isEditing ? 'Edit Question' : 'Create Question'}
@@ -103,7 +106,8 @@ export default function CreateQuestionPage() {
             /* ── QuestionPreview from storybook-ui ── */
             <QuestionPreview
               question={previewData}
-              onBack={() => setMode('create')}
+              onBack={location.state?.startInPreview ? () => navigate('/dashboard') : () => setMode('create')}
+              backLabel={location.state?.startInPreview ? 'Go to Dashboard' : 'Back to Editor'}
             />
           )}
         </div>

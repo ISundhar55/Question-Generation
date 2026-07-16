@@ -2,8 +2,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 
 const navItems = [
-  { label: 'Dashboard', path: '/dashboard', icon: '⊞' },
-  { label: 'New Question', path: '/create', icon: '+' },
+  { label: 'Dashboard', path: '/dashboard', icon: '📊' },
+  { label: 'New Question', path: '/create', icon: '➕' },
   { label: 'Knowledge Base', path: '/syllabus', icon: '📚' },
   { label: 'AI Generate', path: '/ai-generate', icon: '✨' },
 ];
@@ -77,13 +77,21 @@ export default function Layout({ children }) {
           <button
             onClick={handleLogout}
             style={{
-              width: '100%', padding: '9px 12px', background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
-              color: '#8b92a5', fontSize: 13, cursor: 'pointer',
+              width: '100%', padding: '9px 12px', background: 'var(--color-primary)',
+              border: '1.5px solid var(--color-primary)', borderRadius: 6,
+              color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
               transition: 'all 0.12s',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#fca5a5'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8b92a5'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-surface)';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
+              e.currentTarget.style.color = 'var(--color-text)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--color-primary)';
+              e.currentTarget.style.borderColor = 'var(--color-primary)';
+              e.currentTarget.style.color = '#fff';
+            }}
           >
             Sign Out
           </button>

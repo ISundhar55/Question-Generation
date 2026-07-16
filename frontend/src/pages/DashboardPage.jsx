@@ -4,17 +4,20 @@ import Layout from '../components/Layout';
 import { questionsAPI } from '../services/api';
 
 const TYPE_LABELS = {
-  MCQ: { label: 'MCQ', color: '#4f6ef7', bg: '#eef1fe' },
+  SINGLE_SELECT: { label: 'Multiple Choice (Single)', color: '#4f6ef7', bg: '#eef1fe' },
+  MULTIPLE_SELECT: { label: 'Multiple Choice (Multiple)', color: '#3b82f6', bg: '#dbeafe' },
+  MCQ: { label: 'MCQ (Legacy)', color: '#4f6ef7', bg: '#eef1fe' },
   TRUE_FALSE: { label: 'True / False', color: '#22c55e', bg: '#f0fdf4' },
   CONSTRUCTED_RESPONSE: { label: 'Constructed Response', color: '#7c3aed', bg: '#f5f3ff' },
   DROPDOWN: { label: 'Dropdown', color: '#0e7490', bg: '#ecfeff' },
   MATCHING_LINES: { label: 'Matching Lines', color: '#0891b2', bg: '#ecfeff' },
+  ORDERING: { label: 'Ordering', color: '#db2777', bg: '#fdf2f8' },
   // Legacy / Hidden types (still supported for rendering existing data):
   SHORT_ANSWER: { label: 'Short Answer', color: '#f59e0b', bg: '#fffbeb' },
   FILL_IN_BLANK: { label: 'Fill in Blank', color: '#9ca3af', bg: '#f9fafb' },
 };
 
-const ACTIVE_TYPES = ['MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES'];
+const ACTIVE_TYPES = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING'];
 
 const DIFFICULTY_COLORS = {
   easy: { color: '#15803d', bg: '#f0fdf4' },
@@ -172,16 +175,18 @@ export default function DashboardPage() {
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'clip', boxShadow: 'var(--shadow)', width: '100%', minWidth: 0 }}>
         {/* Table Header — always visible, never scrolls */}
         <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 150px 110px 72px 80px',
+          display: 'grid', gridTemplateColumns: '90px 1fr 140px 100px 60px 70px 80px',
           padding: '12px 20px', background: '#f8f9fb',
           borderBottom: '1px solid var(--color-border)',
           fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
           color: 'var(--color-text-muted)',
         }}>
+          <span>ID</span>
           <span>Question</span>
           <span>Type</span>
           <span>Difficulty</span>
           <span>Points</span>
+          <span>Preview</span>
           <span>Actions</span>
         </div>
 
@@ -207,7 +212,7 @@ export default function DashboardPage() {
                 <div
                   key={q.id}
                   style={{
-                    display: 'grid', gridTemplateColumns: '1fr 150px 110px 72px 80px',
+                    display: 'grid', gridTemplateColumns: '90px 1fr 140px 100px 60px 70px 80px',
                     padding: '14px 20px', alignItems: 'center',
                     borderBottom: i < paged.length - 1 ? '1px solid var(--color-border)' : 'none',
                     transition: 'background 0.1s',
@@ -215,23 +220,64 @@ export default function DashboardPage() {
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f8f9fb'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
+                  {/* Question ID — first column */}
+                  <div style={{ paddingRight: 8 }}>
+                    <span style={{
+                      fontSize: 13, fontWeight: 600, color: 'var(--color-text)',
+                      display: 'inline-block',
+                      maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }} title={q.id}>
+                      {q.id}
+                    </span>
+                  </div>
                   <div style={{ paddingRight: 16, minWidth: 0, overflow: 'hidden' }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {q.text}
                     </div>
                   </div>
                   <div>
-                    <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: typeMeta.bg, color: typeMeta.color }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: typeMeta.color }}>
                       {typeMeta.label}
                     </span>
                   </div>
                   <div>
-                    <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: diffMeta.bg, color: diffMeta.color, textTransform: 'capitalize' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: diffMeta.color, textTransform: 'capitalize' }}>
                       {q.difficulty}
                     </span>
                   </div>
                   <div style={{ fontSize: 14, color: 'var(--color-text-muted)', fontWeight: 600 }}>
                     {q.points} pt{q.points !== 1 ? 's' : ''}
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => navigate(`/edit/${q.id}`, { state: { startInPreview: true } })}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid var(--color-border)',
+                        background: 'transparent',
+                        fontSize: 14,
+                        cursor: 'pointer',
+                        color: 'var(--color-text-muted)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#eef2ff';
+                        e.currentTarget.style.borderColor = 'var(--color-primary-light)';
+                        e.currentTarget.style.color = 'var(--color-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.borderColor = 'var(--color-border)';
+                        e.currentTarget.style.color = 'var(--color-text-muted)';
+                      }}
+                      title="Preview question"
+                    >
+                      👁️
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
@@ -242,9 +288,19 @@ export default function DashboardPage() {
                     <button
                       onClick={() => handleDeleteClick(q.id, q.text)}
                       disabled={deleting === q.id}
-                      style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #fecaca', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)' }}
+                      style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Delete"
-                    >🗑</button>
+                    >
+                      {deleting === q.id ? '...' : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18"/>
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                          <line x1="10" x2="10" y1="11" y2="17"/>
+                          <line x1="14" x2="14" y1="11" y2="17"/>
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
               );

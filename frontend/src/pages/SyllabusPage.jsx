@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import { syllabusAPI } from '../services/api';
+import { useUpload } from '../store/UploadContext';
 
 const CONTENT_AREAS = ['English Language Arts', 'Mathematics', 'Science'];
 const GRADES = ['Grade 6', 'Grade 7', 'Grade 8', 'Grade 9'];
@@ -17,9 +18,8 @@ const AREA_COLORS = {
 export default function SyllabusPage() {
   const [syllabi, setSyllabi] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const { uploading, activeUpload, uploadMsg, startUpload, clearUpload } = useUpload();
   const [deleting, setDeleting] = useState(null);
-  const [uploadMsg, setUploadMsg] = useState(null);  // { type: 'success'|'error', text }
   const [contentArea, setContentArea] = useState(CONTENT_AREAS[0]);
   const [grade, setGrade] = useState(GRADES[0]);
   const [dragOver, setDragOver] = useState(false);
@@ -39,7 +39,16 @@ export default function SyllabusPage() {
 
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, filename }
 
-  useEffect(() => { fetchSyllabi(); }, []);
+  useEffect(() => {
+    fetchSyllabi();
+  }, []);
+
+  // Automatically refresh list when background upload finishes successfully
+  useEffect(() => {
+    if (!uploading && uploadMsg && uploadMsg.type === 'success') {
+      fetchSyllabi();
+    }
+  }, [uploading, uploadMsg]);
 
   const handleFileDrop = (e) => {
     e.preventDefault();
@@ -47,7 +56,7 @@ export default function SyllabusPage() {
     const file = e.dataTransfer.files[0];
     if (file) {
       setSelectedFile(file);
-      setUploadMsg(null);
+      clearUpload();
     }
   };
 
@@ -55,36 +64,25 @@ export default function SyllabusPage() {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
-      setUploadMsg(null);
+      clearUpload();
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (!selectedFile) return;
-    setUploading(true);
-    setUploadMsg(null);
 
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('content_area', contentArea);
     formData.append('grade', grade);
 
-    try {
-      const res = await syllabusAPI.upload(formData);
-      const d = res.data;
-      const text = d.recovered
-        ? `🔄 ${d.message} (${d.chunks_indexed} chunks already indexed)`
-        : `✅ ${d.message} (${d.chunks_indexed} chunks indexed)`;
-      setUploadMsg({ type: 'success', text });
-      setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      await fetchSyllabi();
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Upload failed. Please try again.';
-      setUploadMsg({ type: 'error', text: `❌ ${msg}` });
-    } finally {
-      setUploading(false);
-    }
+    const filename = selectedFile.name;
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    startUpload(formData, filename, contentArea, grade, () => {
+      fetchSyllabi();
+    });
   };
 
   const handleDeleteClick = (id, filename) => {
@@ -120,6 +118,37 @@ export default function SyllabusPage() {
         </p>
       </div>
 
+      {/* Background Indexing Status Banner */}
+      {uploading && activeUpload && (
+        <div style={{
+          background: 'var(--color-primary-light, #eef1fe)',
+          border: '1.5px solid var(--color-primary)',
+          borderRadius: 12,
+          padding: '16px 20px',
+          marginBottom: 24,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: 'var(--shadow)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 24, height: 24, borderRadius: '50%',
+              border: '3px solid rgba(79,110,247,0.2)', borderTopColor: 'var(--color-primary)',
+              animation: 'spin 0.8s linear infinite', flexShrink: 0
+            }} />
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--color-text)', fontSize: 14 }}>
+                Indexing Knowledge Source in background...
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                File: <strong style={{ color: 'var(--color-text)' }}>{activeUpload.filename}</strong> | Area: {activeUpload.contentArea} | {activeUpload.grade}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Upload Card */}
       <div style={{
         background: 'var(--color-surface)', border: '1px solid var(--color-border)',
@@ -140,7 +169,7 @@ export default function SyllabusPage() {
               value={contentArea}
               onChange={e => {
                 setContentArea(e.target.value);
-                setUploadMsg(null);
+                clearUpload();
               }}
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: 8,
@@ -162,7 +191,7 @@ export default function SyllabusPage() {
               value={grade}
               onChange={e => {
                 setGrade(e.target.value);
-                setUploadMsg(null);
+                clearUpload();
               }}
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: 8,
@@ -345,14 +374,23 @@ export default function SyllabusPage() {
                         onClick={() => handleDeleteClick(s.id, s.filename)}
                         disabled={deleting === s.id}
                         style={{
-                          padding: '5px 10px', borderRadius: 6,
-                          border: '1px solid #fecaca', background: 'transparent',
+                          padding: '6px 10px', borderRadius: 6,
+                          border: '1px solid var(--color-border)', background: 'transparent',
                           fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)',
                           transition: 'all 0.12s',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
                         }}
                         title="Delete syllabus"
                       >
-                        {deleting === s.id ? '...' : '🗑'}
+                        {deleting === s.id ? '...' : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18" />
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                            <line x1="10" x2="10" y1="11" y2="17" />
+                            <line x1="14" x2="14" y1="11" y2="17" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </div>
