@@ -33,7 +33,7 @@ export function McqEditor({ type, options, setOptions, answer, setAnswer, update
           <button
             type="button"
             className="qc-btn qc-btn-primary"
-            style={{ padding: '6px 12px', fontSize: 11 }}
+            style={{ padding: '10px 12px', fontSize: 12 }}
             onClick={() => setOptions(prev => [...prev, ''])}
           >
             + Add Option

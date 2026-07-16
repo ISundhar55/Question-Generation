@@ -118,12 +118,13 @@ body {
 }
 
 .qc-btn-ghost {
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1.5px solid var(--color-border);
+  background: #e9ecef;
+  color: #475569;
+  border: 1.5px solid #94a3b8;
 }
 
 .qc-btn-ghost:hover {
+  background: var(--color-primary-light);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
@@ -388,7 +389,7 @@ body {
   cursor: grab;
   user-select: none;
   transition: border-color 0.15s, background-color 0.15s, transform 0.12s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .qc-order-item:active {
@@ -418,7 +419,8 @@ body {
 }
 
 /* Lists styling inside Markdown renderer */
-.md-text ul.md-ul, .md-text ol.md-ol {
+.md-text ul.md-ul,
+.md-text ol.md-ol {
   margin: 8px 0;
   padding-left: 20px;
 }

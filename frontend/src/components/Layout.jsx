@@ -31,8 +31,7 @@ export default function Layout({ children }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
             }}>✏️</div>
             <div>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>QuestionApp</div>
-              <div style={{ color: '#a9abafff', fontSize: 11 }}>Education</div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 17 }}>Quizbot</div>
             </div>
           </div>
         </div>

@@ -250,7 +250,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
           </p>
         </div>
         {onBack && (
-          <button className="qc-btn qc-btn-ghost" onClick={onBack} style={{ fontSize: 12 }}>
+          <button className="qc-btn qc-btn-ghost" onClick={onBack}>
             ← {backLabel || 'Back to Editor'}
           </button>
         )}
