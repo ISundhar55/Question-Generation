@@ -360,8 +360,8 @@ export default function SyllabusPage() {
                     </div>
                     <div>
                       <span style={{
-                        display: 'inline-flex', padding: '3px 10px', borderRadius: 20,
-                        fontSize: 11, fontWeight: 600, background: meta.bg, color: meta.color,
+                        display: 'inline-flex', padding: '3px', borderRadius: 20,
+                        fontSize: 13, fontWeight: 600, color: meta.color,
                       }}>
                         {s.grade}
                       </span>

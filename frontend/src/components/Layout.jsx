@@ -32,7 +32,7 @@ export default function Layout({ children }) {
             }}>✏️</div>
             <div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>QuestionApp</div>
-              <div style={{ color: '#4b5263', fontSize: 11 }}>Education</div>
+              <div style={{ color: '#a9abafff', fontSize: 11 }}>Education</div>
             </div>
           </div>
         </div>
@@ -70,7 +70,7 @@ export default function Layout({ children }) {
             <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.name}
             </div>
-            <div style={{ color: '#4b5263', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ color: '#a9abafff', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.email}
             </div>
           </div>
