@@ -449,7 +449,7 @@ export default function AIGeneratePage() {
                     transition: 'all 0.15s',
                   }}
                 >
-                  {savingAll ? 'Saving...' : savedIds.size === questions.filter(q => q.grounded !== false).length ? '✅ All Saved' : '💾 Save All to Bank'}
+                  {savingAll ? '💾 Saving...' : savedIds.size === questions.filter(q => q.grounded !== false).length ? '✅ All Saved' : '💾 Save All to Bank'}
                 </button>
               </div>
             </div>
@@ -506,10 +506,10 @@ export default function AIGeneratePage() {
                     style={{
                       background: 'var(--color-surface)',
                       border: `1.5px solid ${isSaved
-                          ? '#bbf7d0'
-                          : q.grounded === false
-                            ? '#fca5a5'
-                            : 'var(--color-border)'
+                        ? '#bbf7d0'
+                        : q.grounded === false
+                          ? '#fca5a5'
+                          : 'var(--color-border)'
                         }`,
                       borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)',
                       transition: 'border-color 0.2s',
@@ -517,11 +517,11 @@ export default function AIGeneratePage() {
                   >
                     {/* Card Header */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#8b92a5' }}>Q{idx + 1}</span>
-                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: qType.bg, color: qType.color }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#0c0101ff' }}>Q{idx + 1}</span>
+                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: qType.bg, color: qType.color }}>
                         {q.questionType?.replace('_', ' ')}
                       </span>
-                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize' }}>
+                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize' }}>
                         {q.difficulty}
                       </span>
 
@@ -540,7 +540,7 @@ export default function AIGeneratePage() {
                         }
                         return (
                           <span style={{
-                            display: 'inline-flex', padding: '3px 10px', borderRadius: 20,
+                            display: 'inline-flex', padding: '3px 10px', borderRadius: 5,
                             fontSize: 11, fontWeight: 700,
                             background: bg, color, border: `1px solid ${border}`,
                           }}>
@@ -557,7 +557,7 @@ export default function AIGeneratePage() {
                             onClick={() => toggleSource(idx)}
                             title="Show exactly where this question came from"
                             style={{
-                              padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                              padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                               border: '1px solid var(--color-border)', background: src ? 'var(--color-primary-light)' : 'transparent',
                               color: src ? 'var(--color-primary)' : 'var(--color-text-muted)', cursor: 'pointer',
                               transition: 'all 0.15s',
@@ -603,13 +603,13 @@ export default function AIGeneratePage() {
                           disabled={isSaved || isSaving || q.grounded === false}
                           style={{
                             padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            border: q.grounded === false ? '1px solid #e2e8f0' : isSaved ? '1px solid #bbf7d0' : '1px solid var(--color-primary)',
+                            border: q.grounded === false ? '1px solid #e2e8f0' : isSaved ? '1px solid #bbf7d0' : '1px solid #ccd6ff',
                             background: q.grounded === false ? '#f1f5f9' : isSaved ? '#f0fdf4' : 'var(--color-primary-light)',
                             color: q.grounded === false ? '#94a3b8' : isSaved ? 'var(--color-success)' : 'var(--color-primary)',
                             cursor: q.grounded === false ? 'not-allowed' : isSaved ? 'default' : 'pointer', transition: 'all 0.12s',
                           }}
                         >
-                          {isSaving ? '...' : isSaved ? '✅ Saved' : '💾 Save'}
+                          {isSaving ? '💾 Saving...' : isSaved ? '✅ Saved' : '💾 Save'}
                         </button>
                       </div>
                     </div>
@@ -989,8 +989,8 @@ export default function AIGeneratePage() {
                 disabled={regenerating}
                 style={{
                   padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                  border: '1.5px solid var(--color-border)', background: 'transparent',
-                  color: 'var(--color-text-muted)', cursor: 'pointer',
+                  border: '1.5px solid #cbd5e1', background: '#f8fafc',
+                  color: '#475569', cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
               >
@@ -1265,8 +1265,8 @@ export default function AIGeneratePage() {
                     disabled={feedbackSubmitting}
                     style={{
                       padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                      border: '1.5px solid var(--color-border)', background: 'transparent',
-                      color: 'var(--color-text-muted)', cursor: 'pointer',
+                      border: '1.5px solid #cbd5e1', background: '#f8fafc',
+                      color: '#475569', cursor: 'pointer',
                     }}
                   >
                     Cancel

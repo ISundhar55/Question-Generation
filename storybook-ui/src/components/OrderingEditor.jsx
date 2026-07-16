@@ -15,7 +15,7 @@ export function OrderingEditor({ options, setOptions, correctOrder, setCorrectOr
   return (
     <div className="qc-field">
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 12 }}>
-        
+
         {/* Left Panel: Student's Initial View */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -24,14 +24,14 @@ export function OrderingEditor({ options, setOptions, correctOrder, setCorrectOr
               <button
                 type="button"
                 className="qc-btn qc-btn-primary"
-                style={{ padding: '6px 12px', fontSize: 11 }}
+                style={{ padding: '10px 12px', fontSize: 12 }}
                 onClick={() => setOptions(prev => [...prev, ''])}
               >
                 + Add Option
               </button>
             )}
           </div>
-          
+
           {options.map((opt, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
               <input
@@ -149,7 +149,7 @@ export function OrderingEditor({ options, setOptions, correctOrder, setCorrectOr
           </div>
           {err('answer')}
         </div>
-        
+
       </div>
     </div>
   );

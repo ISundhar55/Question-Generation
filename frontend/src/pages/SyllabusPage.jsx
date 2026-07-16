@@ -114,7 +114,7 @@ export default function SyllabusPage() {
           Knowledge Base Library
         </h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginTop: 4 }}>
-          Upload syllabi and documents by Content Area and Grade to power AI question generation.
+          Upload syllabus and documents by Content Area and Grade to power AI question generation.
         </p>
       </div>
 
@@ -360,8 +360,7 @@ export default function SyllabusPage() {
                     </div>
                     <div>
                       <span style={{
-                        display: 'inline-flex', padding: '3px 10px', borderRadius: 20,
-                        fontSize: 11, fontWeight: 600, background: meta.bg, color: meta.color,
+                        display: 'inline-flex', fontSize: 13, fontWeight: 600, color: meta.color,
                       }}>
                         {s.grade}
                       </span>
@@ -426,9 +425,9 @@ export default function SyllabusPage() {
               <button
                 onClick={() => setDeleteConfirm(null)}
                 style={{
-                  padding: '9px 18px', borderRadius: 8, border: '1px solid var(--color-border)',
-                  background: 'transparent', fontSize: 14, fontWeight: 600,
-                  color: 'var(--color-text)', cursor: 'pointer', outline: 'none',
+                  padding: '9px 18px', borderRadius: 8, border: '1.5px solid #cbd5e1',
+                  background: '#f8fafc', fontSize: 14, fontWeight: 600,
+                  color: '#475569', cursor: 'pointer', outline: 'none',
                 }}
               >
                 Cancel

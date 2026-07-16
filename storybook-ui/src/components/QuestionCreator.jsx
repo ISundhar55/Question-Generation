@@ -229,8 +229,8 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           </p>
         </div>
         {onClose && (
-          <button className="qc-btn qc-btn-ghost" onClick={onClose} style={{ padding: '6px 10px' }}>
-            X Close
+          <button className="qc-btn qc-btn-ghost" onClick={onClose}>
+            Close
           </button>
         )}
       </div>
