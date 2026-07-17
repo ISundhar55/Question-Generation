@@ -373,6 +373,7 @@ export default function AIGeneratePage() {
                 fontSize: 13,
                 lineHeight: 1.5,
                 fontStyle: customPrompt ? 'normal' : 'italic',
+                cursor: 'text',
               }}
             />
             {customPrompt.trim() && (
@@ -919,19 +920,35 @@ export default function AIGeneratePage() {
             boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
             border: '1px solid var(--color-border)',
             animation: 'slideUp 0.18s ease',
+            position: 'relative',
           }}>
+            {/* X close button */}
+            <button
+              onClick={closeRegenModal}
+              aria-label="Close regenerate modal"
+              style={{
+                position: 'absolute', top: 14, right: 14,
+                width: 30, height: 30, borderRadius: '50%',
+                border: '1px solid var(--color-border)',
+                background: 'transparent',
+                color: 'var(--color-text-muted)',
+                fontSize: 16, fontWeight: 700, lineHeight: 1,
+                cursor: 'pointer', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = 'var(--color-text)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+            >
+              &#x2715;
+            </button>
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>🔄 Regenerate Question</div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
                   Q{regenModal.idx + 1} — {regenModal.question.questionType?.replace(/_/g, ' ')}
                 </div>
               </div>
-              <button
-                onClick={closeRegenModal}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--color-text-muted)', lineHeight: 1, padding: 4 }}
-              >✕</button>
             </div>
 
             {/* Original Question Preview */}

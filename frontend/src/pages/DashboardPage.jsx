@@ -19,6 +19,17 @@ const TYPE_LABELS = {
 
 const ACTIVE_TYPES = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING'];
 
+const SHORT_LABELS = {
+  SINGLE_SELECT: 'MCQ (Single)',
+  MULTIPLE_SELECT: 'MCQ (Multi)',
+  MCQ: 'MCQ (Legacy)',
+  TRUE_FALSE: 'True / False',
+  CONSTRUCTED_RESPONSE: 'Constructed',
+  DROPDOWN: 'Dropdown',
+  MATCHING_LINES: 'Matching',
+  ORDERING: 'Ordering',
+};
+
 const DIFFICULTY_COLORS = {
   easy: { color: '#15803d', bg: '#f0fdf4' },
   medium: { color: '#92400e', bg: '#fffbeb' },
@@ -120,18 +131,81 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 12, marginBottom: 28 }}>
+        {/* All Questions Card */}
+        <div
+          onClick={() => setFilter('ALL')}
+          style={{
+            background: filter === 'ALL' ? 'var(--color-primary-light)' : 'var(--color-surface)',
+            border: `1.5px solid ${filter === 'ALL' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+            borderRadius: 8,
+            padding: '12px 14px',
+            boxShadow: filter === 'ALL' ? '0 4px 12px rgba(79,110,247,0.15)' : 'var(--shadow)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease-in-out',
+          }}
+          onMouseEnter={(e) => {
+            if (filter !== 'ALL') {
+              e.currentTarget.style.borderColor = 'var(--color-primary)';
+              e.currentTarget.style.background = 'var(--color-primary-light)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (filter !== 'ALL') {
+              e.currentTarget.style.borderColor = 'var(--color-border)';
+              e.currentTarget.style.background = 'var(--color-surface)';
+              e.currentTarget.style.transform = 'none';
+            }
+          }}
+        >
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>{questions.length}</span>
+            {filter === 'ALL' && <span style={{ fontSize: 12 }}>🎯</span>}
+          </div>
+          <div style={{ fontSize: 11, color: filter === 'ALL' ? 'var(--color-text)' : 'var(--color-text-muted)', marginTop: 4, fontWeight: filter === 'ALL' ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            All
+          </div>
+        </div>
+
         {ACTIVE_TYPES.map(type => {
           const meta = TYPE_LABELS[type];
+          const isActive = filter === type;
           return (
-            <div key={type} style={{
-              background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-              borderRadius: 10, padding: '16px 20px', boxShadow: 'var(--shadow)',
-            }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: meta.color }}>
-                {questions.filter(q => q.type === type).length}
+            <div
+              key={type}
+              onClick={() => setFilter(isActive ? 'ALL' : type)}
+              style={{
+                background: isActive ? meta.bg : 'var(--color-surface)',
+                border: `1.5px solid ${isActive ? meta.color : 'var(--color-border)'}`,
+                borderRadius: 8,
+                padding: '12px 14px',
+                boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.05)' : 'var(--shadow)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease-in-out',
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.borderColor = meta.color;
+                  e.currentTarget.style.background = `${meta.bg}22`; // very faint light background
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                  e.currentTarget.style.background = 'var(--color-surface)';
+                  e.currentTarget.style.transform = 'none';
+                }
+              }}
+            >
+              <div style={{ fontSize: 18, fontWeight: 700, color: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>{questions.filter(q => q.type === type).length}</span>
+                {isActive && <span style={{ fontSize: 12 }}>🎯</span>}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{meta.label}</div>
+              <div style={{ fontSize: 11, color: isActive ? 'var(--color-text)' : 'var(--color-text-muted)', marginTop: 4, fontWeight: isActive ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {SHORT_LABELS[type] || meta.label}
+              </div>
             </div>
           );
         })}
@@ -191,7 +265,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Scrollable body */}
-        <div style={{ maxHeight: 'calc(100vh - 360px)', minHeight: 140, overflowY: 'auto' }}>
+        <div style={{ maxHeight: 'calc(100vh - 335px)', minHeight: 140, overflowY: 'auto' }}>
           {loading ? (
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
               Loading questions...
