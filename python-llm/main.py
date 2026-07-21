@@ -26,6 +26,7 @@ from models import (
     SyllabusInfo,
     GenerateRequest,
     GenerateResponse,
+    GenerateInternetRequest,
     QuestionResult,
     SourceRef,
     DeleteResponse,
@@ -49,7 +50,7 @@ from services.metadata_store import (
     get_all_faiss_vectors_map,
     get_document_by_id,
 )
-from services.llm import generate_questions, regenerate_question, verify_grounding_batch, sanitize_user_text
+from services.llm import generate_questions, generate_questions_from_internet, regenerate_question, verify_grounding_batch, sanitize_user_text
 from services.prompt_logger import log_generation
 from services.security import verify_internal_key, rate_limit, validate_upload
 from services.feedback_store import add_feedback as _store_feedback, get_all_feedback
@@ -566,6 +567,102 @@ async def generate(req: GenerateRequest):
         doc_ids_used=doc_ids_used,
         ungrounded_dropped=ungrounded_dropped,
         duplicate_dropped=duplicate_dropped,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /generate-internet
+# ---------------------------------------------------------------------------
+
+@app.post("/generate-internet", response_model=GenerateResponse, dependencies=[Depends(verify_internal_key), Depends(rate_limit)])
+async def generate_internet(req: GenerateInternetRequest):
+    """
+    Generate questions from the LLM's general knowledge when no syllabus is
+    available. Skips FAISS retrieval and grounding checks entirely.
+    Returns the same GenerateResponse shape as /generate so the frontend can
+    render questions identically.
+    """
+    clean_custom_prompt = sanitize_user_text(req.custom_prompt, field_name="custom_prompt")
+
+    valid_types = [
+        'SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE',
+        'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING'
+    ]
+    if req.question_type not in valid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid question_type. Must be one of: {', '.join(valid_types)}"
+        )
+
+    valid_difficulties = ['easy', 'medium', 'hard']
+    if req.difficulty not in valid_difficulties:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid difficulty. Must be one of: {', '.join(valid_difficulties)}"
+        )
+
+    print(
+        f"[main] 🌐 Internet generation requested: {req.content_area} / {req.grade} / "
+        f"{req.question_type} / {req.difficulty} / count={req.count}"
+    )
+
+    questions_raw, prompt_sent, raw_response, parse_success, error_msg = await asyncio.to_thread(
+        generate_questions_from_internet,
+        content_area=req.content_area,
+        grade=req.grade,
+        question_type=req.question_type,
+        difficulty=req.difficulty,
+        count=req.count,
+        custom_prompt=clean_custom_prompt or None,
+    )
+
+    if not parse_success:
+        log_generation(
+            request=req.model_dump(),
+            retrieved_chunk_ids=[],
+            prompt_sent=prompt_sent,
+            raw_response=raw_response,
+            parse_success=parse_success,
+            error=error_msg,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=error_msg or "Failed to generate valid questions from the AI."
+        )
+
+    # Build QuestionResult list — no sources/images since there is no syllabus
+    questions: list[QuestionResult] = []
+    for q in questions_raw:
+        try:
+            questions.append(QuestionResult(
+                **{k: v for k, v in q.items()},
+                sources=[],
+                imageRefs=[],
+                grounded=True,
+                groundingScore=1.0,
+                groundingNote=None,
+            ))
+        except Exception as e:
+            print(f"[main] ⚠️ [internet] Skipped malformed question: {e}")
+
+    if not questions:
+        raise HTTPException(status_code=422, detail="AI returned no valid questions.")
+
+    log_generation(
+        request=req.model_dump(),
+        retrieved_chunk_ids=[],
+        prompt_sent=prompt_sent,
+        raw_response=raw_response,
+        parse_success=parse_success,
+        error=None,
+    )
+
+    return GenerateResponse(
+        questions=questions,
+        retrieved_chunk_count=0,
+        doc_ids_used=[],
+        ungrounded_dropped=0,
+        duplicate_dropped=0,
     )
 
 

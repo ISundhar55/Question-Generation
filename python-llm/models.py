@@ -54,6 +54,22 @@ class GenerateRequest(BaseModel):
     custom_prompt: Optional[str] = Field(None, description="Optional additional instructions for the AI")
 
 
+# ---------------------------------------------------------------------------
+# Internet-based generation (no syllabus / no RAG)
+# ---------------------------------------------------------------------------
+
+class GenerateInternetRequest(BaseModel):
+    content_area: str = Field(..., description="e.g. Mathematics")
+    grade: str = Field(..., description="e.g. Grade 6")
+    question_type: str = Field(
+        ...,
+        description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING"
+    )
+    difficulty: str = Field(..., description="easy | medium | hard")
+    count: int = Field(..., ge=1, le=20, description="Number of questions (1-20)")
+    custom_prompt: Optional[str] = Field(None, description="Optional additional instructions for the AI")
+
+
 class SourceRef(BaseModel):
     """Traces a generated question back to the exact file + page it came from."""
     doc_id: str

@@ -598,8 +598,163 @@ def generate_questions(
 
         return valid, prompt, raw, True, None
 
+
+
     # Should not reach here, but safety net
     return [], prompt, raw, False, "Generation failed after all retries."
+
+
+# ---------------------------------------------------------------------------
+# Internet-based generation (no syllabus — uses LLM general knowledge)
+# ---------------------------------------------------------------------------
+
+def _build_internet_prompt(
+    content_area: str,
+    grade: str,
+    question_type: str,
+    difficulty: str,
+    count: int,
+    custom_prompt: str | None = None,
+) -> str:
+    """
+    Build a generation prompt that does NOT require any syllabus context.
+    The LLM is instructed to use its own general knowledge, calibrated to
+    the specified Grade and Content Area curriculum standards.
+    """
+    format_instruction = _FORMAT_BY_TYPE.get(question_type, _FORMAT_BY_TYPE["MCQ"])
+
+    # Teacher-supplied extra instructions (same priority block used in syllabus prompts)
+    custom_block = ""
+    if custom_prompt and custom_prompt.strip():
+        custom_block = f"""
+
+⚡ PRIORITY INSTRUCTIONS from the teacher (apply these BEFORE the format template):
+\"\"\"
+{custom_prompt.strip()}
+\"\"\"
+Apply ALL of the above exactly as stated.
+"""
+
+    return f"""You are an expert assessment question generator for {grade} {content_area}.
+
+No syllabus has been provided. Generate questions using your general knowledge of
+standard {grade} {content_area} curriculum topics and learning objectives.
+
+STRICT RULES — follow exactly:
+1. All questions MUST be appropriate for {grade} students studying {content_area}.
+2. Use accurate, curriculum-aligned content — do NOT invent facts.
+3. Calibrate difficulty strictly to {difficulty} level.
+4. Return ONLY a valid JSON array. No markdown, no code fences, no explanations,
+   no preamble. The response must start with [ and end with ].
+5. In sourceChunkIds, always return an empty list: [].
+6. Set "contentArea" to "{content_area}" and "grade" to "{grade}" on every question.
+{custom_block}
+Generate exactly {count} {question_type} question(s) at {difficulty} difficulty
+for {grade} {content_area}.
+
+{get_general_guidelines()}
+
+{format_instruction}
+
+Return a JSON array of {count} question object(s):"""
+
+
+def generate_questions_from_internet(
+    content_area: str,
+    grade: str,
+    question_type: str,
+    difficulty: str,
+    count: int,
+    custom_prompt: str | None = None,
+) -> tuple[list[dict], str, str, bool, str | None]:
+    """
+    Generate questions using the LLM's general knowledge (no FAISS / no syllabus).
+
+    Returns:
+      (questions, prompt_sent, raw_response, parse_success, error_message)
+
+    The return signature is intentionally identical to generate_questions() so
+    the calling code in main.py can handle both paths symmetrically.
+    """
+    prompt = _build_internet_prompt(
+        content_area, grade, question_type, difficulty, count, custom_prompt
+    )
+    provider_used = LLM_PROVIDER
+    raw = ""
+
+    MAX_RETRIES = 3
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        # ── Primary call ──────────────────────────────────────────────────────
+        try:
+            if LLM_PROVIDER == "groq":
+                raw = _call_groq(prompt)
+            else:
+                raw = _call_gemini(prompt)
+            print(f"[llm] [internet] Generated via {provider_used} (attempt {attempt})")
+
+        except Exception as primary_err:
+            err_str = str(primary_err)
+
+            # Automatic Gemini → Groq failover on quota errors
+            if LLM_PROVIDER == "gemini" and _is_quota_error(err_str):
+                print(
+                    f"[llm] [internet] Gemini quota hit — switching to Groq ({GROQ_MODEL})"
+                )
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                except Exception as fallback_err:
+                    return [], prompt, "", False, (
+                        f"Gemini quota exceeded AND Groq fallback failed: {str(fallback_err)}."
+                    )
+            else:
+                return [], prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"
+
+        cleaned = _clean_response(raw)
+
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError as e:
+            if attempt < MAX_RETRIES:
+                print(
+                    f"[llm] [internet] JSON parse error on attempt {attempt} — retrying... [{str(e)}]"
+                )
+                continue
+            return [], prompt, raw, False, f"JSON parse error after {MAX_RETRIES} attempts: {str(e)}"
+
+        if isinstance(parsed, dict) and "error" in parsed:
+            return [], prompt, raw, False, parsed["error"]
+
+        if not isinstance(parsed, list):
+            return [], prompt, raw, False, "Expected JSON array from LLM."
+
+        # Normalize + enforce sourceChunkIds=[] (no syllabus)
+        normalized = []
+        for q in parsed:
+            if not isinstance(q, dict):
+                continue
+            nq = normalize_question(q)
+            nq["sourceChunkIds"] = []   # always empty — no FAISS chunks
+            normalized.append(nq)
+
+        # Same MULTIPLE_SELECT validation as the RAG path
+        valid = []
+        for q in normalized:
+            if q.get("questionType") == "MULTIPLE_SELECT":
+                ans = q.get("answer", "")
+                letters = [l.strip() for l in ans.split("|") if l.strip()]
+                if len(letters) < 2:
+                    print(
+                        f"[llm] [internet] MULTIPLE_SELECT dropped: "
+                        f"only {len(letters)} correct answer(s). Q: {q.get('text', '')[:60]}..."
+                    )
+                    continue
+            valid.append(q)
+
+        return valid, prompt, raw, True, None
+
+    return [], prompt, raw, False, "Internet generation failed after all retries."
 
 
 # ---------------------------------------------------------------------------

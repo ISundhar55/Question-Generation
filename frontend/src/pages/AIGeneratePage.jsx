@@ -82,6 +82,10 @@ export default function AIGeneratePage() {
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [feedbackError, setFeedbackError] = useState(null);
 
+  // Internet-generation confirmation modal state
+  const [showInternetConfirm, setShowInternetConfirm] = useState(false);
+  const [internetGenerating, setInternetGenerating] = useState(false);
+
   // Stats from last generation
   const [genMeta, setGenMeta] = useState(null);
 
@@ -91,6 +95,7 @@ export default function AIGeneratePage() {
     setQuestions([]);
     setSavedIds(new Set());
     setGenMeta(null);
+    setShowInternetConfirm(false);
 
     try {
       const res = await aiAPI.generate({
@@ -108,9 +113,50 @@ export default function AIGeneratePage() {
         ungrounded_dropped: res.data.ungrounded_dropped || 0,
       });
     } catch (err) {
-      setError(err.response?.data?.message || 'Generation failed. Please check that a syllabus has been uploaded for this Content Area and Grade.');
+      const status = err.response?.status;
+      const msg = err.response?.data?.message || '';
+
+      // 404 = no syllabus found for this Grade + Content Area
+      // Offer the user the option to generate from the internet instead.
+      if (status === 404 || msg.toLowerCase().includes('no syllabus')) {
+        setShowInternetConfirm(true);
+      } else {
+        setError(msg || 'Generation failed. Please check that a syllabus has been uploaded for this Content Area and Grade.');
+      }
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleInternetGenerate = async () => {
+    setShowInternetConfirm(false);
+    setInternetGenerating(true);
+    setError(null);
+    setQuestions([]);
+    setSavedIds(new Set());
+    setGenMeta(null);
+
+    try {
+      const res = await aiAPI.generateFromInternet({
+        content_area: contentArea,
+        grade,
+        question_type: questionType,
+        difficulty,
+        count,
+        custom_prompt: customPrompt.trim() || undefined,
+      });
+      const qs = (res.data.questions || []).map(q => ({ ...q, _internetSource: true }));
+      setQuestions(qs);
+      setGenMeta({
+        retrieved_chunk_count: 0,
+        doc_ids_used: [],
+        ungrounded_dropped: 0,
+        internetSource: true,
+      });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Internet generation failed. Please try again.');
+    } finally {
+      setInternetGenerating(false);
     }
   };
 
@@ -388,19 +434,19 @@ export default function AIGeneratePage() {
             id="generate-btn"
             className="btn-generate"
             onClick={handleGenerate}
-            disabled={generating}
+            disabled={generating || internetGenerating}
             style={{
-              width: '100%', padding: '13px', background: generating ? '#c7d2fe' : 'var(--color-primary)',
+              width: '100%', padding: '13px', background: (generating || internetGenerating) ? '#c7d2fe' : 'var(--color-primary)',
               border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 700,
-              cursor: generating ? 'not-allowed' : 'pointer',
-              boxShadow: generating ? 'none' : '0 4px 14px rgba(79,110,247,0.35)',
+              cursor: (generating || internetGenerating) ? 'not-allowed' : 'pointer',
+              boxShadow: (generating || internetGenerating) ? 'none' : '0 4px 14px rgba(79,110,247,0.35)',
               transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            {generating ? (
+            {(generating || internetGenerating) ? (
               <>
                 <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                Generating...
+                {internetGenerating ? 'Generating from Internet...' : 'Generating...'}
               </>
             ) : '✨ Generate Questions'}
           </button>
@@ -431,9 +477,18 @@ export default function AIGeneratePage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
                 Generated <strong style={{ color: 'var(--color-text)' }}>{questions.length}</strong> questions
-                from <strong style={{ color: 'var(--color-text)' }}>{genMeta.retrieved_chunk_count}</strong> syllabus chunks
-                {genMeta.ungrounded_dropped > 0 && (
-                  <span style={{ color: '#b91c1c', fontWeight: 600 }}> · {genMeta.ungrounded_dropped} failed validation</span>
+                {genMeta.internetSource ? (
+                  <span style={{ marginLeft: 6 }}>
+                    using <strong style={{ color: '#0891b2' }}>🌐 internet knowledge</strong>
+                    {' '}for <strong style={{ color: 'var(--color-text)' }}>{grade} {contentArea}</strong>
+                  </span>
+                ) : (
+                  <span>
+                    {' '}from <strong style={{ color: 'var(--color-text)' }}>{genMeta.retrieved_chunk_count}</strong> syllabus chunks
+                    {genMeta.ungrounded_dropped > 0 && (
+                      <span style={{ color: '#b91c1c', fontWeight: 600 }}> · {genMeta.ungrounded_dropped} failed validation</span>
+                    )}
+                  </span>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
@@ -457,21 +512,27 @@ export default function AIGeneratePage() {
           )}
 
           {/* Empty state while generating */}
-          {generating && (
+          {(generating || internetGenerating) && (
             <div style={{
               background: 'var(--color-surface)', border: '1px solid var(--color-border)',
               borderRadius: 12, padding: 60, textAlign: 'center', boxShadow: 'var(--shadow)',
             }}>
-              <div style={{ fontSize: 36, marginBottom: 16, animation: 'pulse 1.5s ease-in-out infinite' }}>✨</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>Retrieving syllabus content...</div>
+              <div style={{ fontSize: 36, marginBottom: 16, animation: 'pulse 1.5s ease-in-out infinite' }}>
+                {internetGenerating ? '🌐' : '✨'}
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
+                {internetGenerating ? 'Generating from internet knowledge...' : 'Retrieving syllabus content...'}
+              </div>
               <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>
-                FAISS search → Gemini generation → structured output
+                {internetGenerating
+                  ? `AI is creating ${count} ${questionType.replace('_', ' ')} questions for ${grade} ${contentArea}`
+                  : 'FAISS search → Gemini generation → structured output'}
               </div>
             </div>
           )}
 
           {/* Empty state before generation */}
-          {!generating && questions.length === 0 && !error && (
+          {!generating && !internetGenerating && questions.length === 0 && !error && !showInternetConfirm && (
             <div style={{
               background: 'var(--color-surface)', border: '1px dashed var(--color-border)',
               borderRadius: 12, padding: 60, textAlign: 'center',
@@ -526,8 +587,16 @@ export default function AIGeneratePage() {
                         {q.difficulty}
                       </span>
 
-                      {/* Grounding Status badge — 3-tier classification */}
-                      {(() => {
+                      {/* Grounding Status badge — internet source OR 3-tier syllabus grounding */}
+                      {q._internetSource ? (
+                        <span style={{
+                          display: 'inline-flex', padding: '3px 10px', borderRadius: 5,
+                          fontSize: 11, fontWeight: 700,
+                          background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc',
+                        }}>
+                          🌐 Internet
+                        </span>
+                      ) : (() => {
                         const score = typeof q.groundingScore === 'number'
                           ? q.groundingScore
                           : (q.grounded === false ? 0 : 1);
@@ -897,6 +966,115 @@ export default function AIGeneratePage() {
           )}
         </div>
       </div>
+
+      {/* ─── Internet Confirmation Modal ─── */}
+      {showInternetConfirm && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShowInternetConfirm(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(10, 10, 20, 0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+            animation: 'fadeIn 0.15s ease',
+          }}
+        >
+          <div style={{
+            background: 'var(--color-surface)',
+            borderRadius: 16,
+            padding: 32,
+            width: '100%',
+            maxWidth: 500,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+            border: '1px solid var(--color-border)',
+            animation: 'slideUp 0.18s ease',
+            position: 'relative',
+            textAlign: 'center',
+          }}>
+            {/* X close button */}
+            <button
+              onClick={() => setShowInternetConfirm(false)}
+              aria-label="Close confirmation modal"
+              style={{
+                position: 'absolute', top: 14, right: 14,
+                width: 30, height: 30, borderRadius: '50%',
+                border: '1px solid var(--color-border)',
+                background: 'transparent',
+                color: 'var(--color-text-muted)',
+                fontSize: 16, fontWeight: 700, lineHeight: 1,
+                cursor: 'pointer', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = 'var(--color-text)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+            >
+              &#x2715;
+            </button>
+
+            {/* Icon */}
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🌐</div>
+
+            {/* Title */}
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', marginBottom: 10 }}>
+              No Syllabus Found
+            </div>
+
+            {/* Body */}
+            <div style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.6, marginBottom: 24 }}>
+              No syllabus has been uploaded for{' '}
+              <strong style={{ color: 'var(--color-text)' }}>{grade} — {contentArea}</strong>.
+              <br />
+              Would you like to generate{' '}
+              <strong style={{ color: 'var(--color-primary)' }}>{count} {questionType.replace(/_/g, ' ')} question{count > 1 ? 's' : ''}</strong>{' '}
+              from internet knowledge instead?
+            </div>
+
+            {/* Info note */}
+            <div style={{
+              background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8,
+              padding: '10px 14px', marginBottom: 24, fontSize: 12,
+              color: '#0369a1', textAlign: 'left', lineHeight: 1.5,
+            }}>
+              ℹ️ Questions will be generated using the AI&apos;s general curriculum knowledge
+              for <strong>{grade} {contentArea}</strong>. They will be marked with a 🌐 Internet badge
+              and will not have syllabus source citations.
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                id="internet-cancel-btn"
+                onClick={() => setShowInternetConfirm(false)}
+                style={{
+                  padding: '10px 24px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  border: '1.5px solid #cbd5e1', background: '#f8fafc',
+                  color: '#475569', cursor: 'pointer', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; }}
+              >
+                Cancel
+              </button>
+              <button
+                id="internet-confirm-btn"
+                onClick={handleInternetGenerate}
+                style={{
+                  padding: '10px 24px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                  border: 'none', background: '#0891b2',
+                  color: '#fff', cursor: 'pointer', transition: 'all 0.15s',
+                  boxShadow: '0 4px 12px rgba(8,145,178,0.35)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#0e7490'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#0891b2'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                🌐 Generate from Internet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Regenerate Modal ─── */}
       {regenModal && (
