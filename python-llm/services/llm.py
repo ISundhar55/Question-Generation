@@ -615,6 +615,7 @@ def _build_internet_prompt(
     difficulty: str,
     count: int,
     custom_prompt: str | None = None,
+    preferred_website: str | None = None,
 ) -> str:
     """
     Build a generation prompt that does NOT require any syllabus context.
@@ -622,6 +623,22 @@ def _build_internet_prompt(
     the specified Grade and Content Area curriculum standards.
     """
     format_instruction = _FORMAT_BY_TYPE.get(question_type, _FORMAT_BY_TYPE["MCQ"])
+
+    # Build the webSources rule — let AI choose the best site freely.
+    # The frontend already strips URLs to root domain, so deep-link 404s are not a concern.
+    if preferred_website and preferred_website.strip():
+        pw = preferred_website.strip()
+        preferred_website_rule = (
+            f' The teacher has suggested this website as a preferred reference: "{pw}". '
+            f'If it is a well-known, reputable educational site that covers the topic of this question, use it. '
+            f'If it is not suitable for this specific question, use whichever reputable educational website '
+            f'you consider the best source for this topic.'
+        )
+    else:
+        preferred_website_rule = (
+            ' Choose whichever reputable educational website you consider the best and most relevant '
+            'source for this specific question topic.'
+        )
 
     # Teacher-supplied extra instructions (same priority block used in syllabus prompts)
     custom_block = ""
@@ -648,6 +665,7 @@ STRICT RULES — follow exactly:
    no preamble. The response must start with [ and end with ].
 5. In sourceChunkIds, always return an empty list: [].
 6. Set "contentArea" to "{content_area}" and "grade" to "{grade}" on every question.
+7. MANDATORY: Add a "webSources" field to each question object with 1 entry identifying the best reputable educational website for this question topic.{preferred_website_rule} Use the format: {{"name": "<Website Name>", "url": "<Homepage or section-level URL>"}}. Only use the root domain or a known stable section URL — do NOT guess deep article paths.
 {custom_block}
 Generate exactly {count} {question_type} question(s) at {difficulty} difficulty
 for {grade} {content_area}.
@@ -666,6 +684,7 @@ def generate_questions_from_internet(
     difficulty: str,
     count: int,
     custom_prompt: str | None = None,
+    preferred_website: str | None = None,
 ) -> tuple[list[dict], str, str, bool, str | None]:
     """
     Generate questions using the LLM's general knowledge (no FAISS / no syllabus).
@@ -677,7 +696,7 @@ def generate_questions_from_internet(
     the calling code in main.py can handle both paths symmetrically.
     """
     prompt = _build_internet_prompt(
-        content_area, grade, question_type, difficulty, count, custom_prompt
+        content_area, grade, question_type, difficulty, count, custom_prompt, preferred_website
     )
     provider_used = LLM_PROVIDER
     raw = ""
@@ -736,6 +755,34 @@ def generate_questions_from_internet(
                 continue
             nq = normalize_question(q)
             nq["sourceChunkIds"] = []   # always empty — no FAISS chunks
+
+            # Parse webSources and map to sources list
+            web_sources = q.get("webSources", [])
+            if not isinstance(web_sources, list):
+                web_sources = [web_sources] if web_sources else []
+            
+            sources_list = []
+            for ws in web_sources:
+                if isinstance(ws, dict) and ws.get("url") and ws.get("name"):
+                    sources_list.append({
+                        "doc_id": "internet",
+                        "filename": ws["url"].strip(),
+                        "chapter": ws["name"].strip(),
+                        "page": None,
+                        "chunk_type": "text"
+                    })
+                elif isinstance(ws, str) and ws.strip():
+                    # Fallback for plain string URL
+                    sources_list.append({
+                        "doc_id": "internet",
+                        "filename": ws.strip(),
+                        "chapter": "Web Reference",
+                        "page": None,
+                        "chunk_type": "text"
+                    })
+
+
+            nq["sources"] = sources_list
             normalized.append(nq)
 
         # Same MULTIPLE_SELECT validation as the RAG path

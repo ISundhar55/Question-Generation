@@ -85,6 +85,7 @@ export default function AIGeneratePage() {
   // Internet-generation confirmation modal state
   const [showInternetConfirm, setShowInternetConfirm] = useState(false);
   const [internetGenerating, setInternetGenerating] = useState(false);
+  const [preferredWebsite, setPreferredWebsite] = useState('');
 
   // Stats from last generation
   const [genMeta, setGenMeta] = useState(null);
@@ -144,6 +145,7 @@ export default function AIGeneratePage() {
         difficulty,
         count,
         custom_prompt: customPrompt.trim() || undefined,
+        preferred_website: preferredWebsite.trim() || undefined,
       });
       const qs = (res.data.questions || []).map(q => ({ ...q, _internetSource: true }));
       setQuestions(qs);
@@ -233,7 +235,10 @@ export default function AIGeneratePage() {
         modification_instructions: regenInstructions.trim(),
         source_chunk_ids: question.sourceChunkIds || [],
       });
-      const newQuestion = res.data.question;
+      const newQuestion = {
+        ...res.data.question,
+        _internetSource: question._internetSource
+      };
       setQuestions(prev => {
         const updated = [...prev];
         updated[idx] = newQuestion;
@@ -408,7 +413,7 @@ export default function AIGeneratePage() {
             <textarea
               id="ai-custom-prompt"
               rows={4}
-              placeholder={`Examples:\n• Give 5 options for Multiple Choice instead of 4\n• Include the word "photosynthesis"\n• Focus on Chapter 3`}
+              placeholder={`Examples:\n• Create questions from Trigonometry\n• Focus on Chapter 3 — Algebra\n• Give 5 options instead of 4\n• Include word problems only`}
               value={customPrompt}
               onChange={e => setCustomPrompt(e.target.value)}
               style={{
@@ -625,7 +630,7 @@ export default function AIGeneratePage() {
                           <button
                             className="btn-chunks"
                             onClick={() => toggleSource(idx)}
-                            title="Show exactly where this question came from"
+                            title={q._internetSource ? "Show referenced websites for this question" : "Show exactly where this question came from"}
                             style={{
                               padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                               border: '1px solid var(--color-border)', background: src ? 'var(--color-primary-light)' : 'transparent',
@@ -633,7 +638,7 @@ export default function AIGeneratePage() {
                               transition: 'all 0.15s',
                             }}
                           >
-                            📍 Source{q.sources?.length > 1 ? 's' : ''}
+                            {q._internetSource ? `🌐 Source${q.sources?.length > 1 ? 's' : ''}` : `📍 Source${q.sources?.length > 1 ? 's' : ''}`}
                           </button>
                         )}
                         {/* Feedback button */}
@@ -904,44 +909,77 @@ export default function AIGeneratePage() {
                     {/* Source detail (expandable): exact file + page + chapter for cross-verification */}
                     {src && (q.sources?.length > 0 || q.sourceChunkIds?.length > 0) && (
                       <div style={{
-                        marginTop: 10, padding: '10px 14px', background: '#fffbeb',
-                        borderRadius: 8, border: '1px solid #fde68a', fontSize: 12,
-                        color: '#92400e',
+                        marginTop: 10, padding: '10px 14px',
+                        background: q._internetSource ? '#f0fdf4' : '#fffbeb',
+                        borderRadius: 8,
+                        border: q._internetSource ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                        fontSize: 12,
+                        color: q._internetSource ? '#166534' : '#92400e',
                       }}>
                         <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                          Source{q.sources?.length > 1 ? 's' : ''} — for cross-verification against the syllabus
+                          {q._internetSource
+                            ? `🌐 Reference Website${q.sources?.length > 1 ? 's' : ''}`
+                            : `Source${q.sources?.length > 1 ? 's' : ''} — for cross-verification against the syllabus`
+                          }
                         </div>
                         {q.sources?.length > 0 ? (
                           <ul style={{ margin: 0, paddingLeft: 18 }}>
-                            {q.sources.map((s, si) => (
-                              <li key={si} style={{ marginBottom: 2 }}>
-                                <strong>{s.filename}</strong>
-                                {s.page ? `, page ${s.page}` : ''}
-                                {s.chapter ? ` — ${s.chapter}` : ''}
-                                {s.chunk_type === 'image' ? ' (image)' : ''}
-                              </li>
-                            ))}
+                            {q.sources.map((s, si) => {
+                              const isHttp = s.filename?.startsWith('http://') || s.filename?.startsWith('https://');
+                              // For internet sources: always link to root domain to avoid hallucinated 404 paths.
+                              // e.g. https://www.mathsisfun.com/algebra/radical-expressions.html → https://www.mathsisfun.com
+                              let safeHref = s.filename;
+                              if (q._internetSource && isHttp) {
+                                try { safeHref = new URL(s.filename).origin; } catch (_) { /* keep original */ }
+                              }
+                              return (
+                                <li key={si} style={{ marginBottom: 2 }}>
+                                  {isHttp ? (
+                                    <a
+                                      href={safeHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        color: '#16a34a',
+                                        textDecoration: 'underline',
+                                        fontWeight: 600,
+                                        wordBreak: 'break-all',
+                                      }}
+                                    >
+                                      {q._internetSource ? (s.chapter || 'Web Link') : s.filename}
+                                    </a>
+                                  ) : (
+                                    <strong>{s.filename}</strong>
+                                  )}
+                                  {s.page ? `, page ${s.page}` : ''}
+                                  {s.chapter && !q._internetSource ? ` — ${s.chapter}` : ''}
+                                  {s.chunk_type === 'image' ? ' (image)' : ''}
+                                </li>
+                              );
+                            })}
                           </ul>
                         ) : (
                           <span>Chunk ids: {q.sourceChunkIds.join(', ')}</span>
                         )}
 
-                        {/* Grounding / fact-check status */}
-                        <div style={{ marginTop: 8, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{
-                            color: (() => {
-                              const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
-                              return s >= 0.6 ? '#15803d' : s >= 0.4 ? '#854d0e' : '#b91c1c';
-                            })()
-                          }}>
-                            {(() => {
-                              const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
-                              if (s >= 0.6) return '✅ Passed automated fact-check against the cited source.';
-                              if (s >= 0.4) return `⚠️ Fair: ${q.groundingNote || 'partially supported by the cited source — review before use.'}`;
-                              return `⚠️ Failed: ${q.groundingNote || 'not clearly supported by the cited source.'}`;
-                            })()}
-                          </span>
-                        </div>
+                        {/* Grounding / fact-check status — only shown for syllabus-sourced questions */}
+                        {!q._internetSource && (
+                          <div style={{ marginTop: 8, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{
+                              color: (() => {
+                                const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
+                                return s >= 0.6 ? '#15803d' : s >= 0.4 ? '#854d0e' : '#b91c1c';
+                              })()
+                            }}>
+                              {(() => {
+                                const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
+                                if (s >= 0.6) return '✅ Passed automated fact-check against the cited source.';
+                                if (s >= 0.4) return `⚠️ Fair: ${q.groundingNote || 'partially supported by the cited source — review before use.'}`;
+                                return `⚠️ Failed: ${q.groundingNote || 'not clearly supported by the cited source.'}`;
+                              })()}
+                            </span>
+                          </div>
+                        )}
 
                         {/* Source image thumbnails, if this question drew on a diagram/chart */}
                         {q.imageRefs?.length > 0 && (
@@ -985,7 +1023,7 @@ export default function AIGeneratePage() {
             borderRadius: 16,
             padding: 32,
             width: '100%',
-            maxWidth: 500,
+            maxWidth: 560,
             boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
             border: '1px solid var(--color-border)',
             animation: 'slideUp 0.18s ease',
@@ -1039,6 +1077,31 @@ export default function AIGeneratePage() {
               ℹ️ Questions will be generated using the AI&apos;s general curriculum knowledge
               for <strong>{grade} {contentArea}</strong>. They will be marked with a 🌐 Internet badge
               and will not have syllabus source citations.
+            </div>
+
+            {/* Optional preferred website input */}
+            <div style={{ marginBottom: 20, textAlign: 'left' }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                🔗 Preferred Reference Website <span style={{ fontWeight: 400, color: '#94a3b8' }}>(optional)</span>
+              </label>
+              <input
+                id="preferred-website-input"
+                type="url"
+                placeholder="e.g. https://www.khanacademy.org"
+                value={preferredWebsite}
+                onChange={e => setPreferredWebsite(e.target.value)}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '8px 12px', borderRadius: 7, fontSize: 13,
+                  border: '1.5px solid #cbd5e1', background: '#f8fafc',
+                  color: '#1e293b', outline: 'none', transition: 'border 0.15s',
+                }}
+                onFocus={e => { e.target.style.borderColor = '#0891b2'; e.target.style.background = '#fff'; }}
+                onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8fafc'; }}
+              />
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                If suitable for the topic, AI will use this site. Otherwise it falls back to trusted sites like Khan Academy, Wikipedia, etc.
+              </div>
             </div>
 
             {/* Buttons */}

@@ -68,6 +68,7 @@ class GenerateInternetRequest(BaseModel):
     difficulty: str = Field(..., description="easy | medium | hard")
     count: int = Field(..., ge=1, le=20, description="Number of questions (1-20)")
     custom_prompt: Optional[str] = Field(None, description="Optional additional instructions for the AI")
+    preferred_website: Optional[str] = Field(None, description="Optional user-preferred website URL for sourcing questions")
 
 
 class SourceRef(BaseModel):

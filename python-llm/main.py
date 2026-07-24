@@ -10,6 +10,14 @@ Routes:
   POST /generate        — RAG pipeline: retrieve chunks → Gemini → questions
 """
 
+import sys
+# Prevent UnicodeEncodeError on Windows systems with non-UTF-8 terminals (e.g. cp1252)
+try:
+    sys.stdout.reconfigure(errors='replace')
+    sys.stderr.reconfigure(errors='replace')
+except AttributeError:
+    pass
+
 import asyncio
 import os
 import re
@@ -614,6 +622,7 @@ async def generate_internet(req: GenerateInternetRequest):
         difficulty=req.difficulty,
         count=req.count,
         custom_prompt=clean_custom_prompt or None,
+        preferred_website=req.preferred_website or None,
     )
 
     if not parse_success:
@@ -635,8 +644,8 @@ async def generate_internet(req: GenerateInternetRequest):
     for q in questions_raw:
         try:
             questions.append(QuestionResult(
-                **{k: v for k, v in q.items()},
-                sources=[],
+                **{k: v for k, v in q.items() if k != "sources"},
+                sources=q.get("sources", []),
                 imageRefs=[],
                 grounded=True,
                 groundingScore=1.0,
@@ -747,7 +756,20 @@ async def regenerate(req: RegenerateRequest):
             detail=error_msg or "Failed to regenerate question."
         )
 
-    sources, image_refs = _resolve_sources_and_images(question_dict, chunks_by_faiss_id)
+    # Preserve original internet sources if this was an internet-sourced question
+    orig_sources = req.original_question.get("sources", [])
+    has_internet_source = orig_sources and any(
+        isinstance(s, dict) and s.get("doc_id") == "internet" for s in orig_sources
+    )
+
+    if has_internet_source and not req.source_chunk_ids:
+        sources = [
+            SourceRef(**s) if isinstance(s, dict) else s
+            for s in orig_sources
+        ]
+        image_refs = []
+    else:
+        sources, image_refs = _resolve_sources_and_images(question_dict, chunks_by_faiss_id)
     try:
         # The LLM may echo back fields from the original_question JSON it saw in
         # the prompt (grounded, groundingScore, sources, imageRefs). Strip them
