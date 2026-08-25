@@ -1602,13 +1602,13 @@ export default function AIGeneratePage() {
 }
 
 const labelStyle = {
-  fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)',
+  fontSize: 12, fontWeight: 700, color: '#1e293b',
   display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em',
 };
 
 const selectStyle = {
   width: '100%', padding: '10px 12px', borderRadius: 8,
-  border: '1.5px solid var(--color-border)', fontSize: 14,
-  background: 'var(--color-surface)', color: 'var(--color-text)',
+  border: '1.5px solid #cbd5e1', fontSize: 14,
+  background: 'var(--color-surface)', color: '#0f172a',
   outline: 'none', cursor: 'pointer',
 };
