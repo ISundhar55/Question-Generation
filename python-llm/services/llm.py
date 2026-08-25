@@ -118,13 +118,15 @@ _FORMAT_BY_TYPE = {
   "contentArea": "<content_area>",
   "grade": "<grade>",
   "text": "<question text>",
-  "options": {"A": "<option>", "B": "<option>", "C": "<option>", "D": "<option>"},
-  "answer": "<correct letter, e.g. A>",
-  "explanation": "<brief explanation using only syllabus content>",
+  "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>"},
+  "answer": "<correct letter, e.g. A, B, C, or D>",
+  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
-Default: 4 options (A, B, C, D). If the teacher instructs a different count, add or remove
-letters accordingly (A, B, C, D, E, F...). Always use consecutive letters starting from A.""",
+IMPORTANT for SINGLE_SELECT:
+- Default: 4 options (A, B, C, D). If the teacher instructs a different count, add or remove letters accordingly. Always use consecutive letters starting from A.
+- Vary the correct answer across available letters (A, B, C, D) — do not always pick Option A.
+- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options', explaining why the correct choice is right and why each incorrect distractor is wrong.""",
 
     "MULTIPLE_SELECT": """Each question object must follow this exact format:
 {
@@ -133,20 +135,16 @@ letters accordingly (A, B, C, D, E, F...). Always use consecutive letters starti
   "contentArea": "<content_area>",
   "grade": "<grade>",
   "text": "<question text>",
-  "options": {"A": "<option>", "B": "<option>", "C": "<option>", "D": "<option>"},
-  "answer": "<pipe-separated list of correct letters, e.g. A|C>",
-  "explanation": "<brief explanation using only syllabus content>",
+  "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>"},
+  "answer": "<pipe-separated list of correct letters, e.g. A|C or B|D>",
+  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
 IMPORTANT for MULTIPLE_SELECT:
-- Default: 4 options (A, B, C, D). If the teacher instructs a different count, add or remove
-  letters accordingly. Always use consecutive letters starting from A.
-- MANDATORY: The answer field MUST contain AT LEAST 2 pipe-separated letters (minimum 2 correct
-  answers). A MULTIPLE_SELECT question with only 1 correct answer is INVALID and will be rejected.
-  Valid examples:   "A|C"  /  "B|D"  /  "A|B|D"
-  INVALID example:  "A"    <-- single letter is NOT allowed for MULTIPLE_SELECT
+- Default: 4 options (A, B, C, D). Always use consecutive letters starting from A.
+- MANDATORY: The answer field MUST contain AT LEAST 2 pipe-separated letters (minimum 2 correct answers). A MULTIPLE_SELECT question with only 1 correct answer is INVALID and will be rejected.
 - The answer field must list all correct letters in alphabetical order, joined with | (pipe).
-- Design the question so that exactly 2-3 options are genuinely correct based on the syllabus text.""",
+- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options', explaining why each correct choice is right and why each distractor is wrong.""",
 
     "MCQ": """Each question object must follow this exact format:
 {
@@ -155,13 +153,15 @@ IMPORTANT for MULTIPLE_SELECT:
   "contentArea": "<content_area>",
   "grade": "<grade>",
   "text": "<question text>",
-  "options": {"A": "<option>", "B": "<option>", "C": "<option>", "D": "<option>"},
-  "answer": "<correct letter, e.g. A>",
-  "explanation": "<brief explanation using only syllabus content>",
+  "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>"},
+  "answer": "<correct letter, e.g. A, B, C, or D>",
+  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
-Default: 4 options (A, B, C, D). If the teacher instructs a different count, add or remove
-letters accordingly (A, B, C, D, E, F...). Always use consecutive letters starting from A.""",
+IMPORTANT for MCQ:
+- Default: 4 options (A, B, C, D). Always use consecutive letters starting from A.
+- Vary the correct answer across available letters (A, B, C, D).
+- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option, explaining why each is correct or incorrect.""",
 
     "TRUE_FALSE": """Each question object must follow this exact format:
 {
@@ -171,9 +171,11 @@ letters accordingly (A, B, C, D, E, F...). Always use consecutive letters starti
   "grade": "<grade>",
   "text": "<statement that is clearly true or false>",
   "answer": "True" or "False",
-  "explanation": "<brief explanation using only syllabus content>",
+  "explanation": "• True (<Correct or Incorrect>): <Clear explanation of why True is or is not the correct assessment of this statement>\\n• False (<Correct or Incorrect>): <Clear explanation of why False is or is not the correct assessment of this statement>",
   "sourceChunkIds": [<list of chunk_id integers used>]
-}""",
+}
+IMPORTANT for TRUE_FALSE:
+- MANDATORY RATIONALE: The explanation field MUST provide an explicit rationale for BOTH True and False, clearly identifying which is correct and which is incorrect.""",
 
     "SHORT_ANSWER": """Each question object must follow this exact format:
 {
@@ -183,7 +185,7 @@ letters accordingly (A, B, C, D, E, F...). Always use consecutive letters starti
   "grade": "<grade>",
   "text": "<question>",
   "answer": "<model answer in 1-3 sentences>",
-  "explanation": "<brief explanation using only syllabus content>",
+  "explanation": "<detailed rationale explaining the complete concept and key points expected in the answer>",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }""",
 
@@ -201,7 +203,7 @@ letters accordingly (A, B, C, D, E, F...). Always use consecutive letters starti
     ]
   },
   "answer": "<pipe-separated primary correct answers in blank order, e.g. answer1|answer2>",
-  "explanation": "<brief explanation using only syllabus content>",
+  "explanation": "• Blank <N> (<primary answer>): <Clear explanation of the concept and why the primary answer and acceptable alternatives are correct>\\n• (Provide a bullet for EVERY blank present in the question: Blank 1, Blank 2, ...)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
@@ -209,11 +211,10 @@ IMPORTANT for CONSTRUCTED_RESPONSE:
 - Create 1-3 blanks using ___ in the text. Use EXACTLY three underscores (___) for EVERY blank.
   Do NOT use ____ (4), _____ (5), or any other count — always exactly three underscores.
 - Each element in options.answers MUST be an array of strings representing acceptable correct answers (synonyms, alternate spellings, abbreviations, or alternative terminology) for that blank.
-- You MUST provide at least 2-3 acceptable alternatives inside the array for EACH blank (e.g. for "central idea", include synonyms like "main idea" and "primary concept"). Do NOT return a single-item array.
+- You MUST provide at least 2-3 acceptable alternatives inside the array for EACH blank.
 - The first string in each array is the primary correct answer.
 - The answer field must list only the primary correct answers joined with | (pipe).
-- NOTE: The 'add N options' instruction applies ONLY to MCQ/SINGLE_SELECT question types.
-  For CONSTRUCTED_RESPONSE, ignore any option-count instruction and follow the blank rules above.""",
+- MANDATORY RATIONALE: The explanation field MUST provide a distinct bulleted rationale for EVERY blank present in the question (• Blank 1: ..., • Blank 2: ..., etc.), explaining the core concept and why the listed alternatives are valid.""",
 
     "DROPDOWN": """Each question object must follow this exact format:
 {
@@ -229,16 +230,17 @@ IMPORTANT for CONSTRUCTED_RESPONSE:
     ]
   },
   "answer": "<pipe-separated correct answers in blank order, e.g. answer1|answer2>",
-  "explanation": "<brief explanation using only syllabus content>",
+  "explanation": "• Blank <N>: '<correct_choice>' is correct because <reason>. Other choices (<distractor1>, <distractor2>, <distractor3>) are incorrect because <reason>.\\n• (Provide a bullet for EVERY blank dropdown present in the question: Blank 1, Blank 2, ...)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for DROPDOWN:
 - Create 2-3 blanks using ___ in the text.
 - The number of objects in options.blanks must match the number of ___ in the text.
-- Each blank must have exactly 4 choices (1 correct + 3 plausible distractors from the syllabus).
+- Each blank must have exactly 4 choices (1 correct + 3 plausible distractors).
 - The correct field must be identical to one of the choices strings.
-- The answer field is the pipe-separated correct values in blank order.""",
+- The answer field is the pipe-separated correct values in blank order.
+- MANDATORY RATIONALE: The explanation field MUST provide a distinct bulleted rationale for EVERY blank dropdown (• Blank 1: ..., • Blank 2: ..., etc.), explaining why the chosen option is correct and why the other choices in that dropdown are incorrect distractors.""",
 
     "MATCHING_LINES": """Each question object must follow this exact format:
 {
@@ -252,7 +254,7 @@ IMPORTANT for DROPDOWN:
     "right": {"1": "<right item 1>", "2": "<right item 2>", "3": "<right item 3>", "4": "<right item 4>"}
   },
   "answer": "A-<number>, B-<number>, C-<number>, D-<number>",
-  "explanation": "<brief explanation of the correct matches using only syllabus content>",
+  "explanation": "• Match <LeftKey>-<RightKey> (<Left item> -> <Right item>): <Clear explanation of why these two items pair together>\\n• (Provide a bullet for EVERY matched pair: Match A-..., Match B-..., etc.)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
@@ -261,7 +263,7 @@ IMPORTANT for MATCHING_LINES:
 - Right column keys MUST be digit strings: "1", "2", "3", "4".
 - Every left key must have exactly one matching right key.
 - The answer field must list all pairs in order, e.g. "A-2, B-4, C-1, D-3".
-- All items must be drawn strictly from the syllabus excerpts — no invented content.""",
+- MANDATORY RATIONALE: The explanation field MUST provide a distinct bulleted rationale for EVERY matched pair (• Match A-..., • Match B-..., etc.), clearly explaining the reason for the pairing.""",
 
     "ORDERING": """Each question object must follow this exact format:
 {
@@ -272,15 +274,14 @@ IMPORTANT for MATCHING_LINES:
   "text": "<instruction/stem, e.g. Put these steps of the scientific method in the correct sequence:>",
   "options": ["<shuffled/incorrect ordered option 1>", "<shuffled/incorrect ordered option 2>", "<shuffled/incorrect ordered option 3>", "<shuffled/incorrect ordered option 4>"],
   "answer": "<pipe-separated correct sequence of options, in correct order, e.g. Option 3|Option 2|Option 1>",
-  "explanation": "<brief explanation of the correct sequence using only syllabus content>",
+  "explanation": "• Step <N> (<Option Text>): <Clear explanation of why this step/item is placed at position N in the sequence>\\n• (Provide a bullet for EVERY step in the sequence: Step 1, Step 2, ...)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for ORDERING:
-- Default: 3 to 5 items in the options array. Follow teacher instructions for a different count.
-- The options array MUST be in a shuffled/incorrect order.
-- The answer field MUST consist of all the options strings exactly as written, sorted in their correct sequence, joined by a pipe (|). E.g. "Step A|Step B|Step C".
-- All options must be drawn strictly from the syllabus excerpts — no invented content."""
+- Default: 3 to 5 items in the options array in shuffled/incorrect order. Follow teacher instructions for a different count.
+- The answer field MUST consist of all the options strings exactly as written, sorted in their correct sequence, joined by a pipe (|).
+- MANDATORY RATIONALE: The explanation field MUST provide a distinct bulleted rationale for EVERY step/item in the sequence (• Step 1: ..., • Step 2: ..., etc.), justifying its exact placement in the ordered sequence."""
 }
 
 
@@ -461,7 +462,7 @@ def _call_gemini(prompt: str) -> str:
         prompt_tok  = getattr(usage, 'prompt_token_count', '?')
         output_tok  = getattr(usage, 'candidates_token_count', '?')
         total_tok   = getattr(usage, 'total_token_count', '?')
-        print(f"[llm] 📊 Token usage (Gemini) — prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
+        print(f"[llm] Token usage (Gemini) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
     return response.text
 
 
@@ -488,7 +489,7 @@ def _call_groq(prompt: str) -> str:
         prompt_tok  = getattr(usage, 'prompt_tokens', '?')
         output_tok  = getattr(usage, 'completion_tokens', '?')
         total_tok   = getattr(usage, 'total_tokens', '?')
-        print(f"[llm] 📊 Token usage (Groq) — prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
+        print(f"[llm] Token usage (Groq) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
     return completion.choices[0].message.content
 
 
@@ -1085,7 +1086,7 @@ def _build_regenerate_prompt(
             scope_lines.append("• PRESERVE CHOICES/ANSWERS: Keep ALL existing 'options' and the 'answer' field EXACTLY IDENTICAL word-for-word.")
 
         if "rationale" in targets:
-            scope_lines.append("• Scope: RATIONALE / EXPLANATION — Rewrite/expand the 'explanation' field to provide a clear, accurate explanation.")
+            scope_lines.append("• Scope: RATIONALE / EXPLANATION — Rewrite/expand the 'explanation' field into a full structured rationale (per-option for MCQ/TF, per-blank for Constructed/Dropdown, per-pair for Matching, per-step for Ordering).")
         else:
             scope_lines.append("• PRESERVE RATIONALE: Keep the existing 'explanation' field unless the correct answer or choices were modified.")
 

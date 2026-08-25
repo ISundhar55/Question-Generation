@@ -22,10 +22,12 @@ QUALITY STANDARDS — apply to every question in this batch:
      genuinely correct. Every correct letter must be independently verifiable from the text.
    - ORDERING: sequence explicitly stated or unambiguously implied by the text.
 
-4. EXPLANATION
-   - Structure: (a) restate the correct answer, (b) cite the supporting syllabus sentence,
-     (c) briefly note why the most tempting distractor is wrong.
-   - 2-4 sentences maximum. No outside facts not present in the excerpts.
+4. RATIONALE & EXPLANATION (MANDATORY PER-ITEM BREAKDOWN)
+   - MULTIPLE CHOICE (Single & Multi-Select): Must provide a bulleted rationale for EVERY option letter (• Option <Letter> (<Correct/Incorrect>): ...), explaining why each correct choice is right and why each incorrect distractor is wrong.
+   - TRUE/FALSE: Must provide an explicit rationale for BOTH True and False, identifying which is correct and why the other is incorrect.
+   - CONSTRUCTED RESPONSE & DROPDOWN: Must provide a distinct bulleted rationale for EVERY blank (• Blank <N>: ...), detailing the core concept and explaining acceptable synonyms or why dropdown distractors are incorrect.
+   - MATCHING LINES: Must provide a distinct bulleted rationale for EVERY matched pair (• Match <LeftKey>-<RightKey>: ...), explaining the relationship.
+   - ORDERING: Must provide a distinct bulleted rationale for EVERY step/item in the sequence (• Step <N>: ...), justifying its placement in the sequence.
 
 5. DIFFICULTY
    easy   -> Single fact explicitly stated in one sentence; recall only.

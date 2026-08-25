@@ -1040,7 +1040,7 @@ export default function AIGeneratePage() {
                       );
                     })()}
 
-                    {/* Answer & Explanation */}
+                    {/* Answer & Rationale */}
                     <div style={{
                       background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
                       borderLeft: '3px solid var(--color-primary)',
@@ -1048,15 +1048,15 @@ export default function AIGeneratePage() {
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                         Answer
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 8 : 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 10 : 0 }}>
                         {q.answer}
                       </div>
                       {q.explanation && (
                         <>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                            Explanation
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                            Rationale
                           </div>
-                          <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
                             {q.explanation}
                           </div>
                         </>
