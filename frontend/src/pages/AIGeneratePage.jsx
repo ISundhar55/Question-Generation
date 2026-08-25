@@ -23,6 +23,62 @@ const DIFFICULTIES = [
   { value: 'hard', label: 'Hard', color: '#991b1b', bg: '#fef2f2' },
 ];
 
+const getRefinementTargetsForType = (qType) => {
+  const type = (qType || '').toUpperCase();
+  if (type === 'TRUE_FALSE') {
+    return [
+      { id: 'stem', label: 'Question Stem' },
+      { id: 'answer', label: 'Correct Answer (True / False)' },
+      { id: 'rationale', label: 'Rationale' },
+      { id: 'entire_item', label: 'Entire Item' },
+    ];
+  }
+  if (type === 'CONSTRUCTED_RESPONSE') {
+    return [
+      { id: 'stem', label: 'Question Stem' },
+      { id: 'answer', label: 'Correct Answer' },
+      { id: 'alternatives', label: 'Alternative Answers' },
+      { id: 'rationale', label: 'Rationale' },
+      { id: 'entire_item', label: 'Entire Item' },
+    ];
+  }
+  if (type === 'MATCHING_LINES') {
+    return [
+      { id: 'stem', label: 'Question Stem' },
+      { id: 'pairs', label: 'Matching Pairs' },
+      { id: 'rationale', label: 'Rationale' },
+      { id: 'entire_item', label: 'Entire Item' },
+    ];
+  }
+  if (type === 'ORDERING') {
+    return [
+      { id: 'stem', label: 'Question Stem' },
+      { id: 'sequence', label: 'Sequence Items' },
+      { id: 'rationale', label: 'Rationale' },
+      { id: 'entire_item', label: 'Entire Item' },
+    ];
+  }
+  if (type === 'DROPDOWN') {
+    return [
+      { id: 'stem', label: 'Question Stem' },
+      { id: 'choices', label: 'Dropdown Choices' },
+      { id: 'answer', label: 'Correct Answer' },
+      { id: 'distractors', label: 'Distractors Only' },
+      { id: 'rationale', label: 'Rationale' },
+      { id: 'entire_item', label: 'Entire Item' },
+    ];
+  }
+  // Default for SINGLE_SELECT, MULTIPLE_SELECT, MCQ
+  return [
+    { id: 'stem', label: 'Question Stem' },
+    { id: 'choices', label: 'Answer Choices' },
+    { id: 'answer', label: 'Correct Answer' },
+    { id: 'distractors', label: 'Distractors Only' },
+    { id: 'rationale', label: 'Rationale' },
+    { id: 'entire_item', label: 'Entire Item' },
+  ];
+};
+
 const TYPE_META = {
   SINGLE_SELECT: { color: '#4f6ef7', bg: '#eef1fe' },
   MULTIPLE_SELECT: { color: '#3b82f6', bg: '#dbeafe' },
@@ -53,10 +109,39 @@ export default function AIGeneratePage() {
   // Form state
   const [contentArea, setContentArea] = useState(CONTENT_AREAS[0]);
   const [grade, setGrade] = useState(GRADES[0]);
-  const [questionType, setQuestionType] = useState('SINGLE_SELECT');
   const [difficulty, setDifficulty] = useState('medium');
-  const [count, setCount] = useState(5);
   const [customPrompt, setCustomPrompt] = useState('');
+
+  // Multi-type selection with individual counts (max 20 per type, 50 total)
+  const [typeCounts, setTypeCounts] = useState({
+    SINGLE_SELECT: 0,
+    MULTIPLE_SELECT: 0,
+    TRUE_FALSE: 0,
+    CONSTRUCTED_RESPONSE: 0,
+    DROPDOWN: 0,
+    MATCHING_LINES: 0,
+    ORDERING: 0,
+  });
+
+  const [lastNonZeroCounts, setLastNonZeroCounts] = useState({
+    SINGLE_SELECT: 1,
+    MULTIPLE_SELECT: 1,
+    TRUE_FALSE: 1,
+    CONSTRUCTED_RESPONSE: 1,
+    DROPDOWN: 1,
+    MATCHING_LINES: 1,
+    ORDERING: 1,
+  });
+
+  const totalCount = Object.values(typeCounts).reduce((sum, c) => sum + c, 0);
+
+  const handleTypeCountChange = (type, newCount) => {
+    const validCount = Math.max(0, Math.min(20, newCount));
+    setTypeCounts(prev => ({ ...prev, [type]: validCount }));
+    if (validCount > 0) {
+      setLastNonZeroCounts(prev => ({ ...prev, [type]: validCount }));
+    }
+  };
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -70,6 +155,7 @@ export default function AIGeneratePage() {
   // Regenerate modal state
   const [regenModal, setRegenModal] = useState(null); // null | { idx, question }
   const [regenInstructions, setRegenInstructions] = useState('');
+  const [refinementTargets, setRefinementTargets] = useState([]); // all unchecked by default
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState(null);
 
@@ -82,73 +168,39 @@ export default function AIGeneratePage() {
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [feedbackError, setFeedbackError] = useState(null);
 
-  // Internet-generation confirmation modal state
-  const [showInternetConfirm, setShowInternetConfirm] = useState(false);
-  const [internetGenerating, setInternetGenerating] = useState(false);
+  // Internet-generation configuration
   const [preferredWebsite, setPreferredWebsite] = useState('');
 
   // Stats from last generation
   const [genMeta, setGenMeta] = useState(null);
 
   const handleGenerate = async () => {
+    const activeTypes = Object.entries(typeCounts).filter(([_, count]) => count > 0);
+    if (activeTypes.length === 0 || totalCount > 50) return;
+
     setGenerating(true);
     setError(null);
     setQuestions([]);
     setSavedIds(new Set());
     setGenMeta(null);
-    setShowInternetConfirm(false);
 
     try {
-      const res = await aiAPI.generate({
-        content_area: contentArea,
-        grade,
-        question_type: questionType,
-        difficulty,
-        count,
-        custom_prompt: customPrompt.trim() || undefined,
-      });
-      setQuestions(res.data.questions || []);
-      setGenMeta({
-        retrieved_chunk_count: res.data.retrieved_chunk_count,
-        doc_ids_used: res.data.doc_ids_used,
-        ungrounded_dropped: res.data.ungrounded_dropped || 0,
-      });
-    } catch (err) {
-      const status = err.response?.status;
-      const msg = err.response?.data?.message || '';
-
-      // 404 = no syllabus found for this Grade + Content Area
-      // Offer the user the option to generate from the internet instead.
-      if (status === 404 || msg.toLowerCase().includes('no syllabus')) {
-        setShowInternetConfirm(true);
-      } else {
-        setError(msg || 'Generation failed. Please check that a syllabus has been uploaded for this Content Area and Grade.');
-      }
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleInternetGenerate = async () => {
-    setShowInternetConfirm(false);
-    setInternetGenerating(true);
-    setError(null);
-    setQuestions([]);
-    setSavedIds(new Set());
-    setGenMeta(null);
-
-    try {
-      const res = await aiAPI.generateFromInternet({
-        content_area: contentArea,
-        grade,
-        question_type: questionType,
-        difficulty,
-        count,
-        custom_prompt: customPrompt.trim() || undefined,
-        preferred_website: preferredWebsite.trim() || undefined,
-      });
-      const qs = (res.data.questions || []).map(q => ({ ...q, _internetSource: true }));
-      setQuestions(qs);
+      const requests = activeTypes.map(([type, count]) =>
+        aiAPI.generateFromInternet({
+          content_area: contentArea,
+          grade,
+          question_type: type,
+          difficulty,
+          count,
+          custom_prompt: customPrompt.trim() || undefined,
+          preferred_website: preferredWebsite.trim() || undefined,
+        })
+      );
+      const responses = await Promise.all(requests);
+      const allQuestions = responses.flatMap(res =>
+        (res.data.questions || []).map(q => ({ ...q, _internetSource: true }))
+      );
+      setQuestions(allQuestions);
       setGenMeta({
         retrieved_chunk_count: 0,
         doc_ids_used: [],
@@ -156,9 +208,9 @@ export default function AIGeneratePage() {
         internetSource: true,
       });
     } catch (err) {
-      setError(err.response?.data?.message || 'Internet generation failed. Please try again.');
+      setError(err.response?.data?.message || 'Generation failed. Please try again.');
     } finally {
-      setInternetGenerating(false);
+      setGenerating(false);
     }
   };
 
@@ -211,13 +263,29 @@ export default function AIGeneratePage() {
   const openRegenModal = (idx, question) => {
     setRegenModal({ idx, question });
     setRegenInstructions('');
+    setRefinementTargets([]); // All unchecked by default
     setRegenError(null);
   };
 
   const closeRegenModal = () => {
     setRegenModal(null);
     setRegenInstructions('');
+    setRefinementTargets([]);
     setRegenError(null);
+  };
+
+  const toggleRefinementTarget = (id) => {
+    setRefinementTargets(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(t => t !== id);
+      } else {
+        if (id === 'entire_item') {
+          return ['entire_item'];
+        } else {
+          return [...prev.filter(t => t !== 'entire_item'), id];
+        }
+      }
+    });
   };
 
   const handleRegenerate = async () => {
@@ -233,6 +301,7 @@ export default function AIGeneratePage() {
         difficulty: question.difficulty,
         original_question: question,
         modification_instructions: regenInstructions.trim(),
+        refinement_targets: refinementTargets,
         source_chunk_ids: question.sourceChunkIds || [],
       });
       const newQuestion = {
@@ -301,9 +370,6 @@ export default function AIGeneratePage() {
     }
   };
 
-  const diffMeta = DIFFICULTIES.find(d => d.value === difficulty) || DIFFICULTIES[1];
-  const typeMeta = TYPE_META[questionType] || TYPE_META.MCQ;
-
   return (
     <Layout>
       {/* Page Header */}
@@ -312,11 +378,11 @@ export default function AIGeneratePage() {
           ✨ AI Question Generator
         </h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginTop: 4 }}>
-          Select parameters below — questions are generated from your uploaded syllabus only.
+          Select parameters below — questions are generated using general curriculum knowledge and web sources.
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '390px 1fr', gap: 24, alignItems: 'start' }}>
 
         {/* ─── Left Panel: Form ─── */}
         <div style={{
@@ -345,26 +411,122 @@ export default function AIGeneratePage() {
           </div>
 
 
-          {/* Question Type */}
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Question Type</label>
-            <select
-              id="ai-question-type"
-              value={questionType}
-              onChange={e => setQuestionType(e.target.value)}
-              style={selectStyle}
-            >
-              {QUESTION_TYPES.map(qt => (
-                <option key={qt.value} value={qt.value}>
-                  {qt.label}
-                </option>
-              ))}
-            </select>
+          {/* Question Types Multi-Select Card (Matching Screenshot) */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>
+                Question Types <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--color-text-muted)', fontSize: 11 }}>(Total: {totalCount} {totalCount === 1 ? 'item' : 'items'})</span>
+              </label>
+            </div>
+
+            <div style={{
+              border: '1.5px solid var(--color-border)',
+              borderRadius: 10,
+              background: 'var(--color-surface)',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+            }}>
+              {QUESTION_TYPES.map(qt => {
+                const currentCount = typeCounts[qt.value] || 0;
+                const isChecked = currentCount > 0;
+                return (
+                  <div
+                    key={qt.value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      padding: '6px 4px',
+                      borderRadius: 6,
+                    }}
+                  >
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      fontWeight: isChecked ? 600 : 500,
+                      color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
+                      userSelect: 'none',
+                      flex: 1,
+                      minWidth: 0,
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={e => {
+                          const checked = e.target.checked;
+                          handleTypeCountChange(qt.value, checked ? (lastNonZeroCounts[qt.value] || 1) : 0);
+                        }}
+                        style={{
+                          width: 16,
+                          height: 16,
+                          accentColor: 'var(--color-primary)',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span style={{ lineHeight: 1.35 }}>{qt.label}</span>
+                    </label>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontWeight: 500 }}>Count:</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={currentCount}
+                        onChange={e => {
+                          const val = parseInt(e.target.value, 10);
+                          handleTypeCountChange(qt.value, isNaN(val) ? 0 : Math.max(0, Math.min(20, val)));
+                        }}
+                        style={{
+                          width: 52,
+                          padding: '5px 8px',
+                          borderRadius: 6,
+                          border: `1.5px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                          background: isChecked ? 'var(--color-surface)' : '#f8fafc',
+                          color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          textAlign: 'center',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Summary Footer */}
+              <div style={{
+                borderTop: '1px solid var(--color-border)',
+                marginTop: 8,
+                paddingTop: 12,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>Total Items:</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-primary)' }}>
+                  {totalCount}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
+                Max 20 items per type, 50 total
+                {totalCount > 50 && ' (⚠️ Exceeds 50 total maximum)'}
+              </div>
+            </div>
           </div>
 
           {/* Difficulty */}
           <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Difficulty</label>
+            <label style={labelStyle}>Level of Difficulty</label>
             <div style={{ display: 'flex', gap: 8 }}>
               {DIFFICULTIES.map(d => (
                 <button
@@ -382,25 +544,6 @@ export default function AIGeneratePage() {
                   {d.label}
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Count Slider */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between' }}>
-              <span>Number of Questions</span>
-              <span style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: 16 }}>{count}</span>
-            </label>
-            <input
-              id="question-count"
-              type="range"
-              min={1} max={20} step={1}
-              value={count}
-              onChange={e => setCount(Number(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--color-primary)', cursor: 'pointer' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-              <span>1</span><span>20</span>
             </div>
           </div>
 
@@ -434,26 +577,51 @@ export default function AIGeneratePage() {
             )}
           </div>
 
+          {/* Preferred Reference Website */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Preferred Reference Website</span>
+              <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
+            </label>
+            <input
+              id="ai-preferred-website"
+              type="url"
+              placeholder="e.g. https://www.khanacademy.org"
+              value={preferredWebsite}
+              onChange={e => setPreferredWebsite(e.target.value)}
+              style={{
+                ...selectStyle,
+                fontFamily: 'inherit',
+                fontSize: 13,
+                cursor: 'text',
+              }}
+            />
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              AI will prioritize this domain or fall back to verified educational sites (Khan Academy, Wikipedia, etc.).
+            </div>
+          </div>
+
           {/* Generate Button */}
           <button
             id="generate-btn"
             className="btn-generate"
             onClick={handleGenerate}
-            disabled={generating || internetGenerating}
+            disabled={generating || totalCount === 0 || totalCount > 50}
             style={{
-              width: '100%', padding: '13px', background: (generating || internetGenerating) ? '#c7d2fe' : 'var(--color-primary)',
+              width: '100%', padding: '13px',
+              background: (generating || totalCount === 0 || totalCount > 50) ? '#c7d2fe' : 'var(--color-primary)',
               border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 700,
-              cursor: (generating || internetGenerating) ? 'not-allowed' : 'pointer',
-              boxShadow: (generating || internetGenerating) ? 'none' : '0 4px 14px rgba(79,110,247,0.35)',
+              cursor: (generating || totalCount === 0 || totalCount > 50) ? 'not-allowed' : 'pointer',
+              boxShadow: (generating || totalCount === 0 || totalCount > 50) ? 'none' : '0 4px 14px rgba(79,110,247,0.35)',
               transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            {(generating || internetGenerating) ? (
+            {generating ? (
               <>
                 <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                {internetGenerating ? 'Generating from Internet...' : 'Generating...'}
+                Generating {totalCount} Question{totalCount > 1 ? 's' : ''}...
               </>
-            ) : '✨ Generate Questions'}
+            ) : totalCount === 0 ? 'Select a Question Type' : totalCount > 50 ? 'Exceeds 50 Max Total' : `✨ Generate ${totalCount} Question${totalCount > 1 ? 's' : ''}`}
           </button>
         </div>
 
@@ -484,8 +652,7 @@ export default function AIGeneratePage() {
                 Generated <strong style={{ color: 'var(--color-text)' }}>{questions.length}</strong> questions
                 {genMeta.internetSource ? (
                   <span style={{ marginLeft: 6 }}>
-                    using <strong style={{ color: '#0891b2' }}>🌐 internet knowledge</strong>
-                    {' '}for <strong style={{ color: 'var(--color-text)' }}>{grade} {contentArea}</strong>
+                    for <strong style={{ color: 'var(--color-text)' }}>{grade} {contentArea}</strong>
                   </span>
                 ) : (
                   <span>
@@ -517,27 +684,25 @@ export default function AIGeneratePage() {
           )}
 
           {/* Empty state while generating */}
-          {(generating || internetGenerating) && (
+          {generating && (
             <div style={{
               background: 'var(--color-surface)', border: '1px solid var(--color-border)',
               borderRadius: 12, padding: 60, textAlign: 'center', boxShadow: 'var(--shadow)',
             }}>
               <div style={{ fontSize: 36, marginBottom: 16, animation: 'pulse 1.5s ease-in-out infinite' }}>
-                {internetGenerating ? '🌐' : '✨'}
+                ✨
               </div>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
-                {internetGenerating ? 'Generating from internet knowledge...' : 'Retrieving syllabus content...'}
+                Generating questions...
               </div>
               <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>
-                {internetGenerating
-                  ? `AI is creating ${count} ${questionType.replace('_', ' ')} questions for ${grade} ${contentArea}`
-                  : 'FAISS search → Gemini generation → structured output'}
+                AI is creating {totalCount} questions across selected types for {grade} {contentArea}
               </div>
             </div>
           )}
 
           {/* Empty state before generation */}
-          {!generating && !internetGenerating && questions.length === 0 && !error && !showInternetConfirm && (
+          {!generating && questions.length === 0 && !error && (
             <div style={{
               background: 'var(--color-surface)', border: '1px dashed var(--color-border)',
               borderRadius: 12, padding: 60, textAlign: 'center',
@@ -592,16 +757,8 @@ export default function AIGeneratePage() {
                         {q.difficulty}
                       </span>
 
-                      {/* Grounding Status badge — internet source OR 3-tier syllabus grounding */}
-                      {q._internetSource ? (
-                        <span style={{
-                          display: 'inline-flex', padding: '3px 10px', borderRadius: 5,
-                          fontSize: 11, fontWeight: 700,
-                          background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc',
-                        }}>
-                          🌐 Internet
-                        </span>
-                      ) : (() => {
+                      {/* Grounding Status badge — only for syllabus-sourced questions */}
+                      {!q._internetSource && (() => {
                         const score = typeof q.groundingScore === 'number'
                           ? q.groundingScore
                           : (q.grounded === false ? 0 : 1);
@@ -630,7 +787,7 @@ export default function AIGeneratePage() {
                           <button
                             className="btn-chunks"
                             onClick={() => toggleSource(idx)}
-                            title={q._internetSource ? "Show referenced websites for this question" : "Show exactly where this question came from"}
+                            title="Show source references for this question"
                             style={{
                               padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                               border: '1px solid var(--color-border)', background: src ? 'var(--color-primary-light)' : 'transparent',
@@ -638,7 +795,7 @@ export default function AIGeneratePage() {
                               transition: 'all 0.15s',
                             }}
                           >
-                            {q._internetSource ? `🌐 Source${q.sources?.length > 1 ? 's' : ''}` : `📍 Source${q.sources?.length > 1 ? 's' : ''}`}
+                            📍 Source{q.sources?.length > 1 ? 's' : ''}
                           </button>
                         )}
                         {/* Feedback button */}
@@ -918,7 +1075,7 @@ export default function AIGeneratePage() {
                       }}>
                         <div style={{ fontWeight: 700, marginBottom: 6 }}>
                           {q._internetSource
-                            ? `🌐 Reference Website${q.sources?.length > 1 ? 's' : ''}`
+                            ? `Reference Website${q.sources?.length > 1 ? 's' : ''}`
                             : `Source${q.sources?.length > 1 ? 's' : ''} — for cross-verification against the syllabus`
                           }
                         </div>
@@ -1005,139 +1162,7 @@ export default function AIGeneratePage() {
         </div>
       </div>
 
-      {/* ─── Internet Confirmation Modal ─── */}
-      {showInternetConfirm && (
-        <div
-          onClick={(e) => { if (e.target === e.currentTarget) setShowInternetConfirm(false); }}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(10, 10, 20, 0.55)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
-            animation: 'fadeIn 0.15s ease',
-          }}
-        >
-          <div style={{
-            background: 'var(--color-surface)',
-            borderRadius: 16,
-            padding: 32,
-            width: '100%',
-            maxWidth: 560,
-            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
-            border: '1px solid var(--color-border)',
-            animation: 'slideUp 0.18s ease',
-            position: 'relative',
-            textAlign: 'center',
-          }}>
-            {/* X close button */}
-            <button
-              onClick={() => setShowInternetConfirm(false)}
-              aria-label="Close confirmation modal"
-              style={{
-                position: 'absolute', top: 14, right: 14,
-                width: 30, height: 30, borderRadius: '50%',
-                border: '1px solid var(--color-border)',
-                background: 'transparent',
-                color: 'var(--color-text-muted)',
-                fontSize: 16, fontWeight: 700, lineHeight: 1,
-                cursor: 'pointer', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = 'var(--color-text)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-            >
-              &#x2715;
-            </button>
 
-            {/* Icon */}
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🌐</div>
-
-            {/* Title */}
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', marginBottom: 10 }}>
-              No Syllabus Found
-            </div>
-
-            {/* Body */}
-            <div style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.6, marginBottom: 24 }}>
-              No syllabus has been uploaded for{' '}
-              <strong style={{ color: 'var(--color-text)' }}>{grade} — {contentArea}</strong>.
-              <br />
-              Would you like to generate{' '}
-              <strong style={{ color: 'var(--color-primary)' }}>{count} {questionType.replace(/_/g, ' ')} question{count > 1 ? 's' : ''}</strong>{' '}
-              from internet knowledge instead?
-            </div>
-
-            {/* Info note */}
-            <div style={{
-              background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8,
-              padding: '10px 14px', marginBottom: 24, fontSize: 12,
-              color: '#0369a1', textAlign: 'left', lineHeight: 1.5,
-            }}>
-              ℹ️ Questions will be generated using the AI&apos;s general curriculum knowledge
-              for <strong>{grade} {contentArea}</strong>. They will be marked with a 🌐 Internet badge
-              and will not have syllabus source citations.
-            </div>
-
-            {/* Optional preferred website input */}
-            <div style={{ marginBottom: 20, textAlign: 'left' }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                🔗 Preferred Reference Website <span style={{ fontWeight: 400, color: '#94a3b8' }}>(optional)</span>
-              </label>
-              <input
-                id="preferred-website-input"
-                type="url"
-                placeholder="e.g. https://www.khanacademy.org"
-                value={preferredWebsite}
-                onChange={e => setPreferredWebsite(e.target.value)}
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  padding: '8px 12px', borderRadius: 7, fontSize: 13,
-                  border: '1.5px solid #cbd5e1', background: '#f8fafc',
-                  color: '#1e293b', outline: 'none', transition: 'border 0.15s',
-                }}
-                onFocus={e => { e.target.style.borderColor = '#0891b2'; e.target.style.background = '#fff'; }}
-                onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.background = '#f8fafc'; }}
-              />
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                If suitable for the topic, AI will use this site. Otherwise it falls back to trusted sites like Khan Academy, Wikipedia, etc.
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button
-                id="internet-cancel-btn"
-                onClick={() => setShowInternetConfirm(false)}
-                style={{
-                  padding: '10px 24px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                  border: '1.5px solid #cbd5e1', background: '#f8fafc',
-                  color: '#475569', cursor: 'pointer', transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; }}
-              >
-                Cancel
-              </button>
-              <button
-                id="internet-confirm-btn"
-                onClick={handleInternetGenerate}
-                style={{
-                  padding: '10px 24px', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                  border: 'none', background: '#0891b2',
-                  color: '#fff', cursor: 'pointer', transition: 'all 0.15s',
-                  boxShadow: '0 4px 12px rgba(8,145,178,0.35)',
-                  display: 'flex', alignItems: 'center', gap: 8,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#0e7490'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#0891b2'; e.currentTarget.style.transform = 'translateY(0)'; }}
-              >
-                🌐 Generate from Internet
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── Regenerate Modal ─── */}
       {regenModal && (
@@ -1183,48 +1208,100 @@ export default function AIGeneratePage() {
               &#x2715;
             </button>
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>🔄 Regenerate Question</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>🔄 Regenerate / Refine Question</div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                  Q{regenModal.idx + 1} — {regenModal.question.questionType?.replace(/_/g, ' ')}
+                  Q{regenModal.idx + 1} — {regenModal.question.questionType?.replace(/_/g, ' ')} ({regenModal.question.difficulty})
                 </div>
               </div>
             </div>
 
-            {/* Original Question Preview */}
+            {/* Original Question Stem Preview */}
             <div style={{
-              background: '#f8f9fb', borderRadius: 10, padding: '12px 16px',
-              marginBottom: 20, border: '1px solid var(--color-border)',
+              background: '#f8fafc', borderRadius: 10, padding: '12px 16px',
+              marginBottom: 18, border: '1px solid var(--color-border)',
             }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                Original Question
+                Original Question Stem
               </div>
-              <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.5, fontWeight: 500 }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.5, fontWeight: 600 }}>
                 {regenModal.question.text}
               </div>
             </div>
 
-            {/* Modification Instructions */}
+            {/* What would you like to refine? (Target Checkboxes) */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>
+                What would you like to refine?
+              </label>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 8,
+              }}>
+                {getRefinementTargetsForType(regenModal.question.questionType).map(target => {
+                  const isChecked = refinementTargets.includes(target.id);
+                  return (
+                    <label
+                      key={target.id}
+                      onClick={() => toggleRefinementTarget(target.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: `1.5px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        background: isChecked ? '#f0f4ff' : 'var(--color-surface)',
+                        color: isChecked ? 'var(--color-primary)' : 'var(--color-text)',
+                        fontSize: 13,
+                        fontWeight: isChecked ? 600 : 500,
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        transition: 'all 0.12s',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => { }} // handled by label onClick
+                        style={{
+                          width: 16,
+                          height: 16,
+                          accentColor: 'var(--color-primary)',
+                          cursor: 'pointer',
+                        }}
+                      />
+                      <span>{target.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Refinement Instructions */}
             <div style={{ marginBottom: 20 }}>
-              <label style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>Modification Instructions</label>
+              <label style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>
+                Refinement Instructions <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 11 }}>(optional)</span>
+              </label>
               <textarea
                 id="regen-instructions"
-                rows={4}
-                placeholder={'e.g. Make it harder\nFocus on ecosystems instead\nReword more clearly\nAdd a 5th option'}
+                rows={3}
+                placeholder="e.g. Simplify wording, adjust difficulty, make distractors more plausible, or focus on a specific concept..."
                 value={regenInstructions}
                 onChange={e => setRegenInstructions(e.target.value)}
                 style={{
                   width: '100%', padding: '10px 12px', borderRadius: 8,
                   border: '1.5px solid var(--color-border)', fontSize: 13,
-                  background: 'var(--color-bg)', color: 'var(--color-text)',
+                  background: 'var(--color-surface)', color: 'var(--color-text)',
                   resize: 'vertical', outline: 'none', lineHeight: 1.5,
                   fontFamily: 'inherit',
                   boxSizing: 'border-box',
                 }}
               />
               <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                Leave empty to let AI improve the question automatically.
+                Leave empty to let AI improve selected components automatically.
               </div>
             </div>
 

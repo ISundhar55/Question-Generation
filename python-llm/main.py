@@ -726,6 +726,7 @@ async def regenerate(req: RegenerateRequest):
         original_question=req.original_question,
         modification_instructions=clean_mod_instructions,
         chunks=chunks_for_prompt,
+        refinement_targets=req.refinement_targets,
     )
 
     if parse_success and question_dict is not None and top_chunks:

@@ -120,8 +120,14 @@ const generateQuestions = async (req, res) => {
 const regenerateQuestion = async (req, res) => {
   try {
     const {
-      content_area, grade, question_type, difficulty,
-      original_question, modification_instructions, source_chunk_ids,
+      content_area,
+      grade,
+      question_type,
+      difficulty,
+      original_question,
+      modification_instructions,
+      refinement_targets,
+      source_chunk_ids,
     } = req.body;
 
     // Validate required fields
@@ -160,6 +166,7 @@ const regenerateQuestion = async (req, res) => {
           difficulty,
           original_question,
           modification_instructions: modification_instructions || '',
+          refinement_targets: refinement_targets || [],
           source_chunk_ids: source_chunk_ids || [],
         }),
       });

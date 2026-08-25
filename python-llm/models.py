@@ -129,6 +129,10 @@ class RegenerateRequest(BaseModel):
         "",
         description="Teacher's refinement notes, e.g. 'Make it harder' or 'Focus on photosynthesis'"
     )
+    refinement_targets: list[str] = Field(
+        default_factory=list,
+        description="Target components to refine: stem, choices, answer, distractors, rationale, entire_item"
+    )
     source_chunk_ids: list[int] = Field(
         default_factory=list,
         description="FAISS chunk_id integers from the original question's sourceChunkIds"
