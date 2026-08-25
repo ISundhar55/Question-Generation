@@ -3,105 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { aiAPI, questionsAPI } from '../services/api';
 import { MarkdownText } from 'question-storybook-ui';
-
-const CONTENT_AREAS = ['English Language Arts', 'Mathematics', 'Science'];
-const GRADES = ['Grade 6', 'Grade 7', 'Grade 8', 'Grade 9'];
-
-const QUESTION_TYPES = [
-  { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', icon: '🔘', desc: '4 options, one correct answer' },
-  { value: 'MULTIPLE_SELECT', label: 'Multiple Choice (Multiple Select)', icon: '✅', desc: '4-6 options, one or more correct answers' },
-  { value: 'TRUE_FALSE', label: 'True / False', icon: '⚖️', desc: 'Statement judged true or false' },
-  { value: 'CONSTRUCTED_RESPONSE', label: 'Constructed Response', icon: '✏️', desc: 'Type the answer for each blank' },
-  { value: 'DROPDOWN', label: 'Dropdown', icon: '📋', desc: 'Select answer for each blank from a list' },
-  { value: 'MATCHING_LINES', label: 'Matching Lines', icon: '🔗', desc: 'Match Column A items to Column B' },
-  { value: 'ORDERING', label: 'Ordering', icon: '↕️', desc: 'Drag options to place them in correct order' },
-];
-
-const DIFFICULTIES = [
-  { value: 'easy', label: 'Easy', color: '#15803d', bg: '#f0fdf4' },
-  { value: 'medium', label: 'Medium', color: '#92400e', bg: '#fffbeb' },
-  { value: 'hard', label: 'Hard', color: '#991b1b', bg: '#fef2f2' },
-];
-
-const getRefinementTargetsForType = (qType) => {
-  const type = (qType || '').toUpperCase();
-  if (type === 'TRUE_FALSE') {
-    return [
-      { id: 'stem', label: 'Question Stem' },
-      { id: 'answer', label: 'Correct Answer (True / False)' },
-      { id: 'rationale', label: 'Rationale' },
-      { id: 'entire_item', label: 'Entire Item' },
-    ];
-  }
-  if (type === 'CONSTRUCTED_RESPONSE') {
-    return [
-      { id: 'stem', label: 'Question Stem' },
-      { id: 'answer', label: 'Correct Answer' },
-      { id: 'alternatives', label: 'Alternative Answers' },
-      { id: 'rationale', label: 'Rationale' },
-      { id: 'entire_item', label: 'Entire Item' },
-    ];
-  }
-  if (type === 'MATCHING_LINES') {
-    return [
-      { id: 'stem', label: 'Question Stem' },
-      { id: 'pairs', label: 'Matching Pairs' },
-      { id: 'rationale', label: 'Rationale' },
-      { id: 'entire_item', label: 'Entire Item' },
-    ];
-  }
-  if (type === 'ORDERING') {
-    return [
-      { id: 'stem', label: 'Question Stem' },
-      { id: 'sequence', label: 'Sequence Items' },
-      { id: 'rationale', label: 'Rationale' },
-      { id: 'entire_item', label: 'Entire Item' },
-    ];
-  }
-  if (type === 'DROPDOWN') {
-    return [
-      { id: 'stem', label: 'Question Stem' },
-      { id: 'choices', label: 'Dropdown Choices' },
-      { id: 'answer', label: 'Correct Answer' },
-      { id: 'distractors', label: 'Distractors Only' },
-      { id: 'rationale', label: 'Rationale' },
-      { id: 'entire_item', label: 'Entire Item' },
-    ];
-  }
-  // Default for SINGLE_SELECT, MULTIPLE_SELECT, MCQ
-  return [
-    { id: 'stem', label: 'Question Stem' },
-    { id: 'choices', label: 'Answer Choices' },
-    { id: 'answer', label: 'Correct Answer' },
-    { id: 'distractors', label: 'Distractors Only' },
-    { id: 'rationale', label: 'Rationale' },
-    { id: 'entire_item', label: 'Entire Item' },
-  ];
-};
-
-const TYPE_META = {
-  SINGLE_SELECT: { color: '#4f6ef7', bg: '#eef1fe' },
-  MULTIPLE_SELECT: { color: '#3b82f6', bg: '#dbeafe' },
-  MCQ: { color: '#4f6ef7', bg: '#eef1fe' },
-  TRUE_FALSE: { color: '#22c55e', bg: '#f0fdf4' },
-  SHORT_ANSWER: { color: '#f59e0b', bg: '#fffbeb' },
-  FILL_IN_BLANK: { color: '#a855f7', bg: '#faf5ff' },   // kept for legacy display
-  CONSTRUCTED_RESPONSE: { color: '#7c3aed', bg: '#f5f3ff' },
-  DROPDOWN: { color: '#0e7490', bg: '#ecfeff' },
-  MATCHING_LINES: { color: '#0891b2', bg: '#ecfeff' },
-  ORDERING: { color: '#db2777', bg: '#fdf2f8' },
-};
-
-/** Parse "A-2, B-4, C-1, D-3" → { A: '2', B: '4', C: '1', D: '3' } */
-function parseMatchingAnswer(answerStr) {
-  if (!answerStr) return {};
-  const result = {};
-  answerStr.split(',').forEach(pair => {
-    const [left, right] = pair.trim().split('-');
-    if (left && right) result[left.trim()] = right.trim();
-  });
-  return result;
-}
+import {
+  CONTENT_AREAS,
+  GRADES,
+  QUESTION_TYPES,
+  DIFFICULTIES,
+  TYPE_META,
+  getRefinementTargetsForType,
+  parseMatchingAnswer,
+} from './aiGenerateConstants';
 
 export default function AIGeneratePage() {
   const navigate = useNavigate();
@@ -168,8 +78,10 @@ export default function AIGeneratePage() {
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [feedbackError, setFeedbackError] = useState(null);
 
-  // Internet-generation configuration
-  const [preferredWebsite, setPreferredWebsite] = useState('');
+  // Assessment-specific prompt inputs
+  const [assessmentTarget, setAssessmentTarget] = useState('');
+  const [assessmentBoundaries, setAssessmentBoundaries] = useState('');
+  const [cognitiveComplexity, setCognitiveComplexity] = useState('');
 
   // Stats from last generation
   const [genMeta, setGenMeta] = useState(null);
@@ -184,6 +96,22 @@ export default function AIGeneratePage() {
     setSavedIds(new Set());
     setGenMeta(null);
 
+    // Combine structured assessment fields into priority instructions for the LLM
+    const promptParts = [];
+    if (assessmentTarget.trim()) {
+      promptParts.push(`🎯 Assessment Target:\n${assessmentTarget.trim()}`);
+    }
+    if (assessmentBoundaries.trim()) {
+      promptParts.push(`🛑 Assessment Boundaries:\n${assessmentBoundaries.trim()}`);
+    }
+    if (cognitiveComplexity.trim()) {
+      promptParts.push(`🧠 Cognitive Complexity:\n${cognitiveComplexity.trim()}`);
+    }
+    if (customPrompt.trim()) {
+      promptParts.push(`Additional Instructions:\n${customPrompt.trim()}`);
+    }
+    const combinedCustomPrompt = promptParts.length > 0 ? promptParts.join('\n\n') : undefined;
+
     try {
       const requests = activeTypes.map(([type, count]) =>
         aiAPI.generateFromInternet({
@@ -192,8 +120,7 @@ export default function AIGeneratePage() {
           question_type: type,
           difficulty,
           count,
-          custom_prompt: customPrompt.trim() || undefined,
-          preferred_website: preferredWebsite.trim() || undefined,
+          custom_prompt: combinedCustomPrompt,
         })
       );
       const responses = await Promise.all(requests);
@@ -547,7 +474,74 @@ export default function AIGeneratePage() {
             </div>
           </div>
 
-          {/* Custom Prompt */}
+          {/* Assessment Boundaries */}
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Assessment Boundaries</span>
+              <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
+            </label>
+            <input
+              id="ai-assessment-boundaries"
+              type="text"
+              placeholder="e.g. Exclude biochemical mechanisms (Calvin cycle, Krebs cycle)"
+              value={assessmentBoundaries}
+              onChange={e => setAssessmentBoundaries(e.target.value)}
+              style={{
+                ...selectStyle,
+                fontFamily: 'inherit',
+                fontSize: 13,
+                cursor: 'text',
+              }}
+            />
+          </div>
+
+          {/* Assessment Target */}
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Assessment Target</span>
+              <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
+            </label>
+            <textarea
+              id="ai-assessment-target"
+              rows={3}
+              placeholder="e.g. MS-LS1-6: Construct a scientific explanation based on evidence for the role of photosynthesis in the cycling of matter and flow of energy into and out of organisms."
+              value={assessmentTarget}
+              onChange={e => setAssessmentTarget(e.target.value)}
+              style={{
+                ...selectStyle,
+                resize: 'vertical',
+                minHeight: 70,
+                fontFamily: 'inherit',
+                fontSize: 13,
+                lineHeight: 1.45,
+                fontStyle: assessmentTarget ? 'normal' : 'italic',
+                cursor: 'text',
+              }}
+            />
+          </div>
+
+          {/* Cognitive Complexity */}
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Cognitive Complexity</span>
+              <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
+            </label>
+            <input
+              id="ai-cognitive-complexity"
+              type="text"
+              placeholder="e.g. DOK Level 2 / Bloom's: Analysis (cause-and-effect reasoning)"
+              value={cognitiveComplexity}
+              onChange={e => setCognitiveComplexity(e.target.value)}
+              style={{
+                ...selectStyle,
+                fontFamily: 'inherit',
+                fontSize: 13,
+                cursor: 'text',
+              }}
+            />
+          </div>
+
+          {/* Additional Instructions */}
           <div style={{ marginBottom: 24 }}>
             <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Additional Instructions</span>
@@ -555,14 +549,14 @@ export default function AIGeneratePage() {
             </label>
             <textarea
               id="ai-custom-prompt"
-              rows={4}
+              rows={3}
               placeholder={`Examples:\n• Create questions from Trigonometry\n• Focus on Chapter 3 — Algebra\n• Give 5 options instead of 4\n• Include word problems only`}
               value={customPrompt}
               onChange={e => setCustomPrompt(e.target.value)}
               style={{
                 ...selectStyle,
                 resize: 'vertical',
-                minHeight: 90,
+                minHeight: 80,
                 fontFamily: 'inherit',
                 fontSize: 13,
                 lineHeight: 1.5,
@@ -570,35 +564,11 @@ export default function AIGeneratePage() {
                 cursor: 'text',
               }}
             />
-            {customPrompt.trim() && (
+            {(assessmentTarget.trim() || assessmentBoundaries.trim() || cognitiveComplexity.trim() || customPrompt.trim()) && (
               <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>💡</span> AI will follow these instructions during generation
+                <span>💡</span> AI will strictly apply these assessment parameters and instructions
               </div>
             )}
-          </div>
-
-          {/* Preferred Reference Website */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Preferred Reference Website</span>
-              <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
-            </label>
-            <input
-              id="ai-preferred-website"
-              type="url"
-              placeholder="e.g. https://www.khanacademy.org"
-              value={preferredWebsite}
-              onChange={e => setPreferredWebsite(e.target.value)}
-              style={{
-                ...selectStyle,
-                fontFamily: 'inherit',
-                fontSize: 13,
-                cursor: 'text',
-              }}
-            />
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-              AI will prioritize this domain or fall back to verified educational sites (Khan Academy, Wikipedia, etc.).
-            </div>
           </div>
 
           {/* Generate Button */}

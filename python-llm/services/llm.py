@@ -381,7 +381,7 @@ Return a JSON array of {count} question object(s):"""
 # covers the realistic risk for this use case without adding a heavyweight
 # classifier that would be overkill for a syllabus-question-generation tool.
 
-MAX_USER_TEXT_LEN = 500
+MAX_USER_TEXT_LEN = 2000
 
 _INJECTION_PATTERNS = [
     re.compile(r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions", re.IGNORECASE),
