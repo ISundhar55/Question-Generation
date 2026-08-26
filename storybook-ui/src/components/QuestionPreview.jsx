@@ -235,6 +235,130 @@ export function QuestionPreview({ question, onBack, backLabel }) {
           </div>
         );
       }
+      case 'BACKGROUND_GRAPHIC': {
+        const svg = question.options?.svg_graphic || '';
+        const dropZones = question.options?.drop_zones || [];
+        const labelBank = question.options?.label_bank || [];
+        const zoneWidth = question.options?.drop_zone_width || 120;
+        const zoneHeight = question.options?.drop_zone_height || 36;
+        let answersObj = {};
+        if (typeof question.answer === 'object' && question.answer !== null) {
+          answersObj = question.answer;
+        } else if (typeof question.answer === 'string') {
+          try {
+            answersObj = JSON.parse(question.answer) || {};
+          } catch {
+            answersObj = {};
+          }
+        }
+
+        return (
+          <div className="qc-preview" style={{ fontFamily: 'inherit' }}>
+            <div className="qc-preview-title" style={{ marginBottom: 12 }}>
+              <span className="qc-badge" style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
+                🖼️ Background Graphic
+              </span>
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{question.text}</p>
+
+            {/* SVG Diagram Canvas */}
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: 580,
+              borderRadius: 10,
+              overflow: 'hidden',
+              border: '1.5px solid #cbd5e1',
+              background: '#f8fafc',
+              marginBottom: 14,
+            }}>
+              {svg ? (
+                <div dangerouslySetInnerHTML={{ __html: svg }} style={{ width: '100%', display: 'flex', justifyContent: 'center' }} />
+              ) : (
+                <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>No SVG graphic provided</div>
+              )}
+
+              {/* Overlaid Drop Zone Pins (Empty Target Boxes) */}
+              {dropZones.map((zone) => (
+                <div
+                  key={zone.id}
+                  title={zone.description ? `Pin ${zone.pin_label}: ${zone.description}` : `Drop Zone ${zone.pin_label}`}
+                  style={{
+                    position: 'absolute',
+                    left: `${zone.x_percent || 50}%`,
+                    top: `${zone.y_percent || 50}%`,
+                    transform: 'translate(-50%, -50%)',
+                    width: zoneWidth,
+                    height: zoneHeight,
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    border: '2px dashed #059669',
+                    background: 'rgba(255, 255, 255, 0.88)',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    backdropFilter: 'blur(3px)',
+                    zIndex: 2,
+                  }}
+                >
+                  <span style={{
+                    background: '#059669',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    width: 20,
+                    height: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}>
+                    {zone.pin_label}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#059669', fontWeight: 500, opacity: 0.7, fontStyle: 'italic' }}>
+                    [ Drop Here ]
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Label Bank */}
+            {labelBank.length > 0 && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ecfdf5', border: '1px solid #a7f3d0', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', marginBottom: 6 }}>
+                  🏷️ Label Bank
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {labelBank.map((lbl, i) => (
+                    <span key={i} style={{ padding: '4px 10px', borderRadius: 6, background: '#fff', border: '1px solid #6ee7b7', color: '#065f46', fontSize: 12, fontWeight: 600 }}>
+                      {lbl}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Answer Mapping Key */}
+            {Object.keys(answersObj).length > 0 && (
+              <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Correct Answer Key:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {Object.entries(answersObj).map(([k, v]) => (
+                    <span key={k} style={{ padding: '3px 8px', borderRadius: 4, background: '#ecfdf5', border: '1px solid #a7f3d0', fontSize: 12, color: '#065f46', fontWeight: 600 }}>
+                      {k}: {v}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return <div>Unknown question type</div>;
     }

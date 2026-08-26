@@ -6,6 +6,7 @@ import { ConstructedResponseEditor } from './ConstructedResponseEditor';
 import { DropdownEditor } from './DropdownEditor';
 import { MatchingLinesEditor } from './MatchingLinesEditor';
 import { OrderingEditor } from './OrderingEditor';
+import { BackgroundGraphicEditor } from './BackgroundGraphicEditor';
 
 const QUESTION_TYPES = [
   { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', badge: 'qc-badge-mcq' },
@@ -15,6 +16,7 @@ const QUESTION_TYPES = [
   { value: 'DROPDOWN', label: 'Dropdown', badge: 'qc-badge-dd' },
   { value: 'MATCHING_LINES', label: 'Matching Lines', badge: 'qc-badge-ml' },
   { value: 'ORDERING', label: 'Ordering', badge: 'qc-badge-ord' },
+  { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', badge: 'qc-badge-bg' },
 ];
 
 const DEFAULT_MCQ_OPTIONS = ['', '', '', ''];
@@ -43,9 +45,9 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
     if (typeof initialData.options === 'object') {
       // Map letter-based answers (e.g. 'A|C') to actual option text values
       const opts = initialData.options;
-      const letters = rawAns.split('|').map(s => s.trim());
+      const letters = typeof rawAns === 'string' ? rawAns.split('|').map(s => s.trim()) : [];
       const mapped = letters.map(l => opts[l]).filter(Boolean);
-      return mapped.join('|');
+      return mapped.length > 0 ? mapped.join('|') : rawAns;
     }
     return rawAns;
   });
@@ -82,6 +84,91 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
     }
     return [];
   });
+  // Parse options and answers if passed as serialized JSON strings or Python dict strings from DB
+  const parsedOptions = (() => {
+    if (!initialData?.options) return {};
+    if (typeof initialData.options === 'string') {
+      const trimmed = initialData.options.trim();
+      try {
+        const p = JSON.parse(trimmed);
+        if (typeof p === 'object' && p !== null) return p;
+      } catch (_) {}
+      try {
+        const fixed = trimmed.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+        const p = JSON.parse(fixed);
+        if (typeof p === 'object' && p !== null) return p;
+      } catch (_) {}
+      return {};
+    }
+    return typeof initialData.options === 'object' && initialData.options !== null ? initialData.options : {};
+  })();
+
+  const parsedAnswerObj = (() => {
+    if (!initialData?.answer) return {};
+    if (typeof initialData.answer === 'object' && initialData.answer !== null) {
+      return initialData.answer;
+    }
+    if (typeof initialData.answer === 'string') {
+      const trimmed = initialData.answer.trim();
+      if (!trimmed) return {};
+
+      // 1. Direct JSON parse
+      try {
+        const p = JSON.parse(trimmed);
+        if (typeof p === 'object' && p !== null) return p;
+      } catch (_) {}
+
+      // 2. Python-style single quotes: {'zone_1': 'Photosphere', 'zone_2': 'Core'}
+      try {
+        const fixed = trimmed
+          .replace(/'/g, '"')
+          .replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+        const p = JSON.parse(fixed);
+        if (typeof p === 'object' && p !== null) return p;
+      } catch (_) {}
+
+      // 3. Key-value string: "zone_1: Photosphere, zone_2: Core"
+      try {
+        const result = {};
+        const pairs = trimmed.replace(/[{}]/g, '').split(',');
+        pairs.forEach(pair => {
+          const parts = pair.split(':');
+          if (parts.length >= 2) {
+            const k = parts[0].replace(/['" ]/g, '').trim();
+            const v = parts.slice(1).join(':').replace(/['" ]/g, '').trim();
+            if (k && v) result[k] = v;
+          }
+        });
+        if (Object.keys(result).length > 0) return result;
+      } catch (_) {}
+    }
+    return {};
+  })();
+
+  // BACKGROUND_GRAPHIC state
+  const [svgGraphic, setSvgGraphic] = useState(parsedOptions.svg_graphic || '');
+  const [dropZoneWidth, setDropZoneWidth] = useState(parsedOptions.drop_zone_width || 120);
+  const [dropZoneHeight, setDropZoneHeight] = useState(parsedOptions.drop_zone_height || 36);
+  const [dropZones, setDropZones] = useState(() => {
+    if (parsedOptions.drop_zones && Array.isArray(parsedOptions.drop_zones) && parsedOptions.drop_zones.length > 0) {
+      return parsedOptions.drop_zones;
+    }
+    return [
+      { id: 'zone_1', pin_label: 'A', x_percent: 30, y_percent: 35, description: 'Structure A' },
+      { id: 'zone_2', pin_label: 'B', x_percent: 60, y_percent: 50, description: 'Structure B' },
+    ];
+  });
+  const [labelBank, setLabelBank] = useState(() => {
+    const rawBank = parsedOptions.label_bank;
+    if (Array.isArray(rawBank) && rawBank.length > 0) {
+      return rawBank;
+    }
+    // Fallback: extract any existing answer labels
+    const extracted = Object.values(parsedAnswerObj).filter(Boolean);
+    return extracted.length > 0 ? extracted : [];
+  });
+  const [bgAnswers, setBgAnswers] = useState(parsedAnswerObj);
+
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -121,6 +208,13 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
     if (type === 'ORDERING') {
       const filled = options.filter(o => o.trim());
       if (filled.length < 3) e.options = 'At least 3 options are required';
+    }
+    if (type === 'BACKGROUND_GRAPHIC') {
+      if (!svgGraphic.trim()) e.svgGraphic = 'SVG graphic code is required';
+      if (dropZones.length < 1) e.dropZones = 'At least one drop zone is required';
+      if (labelBank.length < dropZones.length) e.labelBank = 'Label bank must contain at least as many labels as drop zones';
+      const missingAns = dropZones.some(z => !bgAnswers[z.id] && !bgAnswers[z.pin_label]);
+      if (missingAns) e.answer = 'Please assign a correct label for each drop zone';
     }
     return e;
   };
@@ -173,6 +267,22 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
         }
       });
       return { type, text, options: validOptions, answer: finalOrder.join('|'), difficulty, points };
+    }
+    if (type === 'BACKGROUND_GRAPHIC') {
+      return {
+        type,
+        text,
+        options: {
+          svg_graphic: svgGraphic,
+          drop_zone_width: dropZoneWidth,
+          drop_zone_height: dropZoneHeight,
+          drop_zones: dropZones,
+          label_bank: labelBank,
+        },
+        answer: bgAnswers,
+        difficulty,
+        points,
+      };
     }
   };
 
@@ -350,6 +460,25 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           correctOrder={correctOrder}
           setCorrectOrder={setCorrectOrder}
           updateOption={updateOption}
+          err={err}
+        />
+      )}
+
+      {/* Background Graphic */}
+      {type === 'BACKGROUND_GRAPHIC' && (
+        <BackgroundGraphicEditor
+          svgGraphic={svgGraphic}
+          setSvgGraphic={setSvgGraphic}
+          dropZoneWidth={dropZoneWidth}
+          setDropZoneWidth={setDropZoneWidth}
+          dropZoneHeight={dropZoneHeight}
+          setDropZoneHeight={setDropZoneHeight}
+          dropZones={dropZones}
+          setDropZones={setDropZones}
+          labelBank={labelBank}
+          setLabelBank={setLabelBank}
+          answers={bgAnswers}
+          setAnswers={setBgAnswers}
           err={err}
         />
       )}

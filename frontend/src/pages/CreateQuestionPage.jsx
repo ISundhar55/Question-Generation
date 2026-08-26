@@ -97,6 +97,7 @@ export default function CreateQuestionPage() {
           {mode === 'create' ? (
             /* ── QuestionCreator from storybook-ui ── */
             <QuestionCreator
+              key={initialData?.id || 'create'}
               initialData={initialData}
               onSave={handleSave}
               onClose={handleClose}

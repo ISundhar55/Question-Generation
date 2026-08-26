@@ -38,8 +38,10 @@ const getQuestionById = async (req, res) => {
 const createQuestion = async (req, res) => {
   const { bank_id, type, text, options, answer, difficulty, points } = req.body;
 
-  if (!type || !text || !answer)
+  if (!type || !text || answer === undefined || answer === null || answer === '')
     return res.status(400).json({ message: 'type, text, and answer are required' });
+
+  const answerVal = typeof answer === 'object' ? JSON.stringify(answer) : String(answer);
 
   try {
     const result = await pool.query(
@@ -52,7 +54,7 @@ const createQuestion = async (req, res) => {
         type,
         text,
         options ? JSON.stringify(options) : null,
-        answer,
+        answerVal,
         difficulty || 'medium',
         points || 1,
       ]
@@ -67,6 +69,7 @@ const createQuestion = async (req, res) => {
 // PUT /api/questions/:id
 const updateQuestion = async (req, res) => {
   const { type, text, options, answer, difficulty, points } = req.body;
+  const answerVal = typeof answer === 'object' ? JSON.stringify(answer) : String(answer);
 
   try {
     const result = await pool.query(
@@ -74,7 +77,7 @@ const updateQuestion = async (req, res) => {
        SET type=$1, text=$2, options=$3, answer=$4, difficulty=$5, points=$6, updated_at=NOW()
        WHERE id=$7 AND user_id=$8
        RETURNING *`,
-      [type, text, options ? JSON.stringify(options) : null, answer, difficulty, points, req.params.id, req.user.id]
+      [type, text, options ? JSON.stringify(options) : null, answerVal, difficulty, points, req.params.id, req.user.id]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ message: 'Question not found' });

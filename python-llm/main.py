@@ -594,7 +594,7 @@ async def generate_internet(req: GenerateInternetRequest):
 
     valid_types = [
         'SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE',
-        'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING'
+        'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING', 'BACKGROUND_GRAPHIC'
     ]
     if req.question_type not in valid_types:
         raise HTTPException(

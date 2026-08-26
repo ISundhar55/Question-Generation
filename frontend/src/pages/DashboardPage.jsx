@@ -12,12 +12,13 @@ const TYPE_LABELS = {
   DROPDOWN: { label: 'Dropdown', color: '#0e7490', bg: '#ecfeff' },
   MATCHING_LINES: { label: 'Matching Lines', color: '#0891b2', bg: '#ecfeff' },
   ORDERING: { label: 'Ordering', color: '#db2777', bg: '#fdf2f8' },
+  BACKGROUND_GRAPHIC: { label: 'Background Graphic', color: '#059669', bg: '#ecfdf5' },
   // Legacy / Hidden types (still supported for rendering existing data):
   SHORT_ANSWER: { label: 'Short Answer', color: '#f59e0b', bg: '#fffbeb' },
   FILL_IN_BLANK: { label: 'Fill in Blank', color: '#9ca3af', bg: '#f9fafb' },
 };
 
-const ACTIVE_TYPES = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING'];
+const ACTIVE_TYPES = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING', 'BACKGROUND_GRAPHIC'];
 
 const SHORT_LABELS = {
   SINGLE_SELECT: 'MCQ (Single)',
@@ -28,6 +29,7 @@ const SHORT_LABELS = {
   DROPDOWN: 'Dropdown',
   MATCHING_LINES: 'Matching',
   ORDERING: 'Ordering',
+  BACKGROUND_GRAPHIC: 'Background Graphic',
 };
 
 const DIFFICULTY_COLORS = {

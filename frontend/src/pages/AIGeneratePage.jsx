@@ -31,6 +31,7 @@ export default function AIGeneratePage() {
     DROPDOWN: 0,
     MATCHING_LINES: 0,
     ORDERING: 0,
+    BACKGROUND_GRAPHIC: 0,
   });
 
   const [lastNonZeroCounts, setLastNonZeroCounts] = useState({
@@ -41,6 +42,7 @@ export default function AIGeneratePage() {
     DROPDOWN: 1,
     MATCHING_LINES: 1,
     ORDERING: 1,
+    BACKGROUND_GRAPHIC: 1,
   });
 
   const totalCount = Object.values(typeCounts).reduce((sum, c) => sum + c, 0);
@@ -1010,16 +1012,146 @@ export default function AIGeneratePage() {
                       );
                     })()}
 
+                    {/* Background Graphic Interactive SVG Display */}
+                    {q.questionType === 'BACKGROUND_GRAPHIC' && q.options && (() => {
+                      const dropZones = q.options.drop_zones || [];
+                      const labelBank = q.options.label_bank || [];
+                      const zoneWidth = q.options.drop_zone_width || 120;
+                      const zoneHeight = q.options.drop_zone_height || 36;
+                      const answersObj = typeof q.answer === 'object' && q.answer !== null ? q.answer : {};
+
+                      return (
+                        <div style={{ marginBottom: 16 }}>
+                          {/* SVG Diagram Canvas */}
+                          <div style={{
+                            position: 'relative',
+                            width: '100%',
+                            maxWidth: 620,
+                            borderRadius: 12,
+                            overflow: 'hidden',
+                            border: '1.5px solid #cbd5e1',
+                            background: '#f8fafc',
+                            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.04)',
+                            marginBottom: 14,
+                          }}>
+                            {/* Raw SVG rendering */}
+                            {q.options.svg_graphic ? (
+                              <div
+                                dangerouslySetInnerHTML={{ __html: q.options.svg_graphic }}
+                                style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+                              />
+                            ) : (
+                              <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>
+                                🖼️ Diagram Graphic
+                              </div>
+                            )}
+
+                            {/* Drop Zone Pins Overlay (Empty Target Boxes) */}
+                            {dropZones.map((zone) => (
+                              <div
+                                key={zone.id}
+                                title={zone.description ? `Pin ${zone.pin_label}: ${zone.description}` : `Drop Zone ${zone.pin_label}`}
+                                style={{
+                                  position: 'absolute',
+                                  left: `${zone.x_percent || 50}%`,
+                                  top: `${zone.y_percent || 50}%`,
+                                  transform: 'translate(-50%, -50%)',
+                                  width: zoneWidth,
+                                  height: zoneHeight,
+                                  padding: '2px 8px',
+                                  borderRadius: 6,
+                                  border: '2px dashed #059669',
+                                  background: 'rgba(255, 255, 255, 0.88)',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 6,
+                                  backdropFilter: 'blur(3px)',
+                                  zIndex: 2,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <span style={{
+                                  background: '#059669',
+                                  color: '#fff',
+                                  borderRadius: '50%',
+                                  width: 22,
+                                  height: 22,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  flexShrink: 0,
+                                }}>
+                                  {zone.pin_label || '•'}
+                                </span>
+                                <span style={{
+                                  fontSize: 11,
+                                  color: '#059669',
+                                  fontWeight: 500,
+                                  opacity: 0.7,
+                                  fontStyle: 'italic',
+                                  letterSpacing: '0.02em',
+                                }}>
+                                  [ Drop Here ]
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Label Bank */}
+                          {labelBank.length > 0 && (
+                            <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ecfdf5', border: '1px solid #a7f3d0', marginBottom: 12 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                                🏷️ Label Bank
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {labelBank.map((lbl, i) => (
+                                  <div
+                                    key={i}
+                                    style={{
+                                      padding: '5px 12px',
+                                      borderRadius: 6,
+                                      background: '#ffffff',
+                                      border: '1.5px solid #6ee7b7',
+                                      color: '#065f46',
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                    }}
+                                  >
+                                    {lbl}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Answer & Rationale */}
                     <div style={{
                       background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
                       borderLeft: '3px solid var(--color-primary)',
                     }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                        Answer
+                        Answer Key
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 10 : 0 }}>
-                        {q.answer}
+                        {typeof q.answer === 'object' && q.answer !== null ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {Object.entries(q.answer).map(([k, v]) => (
+                              <span key={k} style={{ padding: '3px 8px', borderRadius: 4, background: '#f1f5f9', border: '1px solid #cbd5e1', fontSize: 12 }}>
+                                <strong>{k}:</strong> {v}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          q.answer
+                        )}
                       </div>
                       {q.explanation && (
                         <>

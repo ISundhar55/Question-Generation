@@ -25,6 +25,7 @@ export const QUESTION_TYPES = [
   { value: 'DROPDOWN', label: 'Dropdown', icon: '📋', desc: 'Select answer for each blank from a list' },
   { value: 'MATCHING_LINES', label: 'Matching Lines', icon: '🔗', desc: 'Match Column A items to Column B' },
   { value: 'ORDERING', label: 'Ordering', icon: '↕️', desc: 'Drag options to place them in correct order' },
+  { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', icon: '🖼️', desc: 'Drag labels onto marked diagram drop zones' },
 ];
 
 export const DIFFICULTIES = [
@@ -44,6 +45,7 @@ export const TYPE_META = {
   DROPDOWN: { color: '#0e7490', bg: '#ecfeff' },
   MATCHING_LINES: { color: '#0891b2', bg: '#ecfeff' },
   ORDERING: { color: '#db2777', bg: '#fdf2f8' },
+  BACKGROUND_GRAPHIC: { color: '#059669', bg: '#ecfdf5' },
 };
 
 /**
@@ -90,6 +92,17 @@ export const getRefinementTargetsForType = (qType) => {
       { id: 'choices', label: 'Dropdown Choices' },
       { id: 'answer', label: 'Correct Answer' },
       { id: 'distractors', label: 'Distractors Only' },
+      { id: 'rationale', label: 'Rationale' },
+      { id: 'entire_item', label: 'Entire Item' },
+    ];
+  }
+  if (type === 'BACKGROUND_GRAPHIC') {
+    return [
+      { id: 'stem', label: 'Question Stem' },
+      { id: 'graphic', label: 'Diagram / Graphic' },
+      { id: 'drop_zones', label: 'Drop Zone Pins' },
+      { id: 'label_bank', label: 'Label Bank' },
+      { id: 'answer', label: 'Correct Labels' },
       { id: 'rationale', label: 'Rationale' },
       { id: 'entire_item', label: 'Entire Item' },
     ];

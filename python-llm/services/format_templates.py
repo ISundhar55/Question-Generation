@@ -176,7 +176,65 @@ IMPORTANT for MATCHING_LINES:
 IMPORTANT for ORDERING:
 - Default: 3 to 5 items in the options array in shuffled/incorrect order. Follow teacher instructions for a different count.
 - The answer field MUST consist of all the options strings exactly as written, sorted in their correct sequence, joined by a pipe (|).
-- MANDATORY RATIONALE: The explanation field MUST provide a distinct bulleted rationale for EVERY step/item in the sequence (• Step 1: ..., • Step 2: ..., etc.), justifying its exact placement in the ordered sequence."""
+- MANDATORY RATIONALE: The explanation field MUST provide a distinct bulleted rationale for EVERY step/item in the sequence (• Step 1: ..., • Step 2: ..., etc.), justifying its exact placement in the ordered sequence.""",
+
+    "BACKGROUND_GRAPHIC": """Each question object must follow this exact format:
+{
+  "questionType": "BACKGROUND_GRAPHIC",
+  "difficulty": "<difficulty>",
+  "contentArea": "<content_area>",
+  "grade": "<grade>",
+  "text": "<instruction/stem, e.g. Label the marked parts on the diagram by matching each label to the correct drop zone:>",
+  "options": {
+    "svg_graphic": "<raw standalone valid SVG code starting with <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400' width='100%' height='100%'> and ending with </svg>. Must be an educational 2D vector diagram with clean shapes, gradients, and pointer lines for pins>",
+    "drop_zone_width": 120,
+    "drop_zone_height": 36,
+    "drop_zones": [
+      {
+        "id": "zone_1",
+        "pin_label": "A",
+        "x_percent": <number between 10.0 and 85.0 representing X coordinate percentage of diagram>,
+        "y_percent": <number between 10.0 and 85.0 representing Y coordinate percentage of diagram>,
+        "description": "<short description of structure A on diagram>"
+      },
+      {
+        "id": "zone_2",
+        "pin_label": "B",
+        "x_percent": <number between 10.0 and 85.0 representing X coordinate percentage of diagram>,
+        "y_percent": <number between 10.0 and 85.0 representing Y coordinate percentage of diagram>,
+        "description": "<short description of structure B on diagram>"
+      },
+      {
+        "id": "zone_3",
+        "pin_label": "C",
+        "x_percent": <number between 10.0 and 85.0 representing X coordinate percentage of diagram>,
+        "y_percent": <number between 10.0 and 85.0 representing Y coordinate percentage of diagram>,
+        "description": "<short description of structure C on diagram>"
+      }
+    ],
+    "label_bank": [
+      "<correct_label_1>",
+      "<correct_label_2>",
+      "<correct_label_3>",
+      "<distractor_label_1>",
+      "<distractor_label_2>"
+    ]
+  },
+  "answer": {
+    "zone_1": "<correct_label_1>",
+    "zone_2": "<correct_label_2>",
+    "zone_3": "<correct_label_3>"
+  },
+  "explanation": "• Pin <Letter> / <ZoneId> (<Correct Label>): <Clear explanation of why this label is correct based on visual characteristics and biological/physical function>\\n• (Provide a bullet for EVERY drop zone: Pin A, Pin B, Pin C...)\\n• <Distractor Label> (Distractor): <Clear reason why this option is an incorrect choice that does not match any marked zone>",
+  "sourceChunkIds": [<list of chunk_id integers used>]
+}
+
+IMPORTANT for BACKGROUND_GRAPHIC:
+- drop_zone_width (default 120) and drop_zone_height (default 36): Provide integer pixel dimensions for the drop zone container badges.
+- Create 2 to 4 drop zones positioned at distinct (x_percent, y_percent) locations on the SVG graphic.
+- The label_bank MUST contain all correct labels plus 1-2 plausible distractor labels.
+- The answer field MUST be a JSON object mapping each drop zone id to its correct label string.
+- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item for EVERY drop zone pin (explaining why that label is correct) AND for EVERY distractor label in the label_bank (explaining why it is incorrect/not present)."""
 }
 
 # Backward compatibility alias

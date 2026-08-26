@@ -87,8 +87,8 @@ class QuestionResult(BaseModel):
     grade: str
     chapter: Optional[str] = None    # Chapter filter used during generation
     text: str
-    options: Optional[Union[dict, list]] = None   # Dictionary for MCQ/CR/DD/ML, List for ORDERING
-    answer: str
+    options: Optional[Union[dict, list]] = None   # Dictionary for MCQ/CR/DD/ML/BG, List for ORDERING
+    answer: Union[str, dict]
     explanation: str
     sourceChunkIds: list[int]
     sources: list[SourceRef] = []    # Resolved file/page citations for sourceChunkIds
@@ -122,7 +122,7 @@ class DeleteResponse(BaseModel):
 class RegenerateRequest(BaseModel):
     content_area: str = Field(..., description="e.g. Science")
     grade: str = Field(..., description="e.g. Grade 6")
-    question_type: str = Field(..., description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING")
+    question_type: str = Field(..., description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING | BACKGROUND_GRAPHIC")
     difficulty: str = Field(..., description="easy | medium | hard")
     original_question: dict = Field(..., description="The full original question JSON object")
     modification_instructions: str = Field(
@@ -152,8 +152,8 @@ class FeedbackRequest(BaseModel):
     grade: str = Field(..., description="e.g. Grade 6")
     question_type: str = Field(..., description="e.g. SINGLE_SELECT")
     question_text: str = Field(..., description="The question that feedback refers to")
-    options: Optional[Union[dict, list]] = Field(None, description="Question options (dict for MCQ, list for ordering)")
-    answer: Optional[str] = Field(None, description="Correct answer(s) for the question")
+    options: Optional[Union[dict, list]] = Field(None, description="Question options (dict for MCQ/BG, list for ordering)")
+    answer: Optional[Union[str, dict]] = Field(None, description="Correct answer(s) for the question")
     sources: Optional[list] = Field(None, description="Source references (page, chapter, doc) for the question")
     feedback_text: str = Field(..., description="Teacher's comment or suggestion")
     rating: Optional[int] = Field(None, ge=1, le=5, description="1 (poor) to 5 (excellent)")
