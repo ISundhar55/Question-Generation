@@ -783,6 +783,38 @@ def normalize_question(q: dict) -> dict:
                                 shuffled = shuffled[1:] + shuffled[:1]
                             b["options"] = shuffled
 
+    # 8. Normalize MATRIX_INTERACTION questions
+    elif q.get("questionType") in ["MATRIX_INTERACTION", "MATRIX_CHOICE", "MCRB", "MATRIX_GRID", "MATRIX"]:
+        q["questionType"] = "MATRIX_INTERACTION"
+        opts = q.get("options")
+        if isinstance(opts, dict):
+            if not opts.get("header"):
+                opts["header"] = "Statements"
+
+            # Normalize columns
+            cols = opts.get("columns", [])
+            normalized_cols = []
+            for idx, col in enumerate(cols):
+                if isinstance(col, dict):
+                    col_id = col.get("id") or f"col_{idx + 1}"
+                    col_val = str(col.get("value", "")).strip()
+                    normalized_cols.append({"id": col_id, "value": col_val})
+                elif isinstance(col, str):
+                    normalized_cols.append({"id": f"col_{idx + 1}", "value": col.strip()})
+            opts["columns"] = normalized_cols
+
+            # Normalize rows
+            rows = opts.get("rows", [])
+            normalized_rows = []
+            for idx, row in enumerate(rows):
+                if isinstance(row, dict):
+                    row_id = row.get("id") or f"row_{idx + 1}"
+                    row_val = str(row.get("value", "")).strip()
+                    normalized_rows.append({"id": row_id, "value": row_val})
+                elif isinstance(row, str):
+                    normalized_rows.append({"id": f"row_{idx + 1}", "value": row.strip()})
+            opts["rows"] = normalized_rows
+
     return q
 
 

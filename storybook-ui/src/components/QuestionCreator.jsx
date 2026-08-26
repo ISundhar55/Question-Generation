@@ -9,6 +9,7 @@ import { OrderingEditor } from './OrderingEditor';
 import { BackgroundGraphicEditor } from './BackgroundGraphicEditor';
 import { GapMatchEditor } from './GapMatchEditor';
 import { MultipleDropBucketEditor } from './MultipleDropBucketEditor';
+import { MatrixInteractionEditor } from './MatrixInteractionEditor';
 
 const QUESTION_TYPES = [
   { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', badge: 'qc-badge-mcq' },
@@ -20,6 +21,7 @@ const QUESTION_TYPES = [
   { value: 'ORDERING', label: 'Ordering', badge: 'qc-badge-ord' },
   { value: 'GAP_MATCH', label: 'Gap Match', badge: 'qc-badge-gm' },
   { value: 'MULTIPLE_DROP_BUCKET', label: 'Multiple Drop Bucket', badge: 'qc-badge-mdb' },
+  { value: 'MATRIX_INTERACTION', label: 'Matrix Interaction', badge: 'qc-badge-mi' },
   // { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', badge: 'qc-badge-bg' },
 ];
 
@@ -210,6 +212,26 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
   });
   const [mdbAnswers, setMdbAnswers] = useState(parsedAnswerObj);
 
+  // MATRIX_INTERACTION state
+  const [matrixHeader, setMatrixHeader] = useState(parsedOptions.header || '');
+  const [matrixColumns, setMatrixColumns] = useState(() => {
+    if (parsedOptions.columns && Array.isArray(parsedOptions.columns) && parsedOptions.columns.length > 0) {
+      return parsedOptions.columns.map((c, i) => (typeof c === 'object' ? c : { id: `col_${i + 1}`, value: String(c) }));
+    }
+    return [
+      { id: 'col_1', value: '' },
+    ];
+  });
+  const [matrixRows, setMatrixRows] = useState(() => {
+    if (parsedOptions.rows && Array.isArray(parsedOptions.rows) && parsedOptions.rows.length > 0) {
+      return parsedOptions.rows.map((r, i) => (typeof r === 'object' ? r : { id: `row_${i + 1}`, value: String(r) }));
+    }
+    return [
+      { id: 'row_1', value: '' },
+    ];
+  });
+  const [matrixAnswers, setMatrixAnswers] = useState(parsedAnswerObj);
+
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -268,9 +290,17 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
       const validOptBuckets = optionBuckets.filter(b => b.title?.trim() || b.options?.some(o => o.trim()));
       if (validOptBuckets.length < 1) e.optionBuckets = 'At least one Option Bucket is required';
       const validDropBuckets = dropBuckets.filter(b => b.name?.trim());
-      if (validDropBuckets.length < 2) e.dropBuckets = 'At least two Drop Buckets are required';
+      if (validDropBuckets.length < 1) e.dropBuckets = 'At least one Drop Bucket is required';
       const assignedCount = Object.values(mdbAnswers).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
       if (assignedCount === 0) e.answer = 'Please assign options to the drop buckets';
+    }
+    if (type === 'MATRIX_INTERACTION') {
+      const validCols = matrixColumns.filter(c => c.value?.trim());
+      if (validCols.length < 2) e.columns = 'At least two columns are required';
+      const validRows = matrixRows.filter(r => r.value?.trim());
+      if (validRows.length < 1) e.rows = 'At least one row is required';
+      const missingAns = matrixRows.some(r => !matrixAnswers[r.value] && !matrixAnswers[r.id]);
+      if (missingAns) e.answer = 'Please select a correct response for each row';
     }
     return e;
   };
@@ -363,6 +393,20 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           drop_buckets: dropBuckets.filter(b => b.name?.trim()),
         },
         answer: mdbAnswers,
+        difficulty,
+        points,
+      };
+    }
+    if (type === 'MATRIX_INTERACTION') {
+      return {
+        type,
+        text,
+        options: {
+          header: matrixHeader,
+          columns: matrixColumns.filter(c => c.value?.trim()),
+          rows: matrixRows.filter(r => r.value?.trim()),
+        },
+        answer: matrixAnswers,
         difficulty,
         points,
       };
@@ -591,6 +635,21 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           setDropBuckets={setDropBuckets}
           answers={mdbAnswers}
           setAnswers={setMdbAnswers}
+          err={err}
+        />
+      )}
+
+      {/* Matrix Interaction */}
+      {type === 'MATRIX_INTERACTION' && (
+        <MatrixInteractionEditor
+          header={matrixHeader}
+          setHeader={setMatrixHeader}
+          columns={matrixColumns}
+          setColumns={setMatrixColumns}
+          rows={matrixRows}
+          setRows={setMatrixRows}
+          answers={matrixAnswers}
+          setAnswers={setMatrixAnswers}
           err={err}
         />
       )}

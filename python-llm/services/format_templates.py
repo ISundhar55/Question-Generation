@@ -349,7 +349,64 @@ IMPORTANT for MULTIPLE_DROP_BUCKET:
 - "answer": JSON dictionary mapping each drop_bucket id to the list of correct item strings that belong in that bucket.
 - Every item across all "options.option_buckets" MUST be assigned to its correct drop bucket in "answer".
 - CRITICAL: "options" in "option_buckets" MUST be randomized and shuffled in mixed order so that items are NOT grouped sequentially by their target drop buckets.
-- MANDATORY RATIONALE: The "explanation" field MUST detail the classification logic for each bucket and its assigned items."""
+- MANDATORY RATIONALE: The "explanation" field MUST detail the classification logic for each bucket and its assigned items.""",
+
+    "MATRIX_INTERACTION": """Each question object must follow this exact format:
+{
+  "questionType": "MATRIX_INTERACTION",
+  "difficulty": "<difficulty>",
+  "contentArea": "<content_area>",
+  "grade": "<grade>",
+  "text": "<Clear prompt stem, e.g. For each statement or process below, determine whether it represents a Physical Change or a Chemical Change.>",
+  "options": {
+    "header": "<Top-left header label, e.g. Statements, Processes, Characteristics, Objects>",
+    "columns": [
+      {
+        "id": "col_1",
+        "value": "<Column 1 Category, e.g. Physical Change, True, Plant Cell, Increases>"
+      },
+      {
+        "id": "col_2",
+        "value": "<Column 2 Category, e.g. Chemical Change, False, Animal Cell, Decreases>"
+      }
+    ],
+    "rows": [
+      {
+        "id": "row_1",
+        "value": "<Statement or Item 1>"
+      },
+      {
+        "id": "row_2",
+        "value": "<Statement or Item 2>"
+      },
+      {
+        "id": "row_3",
+        "value": "<Statement or Item 3>"
+      },
+      {
+        "id": "row_4",
+        "value": "<Statement or Item 4>"
+      }
+    ]
+  },
+  "answer": {
+    "<Statement or Item 1>": "<Column 1 or Column 2 Category Value>",
+    "<Statement or Item 2>": "<Column 1 or Column 2 Category Value>",
+    "<Statement or Item 3>": "<Column 1 or Column 2 Category Value>",
+    "<Statement or Item 4>": "<Column 1 or Column 2 Category Value>"
+  },
+  "explanation": "• <Statement 1>: <Correct Column Value> because <educational rationale>\\n• <Statement 2>: <Correct Column Value> because <educational rationale>\\n• <Statement 3>: <Correct Column Value> because <educational rationale>\\n• <Statement 4>: <Correct Column Value> because <educational rationale>",
+  "sourceChunkIds": [<list of chunk_id integers used>]
+}
+
+IMPORTANT for MATRIX_INTERACTION:
+- "text" contains the prompt stem instruction.
+- "options.header": String for the top-left table header (e.g. "Statements", "Processes", "Features").
+- "options.columns": List of 2 to 4 distinct column objects, each with "id" ("col_1", "col_2", ...) and "value" (category name string).
+- "options.rows": List of 3 to 6 distinct row objects, each with "id" ("row_1", "row_2", ...) and "value" (statement or item string).
+- "answer": JSON dictionary mapping each row statement value (or row id) to its exact matching column category value string.
+- MANDATORY: Every row in "options.rows" MUST be mapped to one valid column value in "answer".
+- MANDATORY RATIONALE: The "explanation" field MUST contain a bulleted item for EVERY row statement explaining why that particular column choice is correct."""
 }
 
 # Backward compatibility alias

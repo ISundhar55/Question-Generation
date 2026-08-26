@@ -660,6 +660,167 @@ export function QuestionPreview({ question, onBack, backLabel }) {
           </div>
         );
       }
+      case 'MATRIX_INTERACTION': {
+        const qOptions = question?.options || {};
+        const headerText = qOptions?.header || 'Header';
+        const rawCols = Array.isArray(qOptions?.columns) ? qOptions.columns : [];
+        const columns = rawCols.map((c, i) => (typeof c === 'object' ? c : { id: `col_${i + 1}`, value: String(c) }));
+        const rawRows = Array.isArray(qOptions?.rows) ? qOptions.rows : [];
+        const rows = rawRows.map((r, i) => (typeof r === 'object' ? r : { id: `row_${i + 1}`, value: String(r) }));
+
+        let answersObj = {};
+        const rawAns = question?.answer;
+        if (typeof rawAns === 'object' && rawAns !== null) {
+          answersObj = rawAns;
+        } else if (typeof rawAns === 'string') {
+          try {
+            answersObj = JSON.parse(rawAns);
+          } catch (_) {
+            try {
+              const fixed = rawAns.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+              answersObj = JSON.parse(fixed);
+            } catch (_) {}
+          }
+        }
+
+        const isMatch = (row, col) => {
+          const valByValue = answersObj[row.value];
+          const valById = answersObj[row.id];
+          const expected = col.value || col.id;
+          return valByValue === expected || valById === expected || valByValue === col.id || valById === col.id;
+        };
+
+        return (
+          <div className="qc-preview" style={{ fontFamily: 'inherit' }}>
+            <div className="qc-preview-title" style={{ marginBottom: 12 }}>
+              <span className="qc-badge" style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' }}>
+                📊 Matrix Interaction
+              </span>
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{question?.text}</p>
+
+            {/* Matrix Table */}
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: 10,
+                border: '1.5px solid #cbd5e1',
+                overflowX: 'auto',
+                marginBottom: 18,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+            >
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 450 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', borderRight: '1.5px solid #cbd5e1', width: '40%' }}>
+                      {headerText}
+                    </th>
+                    {columns.map((col, cIdx) => (
+                      <th
+                        key={col.id || cIdx}
+                        style={{
+                          padding: '12px 16px',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          color: 'var(--color-text)',
+                          textAlign: 'center',
+                          borderRight: cIdx < columns.length - 1 ? '1.5px solid #cbd5e1' : 'none',
+                        }}
+                      >
+                        {col.value || `col ${cIdx + 1}`}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, rIdx) => (
+                    <tr
+                      key={row.id || rIdx}
+                      style={{
+                        borderBottom: rIdx < rows.length - 1 ? '1.5px solid #e2e8f0' : 'none',
+                        background: rIdx % 2 === 0 ? '#ffffff' : '#fcfcfd',
+                      }}
+                    >
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--color-text)', borderRight: '1.5px solid #cbd5e1', fontWeight: 500 }}>
+                        {row.value || `Row ${rIdx + 1}`}
+                      </td>
+                      {columns.map((col, cIdx) => {
+                        const selected = isMatch(row, col);
+
+                        return (
+                          <td
+                            key={col.id || cIdx}
+                            style={{
+                              padding: '12px 16px',
+                              textAlign: 'center',
+                              borderRight: cIdx < columns.length - 1 ? '1.5px solid #cbd5e1' : 'none',
+                              background: selected ? '#f0fdf4' : 'transparent',
+                            }}
+                          >
+                            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {selected ? (
+                                <div
+                                  style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: '50%',
+                                    background: '#22c55e',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 4px rgba(34, 197, 94, 0.3)',
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                  </svg>
+                                </div>
+                              ) : (
+                                <div
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: '50%',
+                                    border: '2px solid #3b82f6',
+                                    background: '#ffffff',
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Answer Key Summary */}
+            {rows.length > 0 && (
+              <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Correct Matrix Key:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {rows.map((row) => {
+                    const rowKey = row.value || row.id;
+                    const ansVal = answersObj[row.value] || answersObj[row.id] || 'Not assigned';
+                    const colResolved = columns.find(c => c.id === ansVal)?.value || ansVal;
+
+                    return (
+                      <span key={row.id} style={{ padding: '4px 10px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
+                        {rowKey}: <strong>{colResolved}</strong>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return <div>Unknown question type</div>;
     }
