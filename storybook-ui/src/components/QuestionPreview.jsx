@@ -359,6 +359,150 @@ export function QuestionPreview({ question, onBack, backLabel }) {
           </div>
         );
       }
+      case 'GAP_MATCH': {
+        const qOptions = question?.options || {};
+        const passageText = typeof qOptions === 'object' && qOptions?.passage ? qOptions.passage : '';
+        const responseOptions = Array.isArray(qOptions?.response_options)
+          ? qOptions.response_options
+          : Array.isArray(qOptions?.label_bank)
+            ? qOptions.label_bank
+            : [];
+        let answersObj = {};
+        const rawAns = question?.answer;
+        if (typeof rawAns === 'object' && rawAns !== null) {
+          answersObj = rawAns;
+        } else if (typeof rawAns === 'string') {
+          try {
+            answersObj = JSON.parse(rawAns);
+          } catch (_) {
+            try {
+              const fixed = rawAns.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+              answersObj = JSON.parse(fixed);
+            } catch (_) {}
+          }
+        }
+
+        // Render passage with interactive gap badges
+        const renderPassageWithGaps = () => {
+          if (!passageText) return <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No passage provided</span>;
+          const parts = passageText.split(/(\[gap_[a-zA-Z0-9_-]+\]|\[gap\s*[0-9]+\])/gi);
+          return parts.map((part, idx) => {
+            const match = part.match(/\[(gap_[a-zA-Z0-9_-]+|gap\s*[0-9]+)\]/i);
+            if (match) {
+              const gapKey = match[1].toLowerCase().replace(/\s+/g, '_');
+              const assigned = answersObj[gapKey] || answersObj[match[1]] || '';
+              return (
+                <span
+                  key={idx}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 100,
+                    height: 30,
+                    margin: '0 4px',
+                    padding: '2px 10px',
+                    borderRadius: 6,
+                    border: '2px dashed #2563eb',
+                    background: assigned ? '#eff6ff' : '#f8fafc',
+                    color: assigned ? '#1d4ed8' : '#2563eb',
+                    fontWeight: 600,
+                    fontSize: 12,
+                    verticalAlign: 'middle',
+                  }}
+                >
+                  {assigned || `[ ${match[1]} ]`}
+                </span>
+              );
+            }
+            return <span key={idx}>{part}</span>;
+          });
+        };
+
+        return (
+          <div className="qc-preview" style={{ fontFamily: 'inherit' }}>
+            <div className="qc-preview-title" style={{ marginBottom: 12 }}>
+              <span className="qc-badge" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                🧩 Gap Match
+              </span>
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{question?.text}</p>
+
+            {/* Response Options Bank */}
+            {responseOptions.length > 0 && (
+              <div style={{ padding: '12px 16px', borderRadius: 8, background: '#eff6ff', border: '1.5px solid #bfdbfe', marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.04em' }}>
+                  📦 Response Options Bank
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {responseOptions.map((opt, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: 6,
+                        background: '#ffffff',
+                        border: '1px solid #93c5fd',
+                        color: '#1e40af',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                      }}
+                    >
+                      {opt}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Passage Box */}
+            <div style={{
+              padding: '16px 20px',
+              borderRadius: 10,
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              lineHeight: 2.0,
+              fontSize: 14,
+              color: 'var(--color-text)',
+              marginBottom: 16,
+            }}>
+              {renderPassageWithGaps()}
+            </div>
+
+            {/* Correct Answer Key */}
+            {Object.keys(answersObj).length > 0 && (
+              <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                  Correct Answer Key:
+                </div>
+                {(() => {
+                  const normalizedEntries = [];
+                  const seenGaps = new Set();
+                  Object.entries(answersObj).forEach(([k, v]) => {
+                    const match = k.match(/gap_?([0-9]+)/i);
+                    const keyLabel = match ? `Gap ${match[1]}` : k;
+                    if (!seenGaps.has(keyLabel)) {
+                      seenGaps.add(keyLabel);
+                      normalizedEntries.push([keyLabel, v]);
+                    }
+                  });
+
+                  return (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {normalizedEntries.map(([k, v]) => (
+                        <span key={k} style={{ padding: '3px 8px', borderRadius: 4, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
+                          {k}: <strong>{v}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return <div>Unknown question type</div>;
     }

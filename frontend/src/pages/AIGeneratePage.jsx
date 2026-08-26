@@ -31,6 +31,7 @@ export default function AIGeneratePage() {
     DROPDOWN: 0,
     MATCHING_LINES: 0,
     ORDERING: 0,
+    GAP_MATCH: 0,
     // BACKGROUND_GRAPHIC: 0,
   });
 
@@ -42,6 +43,7 @@ export default function AIGeneratePage() {
     DROPDOWN: 1,
     MATCHING_LINES: 1,
     ORDERING: 1,
+    GAP_MATCH: 1,
     // BACKGROUND_GRAPHIC: 1,
   });
 
@@ -1012,6 +1014,110 @@ export default function AIGeneratePage() {
                       );
                     })()}
 
+                    {/* Gap Match Passage & Response Options Display */}
+                    {q.questionType === 'GAP_MATCH' && q.options && (() => {
+                      const passageText = q.options.passage || '';
+                      const responseOptions = Array.isArray(q.options.response_options)
+                        ? q.options.response_options
+                        : Array.isArray(q.options.label_bank)
+                          ? q.options.label_bank
+                          : [];
+                      let answersObj = {};
+                      if (typeof q.answer === 'object' && q.answer !== null) {
+                        answersObj = q.answer;
+                      } else if (typeof q.answer === 'string') {
+                        try {
+                          answersObj = JSON.parse(q.answer);
+                        } catch (_) {
+                          try {
+                            const fixed = q.answer.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+                            answersObj = JSON.parse(fixed);
+                          } catch (_) {}
+                        }
+                      }
+
+                      const renderPassageWithGaps = () => {
+                        if (!passageText) return <span style={{ color: 'var(--color-text-muted)' }}>No passage provided</span>;
+                        const parts = passageText.split(/(\[gap_[a-zA-Z0-9_-]+\]|\[gap\s*[0-9]+\])/gi);
+                        return parts.map((part, pIdx) => {
+                          const match = part.match(/\[(gap_[a-zA-Z0-9_-]+|gap\s*[0-9]+)\]/i);
+                          if (match) {
+                            const gapKey = match[1].toLowerCase().replace(/\s+/g, '_');
+                            return (
+                              <span
+                                key={pIdx}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  minWidth: 100,
+                                  height: 32,
+                                  margin: '0 4px',
+                                  padding: '2px 10px',
+                                  borderRadius: 6,
+                                  border: '2px dashed #2563eb',
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  fontWeight: 600,
+                                  fontSize: 12,
+                                  verticalAlign: 'middle',
+                                }}
+                              >
+                                [ {match[1]} ]
+                              </span>
+                            );
+                          }
+                          return <span key={pIdx}>{part}</span>;
+                        });
+                      };
+
+                      return (
+                        <div style={{ marginBottom: 16 }}>
+                          {/* Response Options Bank */}
+                          {responseOptions.length > 0 && (
+                            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#eff6ff', border: '1.5px solid #bfdbfe', marginBottom: 14 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.04em' }}>
+                                📦 Response Options Bank
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {responseOptions.map((opt, i) => (
+                                  <span
+                                    key={i}
+                                    style={{
+                                      padding: '5px 12px',
+                                      borderRadius: 6,
+                                      background: '#ffffff',
+                                      border: '1px solid #93c5fd',
+                                      color: '#1e40af',
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                    }}
+                                  >
+                                    {opt}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Passage Box with clean empty gaps */}
+                          <div style={{
+                            padding: '16px 20px',
+                            borderRadius: 10,
+                            background: '#f8fafc',
+                            border: '1.5px solid #e2e8f0',
+                            lineHeight: 2.0,
+                            fontSize: 14,
+                            color: 'var(--color-text)',
+                            marginBottom: 14,
+                          }}>
+                            {renderPassageWithGaps()}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Background Graphic Interactive SVG Display */}
                     {q.questionType === 'BACKGROUND_GRAPHIC' && q.options && (() => {
                       const dropZones = q.options.drop_zones || [];
@@ -1141,17 +1247,53 @@ export default function AIGeneratePage() {
                         Answer Key
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 10 : 0 }}>
-                        {typeof q.answer === 'object' && q.answer !== null ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {Object.entries(q.answer).map(([k, v]) => (
-                              <span key={k} style={{ padding: '3px 8px', borderRadius: 4, background: '#f1f5f9', border: '1px solid #cbd5e1', fontSize: 12 }}>
-                                <strong>{k}:</strong> {v}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          q.answer
-                        )}
+                        {(() => {
+                          let ansObj = null;
+                          if (typeof q.answer === 'object' && q.answer !== null) {
+                            ansObj = q.answer;
+                          } else if (typeof q.answer === 'string' && (q.answer.trim().startsWith('{') || q.answer.includes(':'))) {
+                            const raw = q.answer.trim();
+                            try {
+                              ansObj = JSON.parse(raw);
+                            } catch (_) {
+                              try {
+                                const fixed = raw.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+                                ansObj = JSON.parse(fixed);
+                              } catch (_) {}
+                            }
+                          }
+
+                          if (ansObj && typeof ansObj === 'object') {
+                            const normalized = [];
+                            const seen = new Set();
+                            Object.entries(ansObj).forEach(([k, v]) => {
+                              let keyLabel = k;
+                              const gapMatch = k.match(/gap_?([0-9]+)/i);
+                              if (gapMatch) {
+                                keyLabel = `Gap ${gapMatch[1]}`;
+                              } else if (k.toLowerCase().startsWith('zone_')) {
+                                const pin = q.options?.drop_zones?.find(z => z.id === k)?.pin_label;
+                                keyLabel = pin ? `Pin ${pin}` : k;
+                              }
+                              if (!seen.has(keyLabel)) {
+                                seen.add(keyLabel);
+                                normalized.push([keyLabel, v]);
+                              }
+                            });
+
+                            return (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {normalized.map(([k, v]) => (
+                                  <span key={k} style={{ padding: '4px 10px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
+                                    <strong>{k}:</strong> {v}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          }
+
+                          return <span>{q.answer}</span>;
+                        })()}
                       </div>
                       {q.explanation && (
                         <>

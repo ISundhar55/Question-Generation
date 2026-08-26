@@ -7,6 +7,7 @@ import { DropdownEditor } from './DropdownEditor';
 import { MatchingLinesEditor } from './MatchingLinesEditor';
 import { OrderingEditor } from './OrderingEditor';
 import { BackgroundGraphicEditor } from './BackgroundGraphicEditor';
+import { GapMatchEditor } from './GapMatchEditor';
 
 const QUESTION_TYPES = [
   { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', badge: 'qc-badge-mcq' },
@@ -16,6 +17,7 @@ const QUESTION_TYPES = [
   { value: 'DROPDOWN', label: 'Dropdown', badge: 'qc-badge-dd' },
   { value: 'MATCHING_LINES', label: 'Matching Lines', badge: 'qc-badge-ml' },
   { value: 'ORDERING', label: 'Ordering', badge: 'qc-badge-ord' },
+  { value: 'GAP_MATCH', label: 'Gap Match', badge: 'qc-badge-gm' },
   // { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', badge: 'qc-badge-bg' },
 ];
 
@@ -169,6 +171,24 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
   });
   const [bgAnswers, setBgAnswers] = useState(parsedAnswerObj);
 
+  // GAP_MATCH state
+  const [passage, setPassage] = useState(parsedOptions.passage || '');
+  const [gaps, setGaps] = useState(() => {
+    if (parsedOptions.gaps && Array.isArray(parsedOptions.gaps) && parsedOptions.gaps.length > 0) {
+      return parsedOptions.gaps;
+    }
+    return [];
+  });
+  const [responseOptions, setResponseOptions] = useState(() => {
+    const rawOpts = parsedOptions.response_options || parsedOptions.label_bank;
+    if (Array.isArray(rawOpts) && rawOpts.length > 0) {
+      return rawOpts;
+    }
+    const extracted = Object.values(parsedAnswerObj).filter(Boolean);
+    return extracted.length > 0 ? extracted : [];
+  });
+  const [gmAnswers, setGmAnswers] = useState(parsedAnswerObj);
+
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -215,6 +235,13 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
       if (labelBank.length < dropZones.length) e.labelBank = 'Label bank must contain at least as many labels as drop zones';
       const missingAns = dropZones.some(z => !bgAnswers[z.id] && !bgAnswers[z.pin_label]);
       if (missingAns) e.answer = 'Please assign a correct label for each drop zone';
+    }
+    if (type === 'GAP_MATCH') {
+      if (!passage.trim()) e.passage = 'Passage text is required';
+      if (gaps.length < 1) e.gaps = 'At least one gap is required';
+      if (responseOptions.length < gaps.length) e.responseOptions = 'Response options bank must contain at least as many options as gaps';
+      const missingAns = gaps.some(g => !gmAnswers[g.id] && !gmAnswers[g.label]);
+      if (missingAns) e.answer = 'Please assign a correct option for each gap';
     }
     return e;
   };
@@ -284,6 +311,21 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
         points,
       };
     }
+    if (type === 'GAP_MATCH') {
+      return {
+        type,
+        text,
+        options: {
+          passage,
+          gaps,
+          response_options: responseOptions,
+        },
+        answer: gmAnswers,
+        difficulty,
+        points,
+      };
+    }
+    return { type, text, options, answer, difficulty, points };
   };
 
   const handleSave = async () => {
@@ -479,6 +521,21 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           setLabelBank={setLabelBank}
           answers={bgAnswers}
           setAnswers={setBgAnswers}
+          err={err}
+        />
+      )}
+
+      {/* Gap Match */}
+      {type === 'GAP_MATCH' && (
+        <GapMatchEditor
+          passage={passage}
+          setPassage={setPassage}
+          gaps={gaps}
+          setGaps={setGaps}
+          responseOptions={responseOptions}
+          setResponseOptions={setResponseOptions}
+          answers={gmAnswers}
+          setAnswers={setGmAnswers}
           err={err}
         />
       )}

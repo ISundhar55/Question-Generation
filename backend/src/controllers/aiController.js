@@ -71,7 +71,7 @@ const generateQuestions = async (req, res) => {
       });
     }
 
-    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING', 'BACKGROUND_GRAPHIC'];
+    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING', 'BACKGROUND_GRAPHIC', 'GAP_MATCH'];
     const validDifficulties = ['easy', 'medium', 'hard'];
 
     if (!validTypes.includes(question_type)) {
@@ -143,7 +143,7 @@ const regenerateQuestion = async (req, res) => {
       normalizedType = 'MULTIPLE_SELECT';
     }
 
-    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING', 'BACKGROUND_GRAPHIC'];
+    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING', 'BACKGROUND_GRAPHIC', 'GAP_MATCH'];
     if (!validTypes.includes(normalizedType)) {
       return res.status(400).json({ message: `Invalid question_type. Must be one of: ${validTypes.join(', ')}` });
     }
@@ -259,7 +259,7 @@ async function generateFromInternet(req, res) {
       });
     }
 
-    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING', 'BACKGROUND_GRAPHIC'];
+    const validTypes = ['SINGLE_SELECT', 'MULTIPLE_SELECT', 'MCQ', 'TRUE_FALSE', 'CONSTRUCTED_RESPONSE', 'DROPDOWN', 'MATCHING_LINES', 'ORDERING', 'BACKGROUND_GRAPHIC', 'GAP_MATCH'];
     const validDifficulties = ['easy', 'medium', 'hard'];
 
     if (!validTypes.includes(question_type)) {

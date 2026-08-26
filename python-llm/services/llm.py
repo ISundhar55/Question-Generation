@@ -17,6 +17,7 @@ Key design principles:
 import json
 import os
 import re
+import random
 
 # General quality guidelines shared across all question types.
 # Loaded dynamically from prompt_guidelines.md in the same directory.
@@ -751,6 +752,19 @@ def normalize_question(q: dict) -> dict:
                 q["answer"] = "|".join([x.strip() for x in ans.split(",")])
             else:
                 q["answer"] = ans.strip()
+
+    # 6. Normalize and shuffle response_options for GAP_MATCH questions
+    elif q.get("questionType") == "GAP_MATCH":
+        opts = q.get("options")
+        if isinstance(opts, dict):
+            resp_opts = opts.get("response_options")
+            if isinstance(resp_opts, list) and len(resp_opts) > 1:
+                shuffled_opts = list(resp_opts)
+                random.shuffle(shuffled_opts)
+                # If shuffle happens to match the initial sequence, shift by 1
+                if shuffled_opts == resp_opts and len(shuffled_opts) > 1:
+                    shuffled_opts = shuffled_opts[1:] + shuffled_opts[:1]
+                opts["response_options"] = shuffled_opts
 
     return q
 

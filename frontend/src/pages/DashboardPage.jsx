@@ -12,6 +12,7 @@ const TYPE_LABELS = {
   DROPDOWN: { label: 'Dropdown', color: '#0e7490', bg: '#ecfeff' },
   MATCHING_LINES: { label: 'Matching Lines', color: '#0891b2', bg: '#ecfeff' },
   ORDERING: { label: 'Ordering', color: '#db2777', bg: '#fdf2f8' },
+  GAP_MATCH: { label: 'Gap Match', color: '#2563eb', bg: '#eff6ff' },
   BACKGROUND_GRAPHIC: { label: 'Background Graphic', color: '#059669', bg: '#ecfdf5' },
   // Legacy / Hidden types (still supported for rendering existing data):
   SHORT_ANSWER: { label: 'Short Answer', color: '#f59e0b', bg: '#fffbeb' },
@@ -26,6 +27,7 @@ const ACTIVE_TYPES = [
   'DROPDOWN',
   'MATCHING_LINES',
   'ORDERING',
+  'GAP_MATCH',
   // 'BACKGROUND_GRAPHIC',
 ];
 
@@ -38,6 +40,7 @@ const SHORT_LABELS = {
   DROPDOWN: 'Dropdown',
   MATCHING_LINES: 'Matching',
   ORDERING: 'Ordering',
+  GAP_MATCH: 'Gap Match',
   BACKGROUND_GRAPHIC: 'Background Graphic',
 };
 

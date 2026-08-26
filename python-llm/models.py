@@ -122,7 +122,7 @@ class DeleteResponse(BaseModel):
 class RegenerateRequest(BaseModel):
     content_area: str = Field(..., description="e.g. Science")
     grade: str = Field(..., description="e.g. Grade 6")
-    question_type: str = Field(..., description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING | BACKGROUND_GRAPHIC")
+    question_type: str = Field(..., description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING | BACKGROUND_GRAPHIC | GAP_MATCH")
     difficulty: str = Field(..., description="easy | medium | hard")
     original_question: dict = Field(..., description="The full original question JSON object")
     modification_instructions: str = Field(

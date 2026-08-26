@@ -234,7 +234,52 @@ IMPORTANT for BACKGROUND_GRAPHIC:
 - Create 2 to 4 drop zones positioned at distinct (x_percent, y_percent) locations on the SVG graphic.
 - The label_bank MUST contain all correct labels plus 1-2 plausible distractor labels.
 - The answer field MUST be a JSON object mapping each drop zone id to its correct label string.
-- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item for EVERY drop zone pin (explaining why that label is correct) AND for EVERY distractor label in the label_bank (explaining why it is incorrect/not present)."""
+- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item for EVERY drop zone pin (explaining why that label is correct) AND for EVERY distractor label in the label_bank (explaining why it is incorrect/not present).""",
+
+    "GAP_MATCH": """Each question object must follow this exact format:
+{
+  "questionType": "GAP_MATCH",
+  "difficulty": "<difficulty>",
+  "contentArea": "<content_area>",
+  "grade": "<grade>",
+  "text": "Complete the passage by dragging or selecting the correct terms from the response options into each gap.",
+  "options": {
+    "passage": "<A cohesive 2 to 4 sentence passage containing gaps denoted by [gap_1], [gap_2], [gap_3], etc. Example: Water moves into root cells through [gap_1]. It is then transported upwards through the stem via [gap_2] vessels, driven by the process of [gap_3] in the leaves.>",
+    "gaps": [
+      {
+        "id": "gap_1",
+        "label": "Gap 1"
+      },
+      {
+        "id": "gap_2",
+        "label": "Gap 2"
+      }
+      // Note: Vary the number of gaps dynamically between 2, 3, or 4 gaps depending on passage complexity (e.g. add gap_3, gap_4 where appropriate).
+    ],
+    "response_options": [
+      "<correct_target_for_gap_1>",
+      "<correct_target_for_gap_2>",
+      "<plausible_distractor_1>",
+      "<plausible_distractor_2>"
+    ]
+  },
+  "answer": {
+    "gap_1": "<correct_target_for_gap_1>",
+    "gap_2": "<correct_target_for_gap_2>"
+  },
+  "explanation": "• Gap 1 (<correct_target_1>): <Clear reason why this term accurately fills gap 1 based on the passage context and scientific/mathematical rules>\\n• (Provide a bullet for EVERY gap: Gap 1, Gap 2, and Gap 3/4 if present)\\n• <Distractor 1> (Distractor): <Clear reason why this term is an incorrect choice that does not properly fit any gap in this passage>\\n• <Distractor 2> (Distractor): <Clear reason why this term is incorrect>",
+  "sourceChunkIds": [<list of chunk_id integers used>]
+}
+
+IMPORTANT for GAP_MATCH:
+- "text" contains the prompt/instruction stem (e.g. "Complete the passage by selecting the correct terms from the response options.").
+- "options.passage" contains the narrative or scientific passage with embedded gap tokens: [gap_1], [gap_2], [gap_3], [gap_4], etc. Use EXACTLY [gap_1], [gap_2], etc. tokens in the passage.
+- VARY GAP COUNT DYNAMICALLY: Vary the number of gaps between 2, 3, and 4 gaps per question based on the content depth and difficulty (e.g. 2 gaps for concise concepts, 3 gaps for standard passages, 4 gaps for multi-step processes). Do NOT fix all questions to 3 gaps.
+- The number of gap tokens in "options.passage" MUST match the entries in "options.gaps".
+- "options.gaps" MUST be a list of objects with "id" (e.g. "gap_1") and "label" (e.g. "Gap 1"). Do NOT include any hint fields.
+- "options.response_options" MUST contain all the correct target terms plus 2-3 plausible distractors from the same subject domain and grade level. CRITICAL: "options.response_options" MUST be randomized and shuffled in mixed or alphabetical order so that options do NOT match the chronological/sequential order of the gaps.
+- "answer" MUST be a JSON dictionary mapping each gap id (e.g. "gap_1") to its exact correct term string in "response_options".
+- MANDATORY RATIONALE: The "explanation" field MUST provide a distinct bulleted rationale for EVERY gap assignment (• Gap 1 (...): ..., • Gap 2 (...): ...) AND a bullet for EVERY distractor in the response_options bank explaining why it is incorrect."""
 }
 
 # Backward compatibility alias
