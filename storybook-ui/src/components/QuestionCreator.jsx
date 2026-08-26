@@ -16,7 +16,7 @@ const QUESTION_TYPES = [
   { value: 'DROPDOWN', label: 'Dropdown', badge: 'qc-badge-dd' },
   { value: 'MATCHING_LINES', label: 'Matching Lines', badge: 'qc-badge-ml' },
   { value: 'ORDERING', label: 'Ordering', badge: 'qc-badge-ord' },
-  { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', badge: 'qc-badge-bg' },
+  // { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', badge: 'qc-badge-bg' },
 ];
 
 const DEFAULT_MCQ_OPTIONS = ['', '', '', ''];

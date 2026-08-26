@@ -31,7 +31,7 @@ export default function AIGeneratePage() {
     DROPDOWN: 0,
     MATCHING_LINES: 0,
     ORDERING: 0,
-    BACKGROUND_GRAPHIC: 0,
+    // BACKGROUND_GRAPHIC: 0,
   });
 
   const [lastNonZeroCounts, setLastNonZeroCounts] = useState({
@@ -42,7 +42,7 @@ export default function AIGeneratePage() {
     DROPDOWN: 1,
     MATCHING_LINES: 1,
     ORDERING: 1,
-    BACKGROUND_GRAPHIC: 1,
+    // BACKGROUND_GRAPHIC: 1,
   });
 
   const totalCount = Object.values(typeCounts).reduce((sum, c) => sum + c, 0);
