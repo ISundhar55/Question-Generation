@@ -1060,37 +1060,54 @@ def _build_regenerate_prompt(
     gen_op = _detect_structural_op(mod_text) if mod_text else None
 
     # Targeted refinement scope block
-    targets = refinement_targets or []
-    scope_lines = []
-    if "entire_item" in targets or not targets:
-        scope_lines.append("• Scope: FULL REFINEMENT — You may refine the stem, options, answer, and explanation based on the teacher instructions.")
+    targets = [t.lower() for t in (refinement_targets or [])]
+    is_full_refinement = "entire_item" in targets or len(targets) == 0
+
+    target_instructions = []
+    preserve_instructions = []
+
+    if is_full_refinement:
+        target_instructions.append("• FULL REFINEMENT: You may modify any part of the question (stem, choices, correct answer, rationale) to fulfill the teacher's instructions.")
     else:
+        # Question Stem
         if "stem" in targets:
-            scope_lines.append("• Scope: QUESTION STEM ('text' field) — Refine/reword the question stem to satisfy the teacher instructions. Keep the options and answer consistent.")
+            target_instructions.append("• MODIFY QUESTION STEM ('text' field): Reword or restructure the question stem according to the teacher's instructions.")
         else:
-            scope_lines.append("• PRESERVE STEM: Keep the 'text' field (question stem) EXACTLY IDENTICAL word-for-word.")
+            preserve_instructions.append("• PRESERVE STEM: Keep the 'text' field (question stem) EXACTLY IDENTICAL to the original.")
 
+        # Choices / Distractors / Answers
         if "distractors" in targets:
-            scope_lines.append("• Scope: DISTRACTORS ONLY — Refine ONLY the incorrect choices. Keep the correct answer option and its letter EXACTLY IDENTICAL. Replace or rewrite only the wrong options to make them plausible/accurate.")
+            target_instructions.append("• MODIFY DISTRACTORS ONLY: Rewrite ONLY the incorrect choices in 'options' to satisfy the teacher's instructions. Keep the correct answer option text and letter EXACTLY identical.")
         elif "choices" in targets:
-            scope_lines.append("• Scope: ANSWER CHOICES — Regenerate/update the answer choices based on the teacher instructions, ensuring the correct answer and distractors align.")
-        elif "answer" in targets:
-            scope_lines.append("• Scope: CORRECT ANSWER — Change the correct answer according to the teacher instructions (adjusting the question stem or options as needed).")
-        elif "alternatives" in targets:
-            scope_lines.append("• Scope: ALTERNATIVE ANSWERS — Update or add acceptable synonyms/alternative answers for the blanks in options.answers according to the teacher instructions.")
-        elif "pairs" in targets:
-            scope_lines.append("• Scope: MATCHING PAIRS — Update or regenerate the Column A and Column B matching pairs according to the teacher instructions.")
-        elif "sequence" in targets:
-            scope_lines.append("• Scope: SEQUENCE ITEMS — Update or re-order the sequence items according to the teacher instructions.")
-        else:
-            scope_lines.append("• PRESERVE CHOICES/ANSWERS: Keep ALL existing 'options' and the 'answer' field EXACTLY IDENTICAL word-for-word.")
+            target_instructions.append("• MODIFY ANSWER CHOICES ('options'): Regenerate or update the answer choices according to the teacher's instructions.")
 
+        if "answer" in targets:
+            target_instructions.append("• MODIFY CORRECT ANSWER ('answer' field): Update the correct answer as requested in the teacher's instructions.")
+
+        if "alternatives" in targets:
+            target_instructions.append("• MODIFY ALTERNATIVE ANSWERS: Add or update acceptable synonym arrays in 'options.answers'.")
+
+        if "pairs" in targets:
+            target_instructions.append("• MODIFY MATCHING PAIRS: Update the Column A / Column B pairs according to the teacher's instructions.")
+
+        if "sequence" in targets:
+            target_instructions.append("• MODIFY SEQUENCE ITEMS: Update or re-order the sequence items according to the teacher's instructions.")
+
+        # Preservations for choices if none targeted
+        has_option_target = any(t in targets for t in ["distractors", "choices", "answer", "alternatives", "pairs", "sequence"])
+        if not has_option_target:
+            preserve_instructions.append("• PRESERVE CHOICES & ANSWER: Keep 'options' and 'answer' EXACTLY IDENTICAL to the original.")
+
+        # Rationale handling: Always regenerate rationale to align with modified content unless entire question is untouched
         if "rationale" in targets:
-            scope_lines.append("• Scope: RATIONALE / EXPLANATION — Rewrite/expand the 'explanation' field into a full structured rationale (per-option for MCQ/TF, per-blank for Constructed/Dropdown, per-pair for Matching, per-step for Ordering).")
+            target_instructions.append("• REWRITE RATIONALE: Rewrite the 'explanation' field to provide a thorough, structured breakdown adhering to the format rules.")
+        elif len(target_instructions) > 0:
+            target_instructions.append("• REALIGN RATIONALE: Update the 'explanation' field so it accurately reflects the changes made above.")
         else:
-            scope_lines.append("• PRESERVE RATIONALE: Keep the existing 'explanation' field unless the correct answer or choices were modified.")
+            preserve_instructions.append("• PRESERVE RATIONALE: Keep the 'explanation' field identical.")
 
-    scope_ctx = "\n".join(scope_lines)
+    target_scope_text = "\n".join(target_instructions) if target_instructions else "• Apply teacher instructions to the question."
+    preserve_scope_text = "\n".join(preserve_instructions) if preserve_instructions else "• Maintain question format and standards."
 
     # Build a precise structural context block so the LLM cannot mis-count
     structural_ctx = ""
@@ -1137,40 +1154,38 @@ def _build_regenerate_prompt(
             f"  - Only update questionType and answer fields to match the new type.\n"
         )
 
-    if not mod_text:
-        mod_text = "Improve clarity, precision, and quality while keeping the same topic and question structure."
+    return f"""You are an expert assessment question editor for {grade} {content_area}.
 
-    return f"""You are a surgical assessment editor for {grade} {content_area}.
-
-Your job is to apply the teacher's refinement request following the TARGET REFINEMENT SCOPE below.
+Your task is to refine and update the ORIGINAL QUESTION based on the TEACHER'S MODIFICATION INSTRUCTIONS.
 {structural_ctx}
-ORIGINAL QUESTION (JSON):
+ORIGINAL QUESTION (JSON baseline):
 {original_str}
 
-🎯 TARGET REFINEMENT SCOPE:
-{scope_ctx}
+🎯 COMPONENTS TO MODIFY (Active Changes Required):
+{target_scope_text}
 
-TEACHER'S MODIFICATION INSTRUCTIONS (DATA — refinement notes):
+🔒 COMPONENTS TO PRESERVE:
+{preserve_scope_text}
+
+📝 TEACHER'S MODIFICATION INSTRUCTIONS (MANDATORY TO APPLY):
 \"\"\"
 {mod_text}
 \"\"\"
 
-SYLLABUS / KNOWLEDGE CONTEXT (DATA):
+SYLLABUS / KNOWLEDGE CONTEXT:
 ---
 {context}
 ---
 
 STRICT RULES:
-1. Return EXACTLY 1 modified question as a JSON object (NOT an array, NOT a list).
-2. Follow the {question_type} JSON format exactly (see below).
-3. Strictly adhere to the TARGET REFINEMENT SCOPE above (do NOT modify preserved fields).
-4. If the ⚑ STRUCTURAL CONTEXT block above specifies exact counts and letters, follow those EXACTLY.
-5. Return ONLY the JSON object. No markdown, no code fences, no preamble, no commentary.
-6. The response must start with {{ and end with }}.
+1. Return EXACTLY 1 modified question as a JSON object (NOT an array).
+2. You MUST actively modify the question to satisfy the TEACHER'S MODIFICATION INSTRUCTIONS. Do NOT return the question unmodified.
+3. Follow the {question_type} JSON format and rationale rules exactly (see below).
+4. Return ONLY valid JSON starting with {{ and ending with }}. No markdown fences, no commentary.
 
 {format_instruction}
 
-Return the single modified question JSON object now:"""
+Return the modified question JSON object now:"""
 
 
 def regenerate_question(

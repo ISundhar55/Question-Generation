@@ -1250,29 +1250,41 @@ export default function AIGeneratePage() {
               </div>
             </div>
 
-            {/* Refinement Instructions */}
+            {/* Refinement Instructions (Mandatory) */}
             <div style={{ marginBottom: 20 }}>
-              <label style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>
-                Refinement Instructions <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 11 }}>(optional)</span>
+              <label style={{ ...labelStyle, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Refinement Instructions</span>
               </label>
               <textarea
                 id="regen-instructions"
                 rows={3}
-                placeholder="e.g. Simplify wording, adjust difficulty, make distractors more plausible, or focus on a specific concept..."
+                placeholder={`Examples:\n• Change Option C to focus on chloroplasts instead of cell walls\n• Make the question stem more concise and direct\n• Provide more tempting distractors for Grade 8 level`}
                 value={regenInstructions}
                 onChange={e => setRegenInstructions(e.target.value)}
                 style={{
                   width: '100%', padding: '10px 12px', borderRadius: 8,
-                  border: '1.5px solid var(--color-border)', fontSize: 13,
+                  border: `1.5px solid ${!regenInstructions.trim() && refinementTargets.length > 0 ? '#fca5a5' : 'var(--color-border)'}`,
+                  fontSize: 13,
                   background: 'var(--color-surface)', color: 'var(--color-text)',
                   resize: 'vertical', outline: 'none', lineHeight: 1.5,
                   fontFamily: 'inherit',
                   boxSizing: 'border-box',
                 }}
               />
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                Leave empty to let AI improve selected components automatically.
-              </div>
+              {/* Validation helper hints */}
+              {refinementTargets.length === 0 ? (
+                <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 6, fontWeight: 500 }}>
+                  ⚠️ Please select at least one component above to refine.
+                </div>
+              ) : !regenInstructions.trim() ? (
+                <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 6, fontWeight: 500 }}>
+                  ✍️ Please specify what you would like the AI to change in the instructions above.
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 6, fontWeight: 500 }}>
+                  💡 AI will surgically apply these instructions to the selected component(s).
+                </div>
+              )}
             </div>
 
             {/* Error */}
@@ -1287,7 +1299,7 @@ export default function AIGeneratePage() {
             )}
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
               <button
                 className="btn-modal-cancel"
                 onClick={closeRegenModal}
@@ -1305,20 +1317,23 @@ export default function AIGeneratePage() {
                 id="regen-confirm-btn"
                 className="btn-modal-confirm"
                 onClick={handleRegenerate}
-                disabled={regenerating}
+                disabled={regenerating || refinementTargets.length === 0 || !regenInstructions.trim()}
                 style={{
                   padding: '9px 24px', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                  border: 'none', background: regenerating ? '#c4b5fd' : '#7c3aed',
-                  color: '#fff', cursor: regenerating ? 'not-allowed' : 'pointer',
+                  border: 'none',
+                  background: (regenerating || refinementTargets.length === 0 || !regenInstructions.trim()) ? '#cbd5e1' : '#7c3aed',
+                  color: (regenerating || refinementTargets.length === 0 || !regenInstructions.trim()) ? '#64748b' : '#fff',
+                  cursor: (regenerating || refinementTargets.length === 0 || !regenInstructions.trim()) ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s',
+                  boxShadow: (regenerating || refinementTargets.length === 0 || !regenInstructions.trim()) ? 'none' : '0 4px 14px rgba(124, 58, 237, 0.35)',
                 }}
               >
                 {regenerating ? (
                   <>
                     <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                    Regenerating…
+                    Applying Refinement…
                   </>
-                ) : '🔄 Regenerate'}
+                ) : '✨ Apply Refinement'}
               </button>
             </div>
           </div>
