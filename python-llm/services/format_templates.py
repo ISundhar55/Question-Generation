@@ -287,43 +287,39 @@ IMPORTANT for GAP_MATCH:
   "difficulty": "<difficulty>",
   "contentArea": "<content_area>",
   "grade": "<grade>",
-  "text": "stem instruction - Categorize the items from the option buckets into their appropriate category drop buckets.",
+  "text": "<Clear instruction stem, e.g. Categorize the items from the option buckets into the appropriate category drop buckets.>",
   "options": {
     "option_buckets": [
       {
         "id": "opt_bucket_1",
-        "title": "<Category or Pool Title, e.g. Energy Sources, Organisms, Chemical Reactions>",
+        "title": "<First Option Pool Title, e.g. Terrestrial Animals or Energy Sources>",
         "options": [
           "<item_1>",
           "<item_2>",
           "<item_3>",
-          "<item_4>",
-          "<item_5>",
-          "<item_6>"
+          "<item_4>"
         ]
       },
       {
         "id": "opt_bucket_2",
-        "title": "<Category or Pool Title, e.g. Energy Sources, Organisms, Chemical Reactions>",
+        "title": "<Second Option Pool Title (optional), e.g. Aquatic Animals or Devices>",
         "options": [
-          "<item_1>",
-          "<item_2>",
-          "<item_3>",
-          "<item_4>",
           "<item_5>",
-          "<item_6>"
+          "<item_6>",
+          "<item_7>",
+          "<item_8>"
         ]
       }
     ],
     "drop_buckets": [
       {
         "id": "drop_bucket_1",
-        "name": "<Drop Category Name 1, e.g. Renewable Energy>",
+        "name": "<Drop Category 1 Name, e.g. Herbivores or Renewable Energy>",
         "rationale": "<Clear explanation of why the assigned items belong to this category based on standard curriculum facts>"
       },
       {
         "id": "drop_bucket_2",
-        "name": "<Drop Category Name 2, e.g. Non-Renewable Energy>",
+        "name": "<Drop Category 2 Name, e.g. Carnivores or Non-Renewable Energy>",
         "rationale": "<Clear explanation of why the assigned items belong to this category>"
       }
     ]
@@ -332,25 +328,27 @@ IMPORTANT for GAP_MATCH:
     "drop_bucket_1": [
       "<item_1>",
       "<item_3>",
-      "<item_5>"
+      "<item_5>",
+      "<item_7>"
     ],
     "drop_bucket_2": [
       "<item_2>",
       "<item_4>",
-      "<item_6>"
+      "<item_6>",
+      "<item_8>"
     ]
   },
-  "explanation": "• <Drop Category Name 1>:\\n  - <item_1>: <Rationale>\\n  - <item_3>: <Rationale>\\n• <Drop Category Name 2>:\\n  - <item_2>: <Rationale>\\n  - <item_4>: <Rationale>",
+  "explanation": "• <Drop Category 1 Name>:\\n  - <item_1>: <Rationale>\\n  - <item_3>: <Rationale>\\n• <Drop Category 2 Name>:\\n  - <item_2>: <Rationale>\\n  - <item_4>: <Rationale>",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for MULTIPLE_DROP_BUCKET:
-- "text" contains the prompt/instruction stem (e.g. "Categorize the following items into the correct category buckets.").
-- "options.option_buckets": List of 1 to 2 source option buckets. Each has "id" ("opt_bucket_1"), "title" (e.g. "Energy Sources"), and "options" (list of 4 to 8 distinct item strings).
-- "options.drop_buckets": List of 2 to 4 target drop buckets / categories. Each has "id" ("drop_bucket_1", "drop_bucket_2"), "name" (category title), and "rationale" (dedicated educational rationale for this bucket).
+- "text" contains the prompt/instruction stem (e.g. "Categorize the items from the option buckets into their appropriate category drop buckets."). Do NOT include labels like 'stem instruction -' in the text.
+- "options.option_buckets": List of 1 to 2 source option buckets. Each has "id" ("opt_bucket_1", "opt_bucket_2"), "title" (e.g. "Energy Sources"), and "options" (list of 3 to 6 distinct item strings).
+- "options.drop_buckets": List of 2 to 4 target drop buckets / categories. Each has "id" ("drop_bucket_1", "drop_bucket_2"), "name" (category title), and "rationale" (educational rationale for this bucket).
 - "answer": JSON dictionary mapping each drop_bucket id to the list of correct item strings that belong in that bucket.
-- Every item in "options.option_buckets.options" MUST be assigned to its correct drop bucket in "answer".
-- CRITICAL: "options" in "option_buckets" MUST be randomized/shuffled so that items are NOT grouped sequentially by their target drop buckets.
+- Every item across all "options.option_buckets" MUST be assigned to its correct drop bucket in "answer".
+- CRITICAL: "options" in "option_buckets" MUST be randomized and shuffled in mixed order so that items are NOT grouped sequentially by their target drop buckets.
 - MANDATORY RATIONALE: The "explanation" field MUST detail the classification logic for each bucket and its assigned items."""
 }
 
