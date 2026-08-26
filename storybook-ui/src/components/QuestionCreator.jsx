@@ -8,6 +8,7 @@ import { MatchingLinesEditor } from './MatchingLinesEditor';
 import { OrderingEditor } from './OrderingEditor';
 import { BackgroundGraphicEditor } from './BackgroundGraphicEditor';
 import { GapMatchEditor } from './GapMatchEditor';
+import { MultipleDropBucketEditor } from './MultipleDropBucketEditor';
 
 const QUESTION_TYPES = [
   { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', badge: 'qc-badge-mcq' },
@@ -18,6 +19,7 @@ const QUESTION_TYPES = [
   { value: 'MATCHING_LINES', label: 'Matching Lines', badge: 'qc-badge-ml' },
   { value: 'ORDERING', label: 'Ordering', badge: 'qc-badge-ord' },
   { value: 'GAP_MATCH', label: 'Gap Match', badge: 'qc-badge-gm' },
+  { value: 'MULTIPLE_DROP_BUCKET', label: 'Multiple Drop Bucket', badge: 'qc-badge-mdb' },
   // { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', badge: 'qc-badge-bg' },
 ];
 
@@ -189,6 +191,25 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
   });
   const [gmAnswers, setGmAnswers] = useState(parsedAnswerObj);
 
+  // MULTIPLE_DROP_BUCKET state
+  const [optionBuckets, setOptionBuckets] = useState(() => {
+    if (parsedOptions.option_buckets && Array.isArray(parsedOptions.option_buckets) && parsedOptions.option_buckets.length > 0) {
+      return parsedOptions.option_buckets;
+    }
+    return [
+      { id: 'opt_bucket_1', title: '', options: [''] },
+    ];
+  });
+  const [dropBuckets, setDropBuckets] = useState(() => {
+    if (parsedOptions.drop_buckets && Array.isArray(parsedOptions.drop_buckets) && parsedOptions.drop_buckets.length > 0) {
+      return parsedOptions.drop_buckets;
+    }
+    return [
+      { id: 'drop_bucket_1', name: '' },
+    ];
+  });
+  const [mdbAnswers, setMdbAnswers] = useState(parsedAnswerObj);
+
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -242,6 +263,14 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
       if (responseOptions.length < gaps.length) e.responseOptions = 'Response options bank must contain at least as many options as gaps';
       const missingAns = gaps.some(g => !gmAnswers[g.id] && !gmAnswers[g.label]);
       if (missingAns) e.answer = 'Please assign a correct option for each gap';
+    }
+    if (type === 'MULTIPLE_DROP_BUCKET') {
+      const validOptBuckets = optionBuckets.filter(b => b.title?.trim() || b.options?.some(o => o.trim()));
+      if (validOptBuckets.length < 1) e.optionBuckets = 'At least one Option Bucket is required';
+      const validDropBuckets = dropBuckets.filter(b => b.name?.trim());
+      if (validDropBuckets.length < 2) e.dropBuckets = 'At least two Drop Buckets are required';
+      const assignedCount = Object.values(mdbAnswers).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+      if (assignedCount === 0) e.answer = 'Please assign options to the drop buckets';
     }
     return e;
   };
@@ -321,6 +350,19 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           response_options: responseOptions,
         },
         answer: gmAnswers,
+        difficulty,
+        points,
+      };
+    }
+    if (type === 'MULTIPLE_DROP_BUCKET') {
+      return {
+        type,
+        text,
+        options: {
+          option_buckets: optionBuckets.filter(b => b.title?.trim() || b.options?.some(o => o.trim())),
+          drop_buckets: dropBuckets.filter(b => b.name?.trim()),
+        },
+        answer: mdbAnswers,
         difficulty,
         points,
       };
@@ -536,6 +578,19 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           setResponseOptions={setResponseOptions}
           answers={gmAnswers}
           setAnswers={setGmAnswers}
+          err={err}
+        />
+      )}
+
+      {/* Multiple Drop Bucket */}
+      {type === 'MULTIPLE_DROP_BUCKET' && (
+        <MultipleDropBucketEditor
+          optionBuckets={optionBuckets}
+          setOptionBuckets={setOptionBuckets}
+          dropBuckets={dropBuckets}
+          setDropBuckets={setDropBuckets}
+          answers={mdbAnswers}
+          setAnswers={setMdbAnswers}
           err={err}
         />
       )}

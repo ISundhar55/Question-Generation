@@ -503,6 +503,163 @@ export function QuestionPreview({ question, onBack, backLabel }) {
           </div>
         );
       }
+      case 'MULTIPLE_DROP_BUCKET': {
+        const qOptions = question?.options || {};
+        const optionBuckets = Array.isArray(qOptions?.option_buckets) ? qOptions.option_buckets : [];
+        const dropBuckets = Array.isArray(qOptions?.drop_buckets) ? qOptions.drop_buckets : [];
+        let answersObj = {};
+        const rawAns = question?.answer;
+        if (typeof rawAns === 'object' && rawAns !== null) {
+          answersObj = rawAns;
+        } else if (typeof rawAns === 'string') {
+          try {
+            answersObj = JSON.parse(rawAns);
+          } catch (_) {
+            try {
+              const fixed = rawAns.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+              answersObj = JSON.parse(fixed);
+            } catch (_) {}
+          }
+        }
+
+        return (
+          <div className="qc-preview" style={{ fontFamily: 'inherit' }}>
+            <div className="qc-preview-title" style={{ marginBottom: 12 }}>
+              <span className="qc-badge" style={{ background: '#f0f9ff', color: '#0284c7', border: '1px solid #bae6fd' }}>
+                🗂️ Multiple Drop Bucket
+              </span>
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{question?.text}</p>
+
+            {/* Option Buckets Section */}
+            {optionBuckets.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.04em' }}>
+                  📦 Option Buckets
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {optionBuckets.map((oBucket, bIdx) => (
+                    <div key={oBucket.id || bIdx} style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1.5px solid #e2e8f0' }}>
+                      {oBucket.title && (
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#0d6efd', marginBottom: 8 }}>
+                          {oBucket.title}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {(oBucket.options || []).map((opt, oIdx) => (
+                          <span
+                            key={oIdx}
+                            style={{
+                              padding: '5px 12px',
+                              borderRadius: 6,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              color: 'var(--color-text)',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                            }}
+                          >
+                            {opt}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Target Drop Buckets Grid */}
+            {dropBuckets.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.04em' }}>
+                  📥 Target Drop Buckets
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(dropBuckets.length, 3)}, 1fr)`, gap: 12 }}>
+                  {dropBuckets.map((dBucket, dIdx) => {
+                    const assigned = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
+                    const assignedList = Array.isArray(assigned) ? assigned : [assigned].filter(Boolean);
+
+                    return (
+                      <div
+                        key={dBucket.id || dIdx}
+                        style={{
+                          padding: '14px 16px',
+                          background: '#f0f9ff',
+                          borderRadius: 10,
+                          border: '2px dashed #0284c7',
+                          minHeight: 110,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>📥</span>
+                          <span>{dBucket.name || `Category ${dIdx + 1}`}</span>
+                        </div>
+
+                        {assignedList.length === 0 ? (
+                          <div style={{ fontSize: 11, color: '#0284c7', fontStyle: 'italic', opacity: 0.7, marginTop: 10 }}>
+                            [ Drop items here ]
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                            {assignedList.map((item, i) => (
+                              <span
+                                key={i}
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: 6,
+                                  background: '#ffffff',
+                                  border: '1px solid #7dd3fc',
+                                  color: '#0369a1',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Correct Answer Key & Per-Bucket Rationales */}
+            {dropBuckets.length > 0 && (
+              <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Correct Classification Key:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {dropBuckets.map((dBucket) => {
+                    const assigned = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
+                    const assignedList = Array.isArray(assigned) ? assigned : [assigned].filter(Boolean);
+
+                    return (
+                      <div key={dBucket.id} style={{ fontSize: 12 }}>
+                        <strong style={{ color: '#0369a1' }}>{dBucket.name || 'Category'}:</strong>{' '}
+                        <span>{assignedList.join(', ') || '(None)'}</span>
+                        {dBucket.rationale && (
+                          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, fontStyle: 'italic' }}>
+                            Rationale: {dBucket.rationale}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return <div>Unknown question type</div>;
     }

@@ -47,7 +47,7 @@ class GenerateRequest(BaseModel):
     chapter: Optional[str] = Field(None, description="Optional chapter filter, e.g. Fractions")
     question_type: str = Field(
         ...,
-        description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING"
+        description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING | BACKGROUND_GRAPHIC | GAP_MATCH | MULTIPLE_DROP_BUCKET"
     )
     difficulty: str = Field(..., description="easy | medium | hard")
     count: int = Field(..., ge=1, le=20, description="Number of questions (1-20)")
@@ -63,7 +63,7 @@ class GenerateInternetRequest(BaseModel):
     grade: str = Field(..., description="e.g. Grade 6")
     question_type: str = Field(
         ...,
-        description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING"
+        description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING | BACKGROUND_GRAPHIC | GAP_MATCH | MULTIPLE_DROP_BUCKET"
     )
     difficulty: str = Field(..., description="easy | medium | hard")
     count: int = Field(..., ge=1, le=20, description="Number of questions (1-20)")
@@ -122,7 +122,7 @@ class DeleteResponse(BaseModel):
 class RegenerateRequest(BaseModel):
     content_area: str = Field(..., description="e.g. Science")
     grade: str = Field(..., description="e.g. Grade 6")
-    question_type: str = Field(..., description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING | BACKGROUND_GRAPHIC | GAP_MATCH")
+    question_type: str = Field(..., description="SINGLE_SELECT | MULTIPLE_SELECT | TRUE_FALSE | CONSTRUCTED_RESPONSE | DROPDOWN | MATCHING_LINES | ORDERING | BACKGROUND_GRAPHIC | GAP_MATCH | MULTIPLE_DROP_BUCKET")
     difficulty: str = Field(..., description="easy | medium | hard")
     original_question: dict = Field(..., description="The full original question JSON object")
     modification_instructions: str = Field(

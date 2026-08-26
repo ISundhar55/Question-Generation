@@ -26,6 +26,7 @@ export const QUESTION_TYPES = [
   { value: 'MATCHING_LINES', label: 'Matching Lines', icon: '🔗', desc: 'Match Column A items to Column B' },
   { value: 'ORDERING', label: 'Ordering', icon: '↕️', desc: 'Drag options to place them in correct order' },
   { value: 'GAP_MATCH', label: 'Gap Match', icon: '🧩', desc: 'Place options from the shared bank into passage gaps' },
+  { value: 'MULTIPLE_DROP_BUCKET', label: 'Multiple Drop Bucket', icon: '🗂️', desc: 'Sort items from option buckets into category drop buckets' },
   // { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', icon: '🖼️', desc: 'Drag labels onto marked diagram drop zones' },
 ];
 
@@ -47,6 +48,7 @@ export const TYPE_META = {
   MATCHING_LINES: { color: '#0891b2', bg: '#ecfeff' },
   ORDERING: { color: '#db2777', bg: '#fdf2f8' },
   GAP_MATCH: { color: '#2563eb', bg: '#eff6ff' },
+  MULTIPLE_DROP_BUCKET: { color: '#0284c7', bg: '#f0f9ff' },
   BACKGROUND_GRAPHIC: { color: '#059669', bg: '#ecfdf5' },
 };
 
@@ -103,6 +105,16 @@ export const getRefinementTargetsForType = (qType) => {
       { id: 'stem', label: 'Question Stem' },
       { id: 'passage', label: 'Passage Content & Gaps' },
       { id: 'response_options', label: 'Response Options Bank' },
+      { id: 'answer', label: 'Correct Answers' },
+      { id: 'rationale', label: 'Rationale' },
+      { id: 'entire_item', label: 'Entire Item' },
+    ];
+  }
+  if (type === 'MULTIPLE_DROP_BUCKET') {
+    return [
+      { id: 'stem', label: 'Question Stem' },
+      { id: 'option_buckets', label: 'Option Buckets' },
+      { id: 'drop_buckets', label: 'Drop Buckets' },
       { id: 'answer', label: 'Correct Answers' },
       { id: 'rationale', label: 'Rationale' },
       { id: 'entire_item', label: 'Entire Item' },

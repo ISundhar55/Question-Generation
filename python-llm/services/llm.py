@@ -766,6 +766,23 @@ def normalize_question(q: dict) -> dict:
                     shuffled_opts = shuffled_opts[1:] + shuffled_opts[:1]
                 opts["response_options"] = shuffled_opts
 
+    # 7. Normalize and shuffle options for MULTIPLE_DROP_BUCKET questions
+    elif q.get("questionType") in ["MULTIPLE_DROP_BUCKET", "DROP_BUCKET", "BUCKET_SORT"]:
+        q["questionType"] = "MULTIPLE_DROP_BUCKET"
+        opts = q.get("options")
+        if isinstance(opts, dict):
+            opt_buckets = opts.get("option_buckets")
+            if isinstance(opt_buckets, list):
+                for b in opt_buckets:
+                    if isinstance(b, dict) and isinstance(b.get("options"), list):
+                        items = list(b["options"])
+                        if len(items) > 1:
+                            shuffled = list(items)
+                            random.shuffle(shuffled)
+                            if shuffled == items and len(items) > 1:
+                                shuffled = shuffled[1:] + shuffled[:1]
+                            b["options"] = shuffled
+
     return q
 
 

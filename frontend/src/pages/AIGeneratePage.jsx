@@ -32,6 +32,7 @@ export default function AIGeneratePage() {
     MATCHING_LINES: 0,
     ORDERING: 0,
     GAP_MATCH: 0,
+    MULTIPLE_DROP_BUCKET: 0,
     // BACKGROUND_GRAPHIC: 0,
   });
 
@@ -44,6 +45,7 @@ export default function AIGeneratePage() {
     MATCHING_LINES: 1,
     ORDERING: 1,
     GAP_MATCH: 1,
+    MULTIPLE_DROP_BUCKET: 1,
     // BACKGROUND_GRAPHIC: 1,
   });
 
@@ -1118,6 +1120,89 @@ export default function AIGeneratePage() {
                       );
                     })()}
 
+                    {/* Multiple Drop Bucket Display */}
+                    {q.questionType === 'MULTIPLE_DROP_BUCKET' && q.options && (() => {
+                      const optionBuckets = Array.isArray(q.options.option_buckets) ? q.options.option_buckets : [];
+                      const dropBuckets = Array.isArray(q.options.drop_buckets) ? q.options.drop_buckets : [];
+
+                      return (
+                        <div style={{ marginBottom: 16 }}>
+                          {/* Option Buckets */}
+                          {optionBuckets.length > 0 && (
+                            <div style={{ marginBottom: 14 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.04em' }}>
+                                📦 Option Buckets
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {optionBuckets.map((oBucket, bIdx) => (
+                                  <div key={oBucket.id || bIdx} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1.5px solid #e2e8f0' }}>
+                                    {oBucket.title && (
+                                      <div style={{ fontSize: 12, fontWeight: 700, color: '#0d6efd', marginBottom: 6 }}>
+                                        {oBucket.title}
+                                      </div>
+                                    )}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                      {(oBucket.options || []).map((opt, oIdx) => (
+                                        <span
+                                          key={oIdx}
+                                          style={{
+                                            padding: '4px 10px',
+                                            borderRadius: 6,
+                                            background: '#ffffff',
+                                            border: '1px solid #cbd5e1',
+                                            color: 'var(--color-text)',
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                          }}
+                                        >
+                                          {opt}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Target Drop Buckets */}
+                          {dropBuckets.length > 0 && (
+                            <div style={{ marginBottom: 14 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.04em' }}>
+                                📥 Target Drop Buckets
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(dropBuckets.length, 3)}, 1fr)`, gap: 10 }}>
+                                {dropBuckets.map((dBucket, dIdx) => (
+                                  <div
+                                    key={dBucket.id || dIdx}
+                                    style={{
+                                      padding: '12px 14px',
+                                      background: '#f0f9ff',
+                                      borderRadius: 8,
+                                      border: '2px dashed #0284c7',
+                                      minHeight: 90,
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: 6,
+                                    }}
+                                  >
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <span>📥</span>
+                                      <span>{dBucket.name || `Category ${dIdx + 1}`}</span>
+                                    </div>
+                                    <div style={{ fontSize: 11, color: '#0284c7', fontStyle: 'italic', opacity: 0.7, marginTop: 6 }}>
+                                      [ Drop items here ]
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Background Graphic Interactive SVG Display */}
                     {q.questionType === 'BACKGROUND_GRAPHIC' && q.options && (() => {
                       const dropZones = q.options.drop_zones || [];
@@ -1271,13 +1356,17 @@ export default function AIGeneratePage() {
                               const gapMatch = k.match(/gap_?([0-9]+)/i);
                               if (gapMatch) {
                                 keyLabel = `Gap ${gapMatch[1]}`;
+                              } else if (k.toLowerCase().startsWith('drop_bucket_') || k.toLowerCase().startsWith('bucket_')) {
+                                const bucketName = q.options?.drop_buckets?.find(b => b.id === k)?.name;
+                                keyLabel = bucketName || k;
                               } else if (k.toLowerCase().startsWith('zone_')) {
                                 const pin = q.options?.drop_zones?.find(z => z.id === k)?.pin_label;
                                 keyLabel = pin ? `Pin ${pin}` : k;
                               }
+                              const valStr = Array.isArray(v) ? v.join(', ') : String(v);
                               if (!seen.has(keyLabel)) {
                                 seen.add(keyLabel);
-                                normalized.push([keyLabel, v]);
+                                normalized.push([keyLabel, valStr]);
                               }
                             });
 
