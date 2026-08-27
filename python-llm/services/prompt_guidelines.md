@@ -44,3 +44,14 @@ QUALITY STANDARDS — apply to every question in this batch:
    - Reading level and vocabulary must match the specified grade.
    - Spell out every abbreviation/acronym on first use.
    - Match exact spellings, units, and proper nouns from the syllabus text.
+
+8. TABLES & DATA FORMATTING
+   - When generating questions that include data tables, input-output function tables, or comparison charts in the question text or stem, ALWAYS format them as standard GitHub-Flavored Markdown tables with leading/trailing pipes and header separators:
+     | Header 1 | Header 2 |
+     | :--- | :--- |
+     | Value 1 | Value 2 |
+   - Never output informal tables or plain dashes without standard markdown pipe separators.
+
+9. MATHEMATICAL EXPRESSIONS & NOTATION
+   - For mathematical equations, formulas, and single-letter variables (e.g. x, y, 3x + 2 = 38), write them cleanly in plain text or standard math notation without wrapping every single individual variable in raw LaTeX dollar signs ($x$).
+   - Use standard Unicode math symbols directly (e.g., °, ×, ÷, ², ³, √, π, ≤, ≥, ±) for clean legibility.

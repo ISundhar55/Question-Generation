@@ -409,6 +409,79 @@ body {
   transition: background 0.12s;
 }
 
+/* Inline Math & Formula Typography */
+.md-math {
+  font-family: 'Cambria Math', 'KaTeX_Math', 'Times New Roman', serif;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  padding: 0 1.5px;
+  font-weight: 500;
+}
+
+.md-math-block {
+  display: block;
+  text-align: center;
+  font-family: 'Cambria Math', 'KaTeX_Math', 'Times New Roman', serif;
+  font-style: italic;
+  margin: 6px 0;
+  padding: 4px 0;
+}
+
+/* Stacked Math Fractions: \frac{a}{b} */
+.md-frac {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 0.88em;
+  line-height: 1.1;
+  padding: 0 3px;
+  font-family: 'Cambria Math', 'KaTeX_Math', 'Times New Roman', serif;
+  margin: 0 2px;
+}
+
+.md-frac-num {
+  border-bottom: 1.5px solid currentColor;
+  padding-bottom: 1px;
+}
+
+.md-frac-den {
+  padding-top: 1px;
+}
+
+/* Square Roots: \sqrt{x} */
+.md-sqrt {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: 'Cambria Math', 'KaTeX_Math', 'Times New Roman', serif;
+  padding: 0 1px;
+}
+
+.md-sqrt-rad {
+  border-top: 1.5px solid currentColor;
+  padding-top: 1px;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+sup {
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+  top: -0.5em;
+  font-family: inherit;
+}
+
+sub {
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+  bottom: -0.25em;
+  font-family: inherit;
+}
+
 /* ============================================
    Ordering Drag & Drop Question Styles
    ============================================ */

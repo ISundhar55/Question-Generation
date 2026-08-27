@@ -1797,8 +1797,8 @@ export default function AIGeneratePage() {
                           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
                             Rationale
                           </div>
-                          <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                            {q.explanation}
+                          <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.6 }}>
+                            <MarkdownText text={q.explanation} />
                           </div>
                         </>
                       )}
