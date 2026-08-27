@@ -61,7 +61,27 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
   });
   const [difficulty, setDifficulty] = useState(initialData?.difficulty || 'medium');
   const [points, setPoints] = useState(initialData?.points || 1);
-  const [tfAnswers, setTfAnswers] = useState(initialData?.answer || '');
+  const [tfAnswers, setTfAnswers] = useState(() => {
+    const raw = initialData?.answer;
+    if (raw === true || raw === 'true') return 'true';
+    if (raw === false || raw === 'false') return 'false';
+    if (typeof raw === 'string') {
+      const lower = raw.trim().toLowerCase();
+      if (lower === 'true' || lower === 't') return 'true';
+      if (lower === 'false' || lower === 'f') return 'false';
+      if (lower === 'a') {
+        const optA = initialData?.options?.A || (Array.isArray(initialData?.options) ? initialData?.options[0] : null);
+        if (typeof optA === 'string' && optA.toLowerCase().includes('false')) return 'false';
+        return 'true';
+      }
+      if (lower === 'b') {
+        const optB = initialData?.options?.B || (Array.isArray(initialData?.options) ? initialData?.options[1] : null);
+        if (typeof optB === 'string' && optB.toLowerCase().includes('true')) return 'true';
+        return 'false';
+      }
+    }
+    return '';
+  });
   // CONSTRUCTED_RESPONSE — one entry per blank: { correct: '', acceptable: '' }
   const [crBlanks, setCrBlanks] = useState(() => {
     if (!initialData?.options?.answers) return [{ correct: '', acceptable: '' }, { correct: '', acceptable: '' }];

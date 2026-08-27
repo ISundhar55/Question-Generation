@@ -1337,8 +1337,7 @@ export default function AIGeneratePage() {
                               cV === cColVal ||
                               cV === cColId ||
                               cV === `col${cIdx + 1}` ||
-                              cV === `${cIdx + 1}` ||
-                              (cColVal.length > 3 && (cV.includes(cColVal) || cColVal.includes(cV)));
+                              cV === `${cIdx + 1}`;
 
                             if (colMatches) return true;
                           }

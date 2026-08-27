@@ -33,7 +33,7 @@ export function TrueFalseQuestion({ question, correctAnswer, mode = 'preview', o
       </div>
       {mode === 'preview' && revealed && (
         <div style={{ marginTop: 14, padding: '8px 14px', background: '#f0fdf4', borderRadius: 'var(--radius-sm)', fontSize: 13, color: '#15803d', fontWeight: 600 }}>
-          Correct Answer: {correctAnswer === 'true' ? '✓ True' : '✗ False'}
+          Correct Answer: {(correctAnswer === true || String(correctAnswer).toLowerCase() === 'true' || String(correctAnswer).toUpperCase() === 'A') ? '✓ True' : '✗ False'}
         </div>
       )}
       {mode === 'preview' && (

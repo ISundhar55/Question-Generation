@@ -4,6 +4,7 @@ import { MCQQuestion } from './MCQQuestion';
 import { TrueFalseQuestion } from './TrueFalseQuestion';
 import { ShortAnswerQuestion } from './ShortAnswerQuestion';
 import { FillBlankQuestion } from './FillBlankQuestion';
+import { MarkdownText } from './MarkdownText';
 
 /**
  * QuestionPreview
@@ -123,38 +124,112 @@ export function QuestionPreview({ question, onBack, backLabel }) {
       case 'MATCHING_LINES': {
         const left  = question.options?.left  || {};
         const right = question.options?.right || {};
-        const pairs = question.answer
-          ? Object.fromEntries(
-              question.answer.split(',').map(p => {
-                const [l, r] = p.trim().split('-');
-                return [l?.trim(), r?.trim()];
-              })
-            )
-          : {};
+        const leftItems = Object.entries(left);
+        const rightItems = Object.entries(right);
+
+        const parsePairs = (raw) => {
+          if (!raw) return [];
+          if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+            return Object.entries(raw).map(([l, r]) => ({ left: l, right: String(r) }));
+          }
+          if (typeof raw === 'string') {
+            const trimmed = raw.trim();
+            try {
+              const obj = JSON.parse(trimmed);
+              if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+                return Object.entries(obj).map(([l, r]) => ({ left: l, right: String(r) }));
+              }
+            } catch (_) {}
+
+            const items = trimmed.split(/[,|;]/);
+            const list = [];
+            items.forEach(item => {
+              const part = item.trim();
+              if (!part) return;
+              if (part.includes('->')) {
+                const [l, r] = part.split('->');
+                if (l && r) list.push({ left: l.trim(), right: r.trim() });
+              } else if (part.includes('→')) {
+                const [l, r] = part.split('→');
+                if (l && r) list.push({ left: l.trim(), right: r.trim() });
+              } else if (part.includes('-')) {
+                const [l, r] = part.split('-');
+                if (l && r) list.push({ left: l.trim(), right: r.trim() });
+              } else if (part.includes(':')) {
+                const [l, r] = part.split(':');
+                if (l && r) list.push({ left: l.trim(), right: r.trim() });
+              }
+            });
+            if (list.length > 0) return list;
+          }
+          return [];
+        };
+
+        const formattedPairs = parsePairs(question.answer);
+
         return (
-          <div style={{ fontFamily: 'inherit' }}>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{question.text}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', marginBottom: 6, textTransform: 'uppercase' }}>Column A</div>
-                {Object.entries(left).map(([k, v]) => (
-                  <div key={k} style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 5, fontSize: 13, display: 'flex', gap: 8 }}>
-                    <strong style={{ color: '#0891b2' }}>{k}.</strong> {v}
-                  </div>
-                ))}
+          <div className="qc-preview" style={{ fontFamily: 'inherit' }}>
+            <div className="qc-preview-title" style={{ marginBottom: 12 }}>
+              <span className="qc-badge" style={{ background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc' }}>
+                🔗 Matching Lines
+              </span>
+            </div>
+            <div className="qc-preview-question">
+              <MarkdownText text={question.text || 'Match each item from Column A with its corresponding item from Column B.'} />
+            </div>
+
+            {/* Side-by-Side Modern Columns */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+              {/* Column A */}
+              <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: 10, border: '1.5px solid #e2e8f0' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>Column A</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {leftItems.map(([key, label]) => (
+                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: '#ffffff', border: '1.5px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#ecfeff', border: '1px solid #a5f3fc', color: '#0891b2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                        {key}
+                      </span>
+                      <span style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500, lineHeight: 1.4 }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase' }}>Column B</div>
-                {Object.entries(right).map(([k, v]) => (
-                  <div key={k} style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 5, fontSize: 13, display: 'flex', gap: 8 }}>
-                    <strong style={{ color: '#6b7280' }}>{k}.</strong> {v}
-                  </div>
-                ))}
+
+              {/* Column B */}
+              <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: 10, border: '1.5px solid #e2e8f0' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>Column B</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {rightItems.map(([key, label]) => (
+                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, background: '#ffffff', border: '1.5px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                        {key}
+                      </span>
+                      <span style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500, lineHeight: 1.4 }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            {Object.keys(pairs).length > 0 && (
-              <div style={{ fontSize: 12, color: '#0891b2', fontWeight: 600 }}>
-                Answer: {question.answer}
+
+            {/* Answer Key Pills Bar */}
+            {formattedPairs.length > 0 && (
+              <div style={{ padding: '12px 16px', background: '#ecfeff', borderRadius: 8, border: '1px solid #a5f3fc' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  Correct Matching Key:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {formattedPairs.map((pair, pIdx) => (
+                    <div key={pIdx} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: '#ffffff', border: '1px solid #67e8f9', fontSize: 12, fontWeight: 700, color: '#0891b2', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <span>{pair.left}</span>
+                      <span style={{ color: '#06b6d4' }}>➔</span>
+                      <span>{pair.right}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -715,8 +790,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
                 cV === cColVal ||
                 cV === cColId ||
                 cV === `col${cIdx + 1}` ||
-                cV === `${cIdx + 1}` ||
-                (cColVal.length > 3 && (cV.includes(cColVal) || cColVal.includes(cV)));
+                cV === `${cIdx + 1}`;
 
               if (colMatches) return true;
             }
