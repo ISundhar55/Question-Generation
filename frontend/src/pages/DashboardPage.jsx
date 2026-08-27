@@ -15,6 +15,7 @@ const TYPE_LABELS = {
   GAP_MATCH: { label: 'Gap Match', color: '#2563eb', bg: '#eff6ff' },
   MULTIPLE_DROP_BUCKET: { label: 'Multiple Drop Bucket', color: '#0284c7', bg: '#f0f9ff' },
   MATRIX_INTERACTION: { label: 'Matrix Interaction', color: '#16a34a', bg: '#f0fdf4' },
+  SELECT_TEXT: { label: 'Select Text', color: '#7c3aed', bg: '#f5f3ff' },
   BACKGROUND_GRAPHIC: { label: 'Background Graphic', color: '#059669', bg: '#ecfdf5' },
   // Legacy / Hidden types (still supported for rendering existing data):
   SHORT_ANSWER: { label: 'Short Answer', color: '#f59e0b', bg: '#fffbeb' },
@@ -32,6 +33,7 @@ const ACTIVE_TYPES = [
   'GAP_MATCH',
   'MULTIPLE_DROP_BUCKET',
   'MATRIX_INTERACTION',
+  'SELECT_TEXT',
   // 'BACKGROUND_GRAPHIC',
 ];
 
@@ -47,6 +49,7 @@ const SHORT_LABELS = {
   GAP_MATCH: 'Gap Match',
   MULTIPLE_DROP_BUCKET: 'Multiple Drop Bucket',
   MATRIX_INTERACTION: 'Matrix Interaction',
+  SELECT_TEXT: 'Select Text',
   BACKGROUND_GRAPHIC: 'Background Graphic',
 };
 

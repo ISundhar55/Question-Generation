@@ -815,6 +815,42 @@ def normalize_question(q: dict) -> dict:
                     normalized_rows.append({"id": f"row_{idx + 1}", "value": row.strip()})
             opts["rows"] = normalized_rows
 
+    # 9. Normalize SELECT_TEXT questions
+    elif q.get("questionType") in ["SELECT_TEXT", "HOTTEXT", "HOT_TEXT", "HIGHLIGHT_TEXT"]:
+        q["questionType"] = "SELECT_TEXT"
+        opts = q.get("options")
+        if not isinstance(opts, dict):
+            opts = {}
+            q["options"] = opts
+
+        if not opts.get("selection_type"):
+            opts["selection_type"] = "Sentence"
+        if not isinstance(opts.get("passage"), str):
+            opts["passage"] = str(opts.get("passage", "")).strip()
+
+        # Normalize answer to list of trimmed strings (splitting pipe delimiters if returned joined)
+        ans = q.get("answer")
+        normalized_ans = []
+        if isinstance(ans, str):
+            if "|" in ans:
+                normalized_ans = [x.strip() for x in ans.split("|") if x.strip()]
+            else:
+                normalized_ans = [ans.strip()]
+        elif isinstance(ans, list):
+            for x in ans:
+                if x is not None:
+                    s = str(x).strip()
+                    if "|" in s:
+                        normalized_ans.extend([part.strip() for part in s.split("|") if part.strip()])
+                    elif s:
+                        normalized_ans.append(s)
+        q["answer"] = normalized_ans
+
+        if not opts.get("max_selections") or int(opts.get("max_selections", 0)) < 1:
+            opts["max_selections"] = len(normalized_ans) if normalized_ans else 1
+        else:
+            opts["max_selections"] = int(opts["max_selections"])
+
     return q
 
 
@@ -981,8 +1017,36 @@ def _build_regenerate_prompt(
         if "sequence" in targets:
             target_instructions.append("• MODIFY SEQUENCE ITEMS: Update or re-order the sequence items according to the teacher's instructions.")
 
+        if "passage" in targets:
+            target_instructions.append("• MODIFY PASSAGE: Update or expand the reading passage ('options.passage') according to the teacher's instructions.")
+
+        if "gaps" in targets or "response_options" in targets:
+            target_instructions.append("• MODIFY GAPS & RESPONSE OPTIONS: Update the gaps list or response options bank in 'options' and align 'answer' appropriately.")
+
+        if "option_buckets" in targets or "drop_buckets" in targets:
+            target_instructions.append("• MODIFY BUCKETS: Update 'options.option_buckets' or 'options.drop_buckets' and realign the mapping in 'answer'.")
+
+        if "header" in targets or "columns" in targets or "rows" in targets:
+            target_instructions.append("• MODIFY MATRIX GRID: Update 'options.header', 'options.columns', or 'options.rows' and realign the row-to-column mappings in 'answer'.")
+
+        if "drop_zones" in targets or "label_bank" in targets or "graphic" in targets:
+            target_instructions.append("• MODIFY DIAGRAM GRAPHIC & DROP ZONES: Update 'options.svg_graphic', 'options.drop_zones', or 'options.label_bank' and realign 'answer'.")
+
+        if "max_selections" in targets or "selection_type" in targets:
+            target_instructions.append(
+                "• MODIFY SELECTION SETTINGS & ANSWERS: "
+                "If 'selection_type' is changed to 'Words', update 'text' stem to ask for words (e.g. 'Select the word from the passage that...'), update 'options.selection_type' = 'Words', and supply individual single-word answers in 'answer' (NOT entire sentences). "
+                "If 'selection_type' is changed to 'Sentence', update 'text' to ask for sentences and supply full-sentence answers in 'answer'. "
+                "If 'max_selections' is updated to N, update 'options.max_selections' = N, update 'text' stem to reflect the count N, ensure 'options.passage' has enough valid targets, and supply EXACTLY N verbatim target answers in the 'answer' array."
+            )
+
         # Preservations for choices if none targeted
-        has_option_target = any(t in targets for t in ["distractors", "choices", "answer", "alternatives", "pairs", "sequence"])
+        has_option_target = any(t in targets for t in [
+            "distractors", "choices", "answer", "alternatives", "pairs", "sequence",
+            "passage", "selection_type", "max_selections", "header", "columns", "rows",
+            "option_buckets", "drop_buckets", "gaps", "response_options", "drop_zones",
+            "label_bank", "graphic"
+        ])
         if not has_option_target:
             preserve_instructions.append("• PRESERVE CHOICES & ANSWER: Keep 'options' and 'answer' EXACTLY IDENTICAL to the original.")
 

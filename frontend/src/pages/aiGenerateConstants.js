@@ -28,6 +28,7 @@ export const QUESTION_TYPES = [
   { value: 'GAP_MATCH', label: 'Gap Match', icon: '🧩', desc: 'Place options from the shared bank into passage gaps' },
   { value: 'MULTIPLE_DROP_BUCKET', label: 'Multiple Drop Bucket', icon: '🗂️', desc: 'Sort items from option buckets into category drop buckets' },
   { value: 'MATRIX_INTERACTION', label: 'Matrix Interaction', icon: '📊', desc: 'Evaluate statements in rows across category columns' },
+  { value: 'SELECT_TEXT', label: 'Select Text', icon: '📝', desc: 'Click to select sentences, words, or paragraphs in a passage' },
   // { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', icon: '🖼️', desc: 'Drag labels onto marked diagram drop zones' },
 ];
 
@@ -51,6 +52,7 @@ export const TYPE_META = {
   GAP_MATCH: { color: '#2563eb', bg: '#eff6ff' },
   MULTIPLE_DROP_BUCKET: { color: '#0284c7', bg: '#f0f9ff' },
   MATRIX_INTERACTION: { color: '#16a34a', bg: '#f0fdf4' },
+  SELECT_TEXT: { color: '#7c3aed', bg: '#f5f3ff' },
   BACKGROUND_GRAPHIC: { color: '#059669', bg: '#ecfdf5' },
 };
 
@@ -129,6 +131,17 @@ export const getRefinementTargetsForType = (qType) => {
       { id: 'columns', label: 'Column Categories' },
       { id: 'rows', label: 'Row Statements' },
       { id: 'answer', label: 'Correct Matrix Answers' },
+      { id: 'rationale', label: 'Rationale' },
+      { id: 'entire_item', label: 'Entire Item' },
+    ];
+  }
+  if (type === 'SELECT_TEXT') {
+    return [
+      { id: 'stem', label: 'Question Stem' },
+      { id: 'passage', label: 'Passage Content' },
+      { id: 'selection_type', label: 'Selection Type (Sentence/Word)' },
+      { id: 'max_selections', label: 'Max Selections Limit' },
+      { id: 'answer', label: 'Target Selected Answers' },
       { id: 'rationale', label: 'Rationale' },
       { id: 'entire_item', label: 'Entire Item' },
     ];

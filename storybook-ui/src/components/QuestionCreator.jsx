@@ -10,6 +10,7 @@ import { BackgroundGraphicEditor } from './BackgroundGraphicEditor';
 import { GapMatchEditor } from './GapMatchEditor';
 import { MultipleDropBucketEditor } from './MultipleDropBucketEditor';
 import { MatrixInteractionEditor } from './MatrixInteractionEditor';
+import { SelectTextEditor } from './SelectTextEditor';
 
 const QUESTION_TYPES = [
   { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', badge: 'qc-badge-mcq' },
@@ -22,6 +23,7 @@ const QUESTION_TYPES = [
   { value: 'GAP_MATCH', label: 'Gap Match', badge: 'qc-badge-gm' },
   { value: 'MULTIPLE_DROP_BUCKET', label: 'Multiple Drop Bucket', badge: 'qc-badge-mdb' },
   { value: 'MATRIX_INTERACTION', label: 'Matrix Interaction', badge: 'qc-badge-mi' },
+  { value: 'SELECT_TEXT', label: 'Select Text', badge: 'qc-badge-st' },
   // { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', badge: 'qc-badge-bg' },
 ];
 
@@ -232,6 +234,23 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
   });
   const [matrixAnswers, setMatrixAnswers] = useState(parsedAnswerObj);
 
+  // SELECT_TEXT state
+  const [stSelectionType, setStSelectionType] = useState(parsedOptions.selection_type || 'Sentence');
+  const [stMaxSelections, setStMaxSelections] = useState(parsedOptions.max_selections || 1);
+  const [stPassage, setStPassage] = useState(parsedOptions.passage || '');
+  const [stAnswers, setStAnswers] = useState(() => {
+    const raw = initialData?.answer;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const p = JSON.parse(raw);
+        if (Array.isArray(p)) return p;
+      } catch (_) {}
+      return raw ? [raw] : [];
+    }
+    return [];
+  });
+
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -301,6 +320,10 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
       if (validRows.length < 1) e.rows = 'At least one row is required';
       const missingAns = matrixRows.some(r => !matrixAnswers[r.value] && !matrixAnswers[r.id]);
       if (missingAns) e.answer = 'Please select a correct response for each row';
+    }
+    if (type === 'SELECT_TEXT') {
+      if (!stPassage.trim()) e.passage = 'Passage content is required';
+      if (!Array.isArray(stAnswers) || stAnswers.length === 0) e.answer = 'Please select at least one correct answer from the passage';
     }
     return e;
   };
@@ -407,6 +430,20 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           rows: matrixRows.filter(r => r.value?.trim()),
         },
         answer: matrixAnswers,
+        difficulty,
+        points,
+      };
+    }
+    if (type === 'SELECT_TEXT') {
+      return {
+        type,
+        text,
+        options: {
+          selection_type: stSelectionType,
+          max_selections: stMaxSelections,
+          passage: stPassage,
+        },
+        answer: stAnswers,
         difficulty,
         points,
       };
@@ -650,6 +687,21 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
           setRows={setMatrixRows}
           answers={matrixAnswers}
           setAnswers={setMatrixAnswers}
+          err={err}
+        />
+      )}
+
+      {/* Select Text */}
+      {type === 'SELECT_TEXT' && (
+        <SelectTextEditor
+          selectionType={stSelectionType}
+          setSelectionType={setStSelectionType}
+          maxSelections={stMaxSelections}
+          setMaxSelections={setStMaxSelections}
+          passage={stPassage}
+          setPassage={setStPassage}
+          answers={stAnswers}
+          setAnswers={setStAnswers}
           err={err}
         />
       )}

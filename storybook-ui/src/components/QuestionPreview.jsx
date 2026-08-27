@@ -821,6 +821,169 @@ export function QuestionPreview({ question, onBack, backLabel }) {
           </div>
         );
       }
+      case 'SELECT_TEXT': {
+        const qOptions = question?.options || {};
+        const selectionType = qOptions?.selection_type || 'Sentence';
+        const maxSelections = qOptions?.max_selections || 1;
+        const passageText = qOptions?.passage || '';
+
+        let targetAnswers = [];
+        const rawAns = question?.answer;
+        if (Array.isArray(rawAns)) {
+          targetAnswers = rawAns.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+        } else if (typeof rawAns === 'string') {
+          const trimmed = rawAns.trim();
+          try {
+            const p = JSON.parse(trimmed);
+            if (Array.isArray(p)) targetAnswers = p.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+            else if (trimmed.includes('|')) targetAnswers = trimmed.split('|').map(s => s.trim());
+            else targetAnswers = [trimmed];
+          } catch (_) {
+            try {
+              const fixed = trimmed.replace(/'/g, '"');
+              const p = JSON.parse(fixed);
+              if (Array.isArray(p)) targetAnswers = p.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+              else if (trimmed.includes('|')) targetAnswers = trimmed.split('|').map(s => s.trim());
+              else targetAnswers = [trimmed];
+            } catch (_) {
+              if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                const inner = trimmed.slice(1, -1);
+                targetAnswers = inner.split(',').flatMap(s => s.trim().replace(/^['"]|['"]$/g, '').split('|').map(x => x.trim())).filter(Boolean);
+              } else if (trimmed.includes('|')) {
+                targetAnswers = trimmed.split('|').map(s => s.trim()).filter(Boolean);
+              } else {
+                targetAnswers = [trimmed];
+              }
+            }
+          }
+        }
+
+        // Parse passage into tokens
+        let tokens = [];
+        if (selectionType === 'Paragraph') {
+          tokens = passageText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+        } else if (selectionType === 'Words') {
+          tokens = passageText.split(/\s+/).map(w => w.trim()).filter(Boolean);
+        } else {
+          tokens = passageText.match(/[^.!?\n]+[.!?]+(?:\s+|$)|[^.!?\n]+$/g) || [passageText];
+          tokens = tokens.map(s => s.trim()).filter(Boolean);
+        }
+
+        // Build set of target words when in Words selection mode
+        const cleanWord = (s) => (s || '').trim().replace(/^[“"'.,;:!?|/\\_-]+|[”"'.,;:!?|/\\_-]+$/g, '').toLowerCase();
+        const targetWordSet = new Set();
+        if (selectionType === 'Words') {
+          targetAnswers.forEach(ans => {
+            (ans || '').toLowerCase().replace(/[“"'.,;:!?|/\\_-]/g, ' ').split(/\s+/).forEach(w => {
+              if (w.trim()) targetWordSet.add(w.trim());
+            });
+          });
+        }
+
+        return (
+          <div className="qc-preview" style={{ fontFamily: 'inherit' }}>
+            <div className="qc-preview-title" style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span className="qc-badge qc-badge-st">
+                📝 Select Text
+              </span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 6, background: '#f5f3ff', border: '1px solid #ddd6fe', fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+                <span>Selection Type:</span>
+                <strong style={{ color: '#6d28d9' }}>{selectionType}</strong>
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
+                <span>Max Selections:</span>
+                <strong style={{ color: '#1e40af' }}>{maxSelections}</strong>
+              </div>
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{question?.text}</p>
+
+            {/* Passage Box with Highlighted Target Text */}
+            <div
+              style={{
+                padding: '18px 20px',
+                borderRadius: 10,
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                lineHeight: 2.0,
+                fontSize: 14,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: selectionType === 'Paragraph' ? 14 : selectionType === 'Words' ? 6 : 8,
+                marginBottom: 16,
+              }}
+            >
+              {tokens.map((tokenText, idx) => {
+                const cTok = cleanWord(tokenText);
+                const isSelected = selectionType === 'Words'
+                  ? targetWordSet.has(cTok)
+                  : targetAnswers.some(ans => {
+                      const cAns = cleanWord(ans);
+                      if (!cAns || !cTok) return false;
+                      return cAns === cTok || (cAns.length >= 6 && cTok.includes(cAns)) || (cTok.length >= 6 && cAns.includes(cTok));
+                    });
+
+                return (
+                  <span
+                    key={idx}
+                    style={{
+                      display: selectionType === 'Paragraph' ? 'block' : 'inline-flex',
+                      width: selectionType === 'Paragraph' ? '100%' : 'auto',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: selectionType === 'Paragraph' ? '10px 14px' : '4px 10px',
+                      borderRadius: 6,
+                      background: isSelected ? '#dcfce7' : '#ffffff',
+                      border: `1.5px solid ${isSelected ? '#16a34a' : '#cbd5e1'}`,
+                      color: isSelected ? '#15803d' : 'var(--color-text)',
+                      fontWeight: isSelected ? 600 : 400,
+                      boxShadow: isSelected ? '0 2px 4px rgba(22, 163, 74, 0.15)' : 'none',
+                    }}
+                  >
+                    {isSelected && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          background: '#16a34a',
+                          color: '#ffffff',
+                          fontSize: 10,
+                          fontWeight: 900,
+                          marginRight: 2,
+                          flexShrink: 0,
+                        }}
+                      >
+                        ✓
+                      </span>
+                    )}
+                    <span>{tokenText}</span>
+                  </span>
+                );
+              })}
+            </div>
+
+            {/* Answer Key */}
+            {targetAnswers.length > 0 && (
+              <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Correct Selected Text ({targetAnswers.length}):
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {targetAnswers.map((ans, aIdx) => (
+                    <div key={aIdx} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#15803d', fontWeight: 600 }}>
+                      <span>✓</span>
+                      <span>"{ans}"</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return <div>Unknown question type</div>;
     }

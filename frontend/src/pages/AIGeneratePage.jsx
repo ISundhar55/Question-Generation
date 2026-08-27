@@ -34,6 +34,7 @@ export default function AIGeneratePage() {
     GAP_MATCH: 0,
     MULTIPLE_DROP_BUCKET: 0,
     MATRIX_INTERACTION: 0,
+    SELECT_TEXT: 0,
     // BACKGROUND_GRAPHIC: 0,
   });
 
@@ -48,6 +49,7 @@ export default function AIGeneratePage() {
     GAP_MATCH: 1,
     MULTIPLE_DROP_BUCKET: 1,
     MATRIX_INTERACTION: 1,
+    SELECT_TEXT: 1,
     // BACKGROUND_GRAPHIC: 1,
   });
 
@@ -170,7 +172,7 @@ export default function AIGeneratePage() {
 
   const saveAll = async () => {
     setSavingAll(true);
-    const unsaved = questions.filter((q, i) => !savedIds.has(i) && q.grounded !== false);
+    const unsaved = questions.filter((q, i) => !savedIds.has(i));
     for (let i = 0; i < unsaved.length; i++) {
       const q = unsaved[i];
       const idx = questions.indexOf(q);
@@ -358,103 +360,115 @@ export default function AIGeneratePage() {
               border: '1.5px solid var(--color-border)',
               borderRadius: 10,
               background: 'var(--color-surface)',
-              padding: '14px 16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
+              overflow: 'hidden',
               boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
             }}>
-              {QUESTION_TYPES.map(qt => {
-                const currentCount = typeCounts[qt.value] || 0;
-                const isChecked = currentCount > 0;
-                return (
-                  <div
-                    key={qt.value}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 16,
-                      padding: '6px 4px',
-                      borderRadius: 6,
-                    }}
-                  >
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: isChecked ? 600 : 500,
-                      color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
-                      userSelect: 'none',
-                      flex: 1,
-                      minWidth: 0,
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={e => {
-                          const checked = e.target.checked;
-                          handleTypeCountChange(qt.value, checked ? (lastNonZeroCounts[qt.value] || 1) : 0);
-                        }}
-                        style={{
-                          width: 16,
-                          height: 16,
-                          accentColor: 'var(--color-primary)',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span style={{ lineHeight: 1.35 }}>{qt.label}</span>
-                    </label>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontWeight: 500 }}>Count:</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={20}
-                        value={currentCount}
-                        onChange={e => {
-                          const val = parseInt(e.target.value, 10);
-                          handleTypeCountChange(qt.value, isNaN(val) ? 0 : Math.max(0, Math.min(20, val)));
-                        }}
-                        style={{
-                          width: 52,
-                          padding: '5px 8px',
-                          borderRadius: 6,
-                          border: `1.5px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                          background: isChecked ? 'var(--color-surface)' : '#f8fafc',
-                          color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          textAlign: 'center',
-                          outline: 'none',
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Summary Footer */}
+              {/* Scrollable Question Types List */}
               <div style={{
-                borderTop: '1px solid var(--color-border)',
-                marginTop: 8,
-                paddingTop: 12,
+                maxHeight: 280,
+                overflowY: 'auto',
+                padding: '12px 14px',
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                flexDirection: 'column',
+                gap: 8,
               }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>Total Items:</span>
-                <span style={{ fontSize: 16, fontWeight: 800, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-primary)' }}>
-                  {totalCount}
-                </span>
+                {QUESTION_TYPES.map(qt => {
+                  const currentCount = typeCounts[qt.value] || 0;
+                  const isChecked = currentCount > 0;
+                  return (
+                    <div
+                      key={qt.value}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 16,
+                        padding: '6px 8px',
+                        borderRadius: 6,
+                        background: isChecked ? 'var(--color-primary-light, #eff6ff)' : 'transparent',
+                        transition: 'background 0.15s ease',
+                      }}
+                    >
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: isChecked ? 600 : 500,
+                        color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
+                        userSelect: 'none',
+                        flex: 1,
+                        minWidth: 0,
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            handleTypeCountChange(qt.value, checked ? (lastNonZeroCounts[qt.value] || 1) : 0);
+                          }}
+                          style={{
+                            width: 16,
+                            height: 16,
+                            accentColor: 'var(--color-primary)',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span style={{ lineHeight: 1.35 }}>{qt.label}</span>
+                      </label>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontWeight: 500 }}>Count:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={20}
+                          value={currentCount}
+                          onChange={e => {
+                            const val = parseInt(e.target.value, 10);
+                            handleTypeCountChange(qt.value, isNaN(val) ? 0 : Math.max(0, Math.min(20, val)));
+                          }}
+                          style={{
+                            width: 52,
+                            padding: '5px 8px',
+                            borderRadius: 6,
+                            border: `1.5px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            background: isChecked ? 'var(--color-surface)' : '#f8fafc',
+                            color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            textAlign: 'center',
+                            outline: 'none',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{ fontSize: 11, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
-                Max 20 items per type, 50 total
-                {totalCount > 50 && ' (⚠️ Exceeds 50 total maximum)'}
+
+              {/* Fixed Summary Footer */}
+              <div style={{
+                borderTop: '1.5px solid var(--color-border)',
+                background: '#f8fafc',
+                padding: '10px 16px',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>Total Items:</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-primary)' }}>
+                    {totalCount}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-text-muted)', marginTop: 2 }}>
+                  Max 20 items per type, 50 total
+                  {totalCount > 50 && ' (⚠️ Exceeds 50 total maximum)'}
+                </div>
               </div>
             </div>
           </div>
@@ -646,16 +660,21 @@ export default function AIGeneratePage() {
                   id="save-all-btn"
                   className="btn-save-all"
                   onClick={saveAll}
-                  disabled={savingAll || savedIds.size === questions.filter(q => q.grounded !== false).length}
+                  disabled={savingAll || savedIds.size === questions.length}
                   style={{
-                    padding: '9px 20px', background: savedIds.size === questions.filter(q => q.grounded !== false).length ? '#f0fdf4' : 'var(--color-primary)',
-                    border: 'none', borderRadius: 8, color: savedIds.size === questions.filter(q => q.grounded !== false).length ? 'var(--color-success)' : '#fff',
-                    fontSize: 13, fontWeight: 600, cursor: savingAll || savedIds.size === questions.filter(q => q.grounded !== false).length ? 'default' : 'pointer',
-                    boxShadow: savedIds.size === questions.filter(q => q.grounded !== false).length ? 'none' : '0 4px 12px rgba(79,110,247,0.25)',
+                    padding: '9px 20px',
+                    background: savedIds.size === questions.length ? '#f0fdf4' : 'var(--color-primary)',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: savedIds.size === questions.length ? 'var(--color-success)' : '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: savingAll || savedIds.size === questions.length ? 'default' : 'pointer',
+                    boxShadow: savedIds.size === questions.length ? 'none' : '0 4px 12px rgba(79,110,247,0.25)',
                     transition: 'all 0.15s',
                   }}
                 >
-                  {savingAll ? '💾 Saving...' : savedIds.size === questions.filter(q => q.grounded !== false).length ? '✅ All Saved' : '💾 Save All to Bank'}
+                  {savingAll ? '💾 Saving...' : savedIds.size === questions.length ? '✅ All Saved' : '💾 Save All to Bank'}
                 </button>
               </div>
             </div>
@@ -809,14 +828,14 @@ export default function AIGeneratePage() {
                         <button
                           id={`save-q-${idx}`}
                           className="btn-save-card"
-                          onClick={() => !isSaved && q.grounded !== false && saveQuestion(q, idx)}
-                          disabled={isSaved || isSaving || q.grounded === false}
+                          onClick={() => !isSaved && saveQuestion(q, idx)}
+                          disabled={isSaved || isSaving}
                           style={{
                             padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            border: q.grounded === false ? '1px solid #e2e8f0' : isSaved ? '1px solid #bbf7d0' : '1px solid #ccd6ff',
-                            background: q.grounded === false ? '#f1f5f9' : isSaved ? '#f0fdf4' : 'var(--color-primary-light)',
-                            color: q.grounded === false ? '#94a3b8' : isSaved ? 'var(--color-success)' : 'var(--color-primary)',
-                            cursor: q.grounded === false ? 'not-allowed' : isSaved ? 'default' : 'pointer', transition: 'all 0.12s',
+                            border: isSaved ? '1px solid #bbf7d0' : '1px solid #ccd6ff',
+                            background: isSaved ? '#f0fdf4' : 'var(--color-primary-light)',
+                            color: isSaved ? 'var(--color-success)' : 'var(--color-primary)',
+                            cursor: isSaved ? 'default' : 'pointer', transition: 'all 0.12s',
                           }}
                         >
                           {isSaving ? '💾 Saving...' : isSaved ? '✅ Saved' : '💾 Save'}
@@ -1336,6 +1355,147 @@ export default function AIGeneratePage() {
                       );
                     })()}
 
+                    {/* Select Text Display */}
+                    {q.questionType === 'SELECT_TEXT' && q.options && (() => {
+                      const selectionType = q.options?.selection_type || 'Sentence';
+                      const maxSelections = q.options?.max_selections || 1;
+                      const passageText = q.options?.passage || '';
+
+                      let targetAnswers = [];
+                      const rawAns = q.answer;
+                      if (Array.isArray(rawAns)) {
+                        targetAnswers = rawAns.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+                      } else if (typeof rawAns === 'string') {
+                        const trimmed = rawAns.trim();
+                        try {
+                          const p = JSON.parse(trimmed);
+                          if (Array.isArray(p)) targetAnswers = p.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+                          else if (trimmed.includes('|')) targetAnswers = trimmed.split('|').map(s => s.trim());
+                          else targetAnswers = [trimmed];
+                        } catch (_) {
+                          try {
+                            const fixed = trimmed.replace(/'/g, '"');
+                            const p = JSON.parse(fixed);
+                            if (Array.isArray(p)) targetAnswers = p.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+                            else if (trimmed.includes('|')) targetAnswers = trimmed.split('|').map(s => s.trim());
+                            else targetAnswers = [trimmed];
+                          } catch (_) {
+                            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                              const inner = trimmed.slice(1, -1);
+                              targetAnswers = inner.split(',').flatMap(s => s.trim().replace(/^['"]|['"]$/g, '').split('|').map(x => x.trim())).filter(Boolean);
+                            } else if (trimmed.includes('|')) {
+                              targetAnswers = trimmed.split('|').map(s => s.trim()).filter(Boolean);
+                            } else {
+                              targetAnswers = [trimmed];
+                            }
+                          }
+                        }
+                      }
+
+                      let tokens = [];
+                      if (selectionType === 'Paragraph') {
+                        tokens = passageText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+                      } else if (selectionType === 'Words') {
+                        tokens = passageText.split(/\s+/).map(w => w.trim()).filter(Boolean);
+                      } else {
+                        tokens = passageText.match(/[^.!?\n]+[.!?]+(?:\s+|$)|[^.!?\n]+$/g) || [passageText];
+                        tokens = tokens.map(s => s.trim()).filter(Boolean);
+                      }
+
+                      // Build set of target words when in Words selection mode
+                      const cleanWord = (s) => (s || '').trim().replace(/^[“"'.,;:!?|/\\_-]+|[”"'.,;:!?|/\\_-]+$/g, '').toLowerCase();
+                      const targetWordSet = new Set();
+                      if (selectionType === 'Words') {
+                        targetAnswers.forEach(ans => {
+                          (ans || '').toLowerCase().replace(/[“"'.,;:!?|/\\_-]/g, ' ').split(/\s+/).forEach(w => {
+                            if (w.trim()) targetWordSet.add(w.trim());
+                          });
+                        });
+                      }
+
+                      return (
+                        <div style={{ marginBottom: 16 }}>
+                          {/* Selection Type & Max Selections Metadata Pill Bar */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: '#f5f3ff', border: '1px solid #ddd6fe', fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+                              <span>Selection Type:</span>
+                              <strong style={{ color: '#6d28d9' }}>{selectionType}</strong>
+                            </div>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
+                              <span>Max Selections:</span>
+                              <strong style={{ color: '#1e40af' }}>{maxSelections}</strong>
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              padding: '16px 18px',
+                              borderRadius: 10,
+                              background: '#f8fafc',
+                              border: '1.5px solid #e2e8f0',
+                              lineHeight: 2.0,
+                              fontSize: 14,
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: selectionType === 'Paragraph' ? 14 : selectionType === 'Words' ? 6 : 8,
+                            }}
+                          >
+                            {tokens.map((tokenText, idx) => {
+                              const cTok = cleanWord(tokenText);
+                              const isSelected = selectionType === 'Words'
+                                ? targetWordSet.has(cTok)
+                                : targetAnswers.some(ans => {
+                                    const cAns = cleanWord(ans);
+                                    if (!cAns || !cTok) return false;
+                                    return cAns === cTok || (cAns.length >= 6 && cTok.includes(cAns)) || (cTok.length >= 6 && cAns.includes(cTok));
+                                  });
+
+                              return (
+                                <span
+                                  key={idx}
+                                  style={{
+                                    display: selectionType === 'Paragraph' ? 'block' : 'inline-flex',
+                                    width: selectionType === 'Paragraph' ? '100%' : 'auto',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    padding: selectionType === 'Paragraph' ? '10px 14px' : '4px 10px',
+                                    borderRadius: 6,
+                                    background: isSelected ? '#dcfce7' : '#ffffff',
+                                    border: `1.5px solid ${isSelected ? '#16a34a' : '#cbd5e1'}`,
+                                    color: isSelected ? '#15803d' : 'var(--color-text)',
+                                    fontWeight: isSelected ? 600 : 400,
+                                    boxShadow: isSelected ? '0 2px 4px rgba(22, 163, 74, 0.15)' : 'none',
+                                  }}
+                                >
+                                  {isSelected && (
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: 16,
+                                        height: 16,
+                                        borderRadius: '50%',
+                                        background: '#16a34a',
+                                        color: '#ffffff',
+                                        fontSize: 10,
+                                        fontWeight: 900,
+                                        marginRight: 2,
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      ✓
+                                    </span>
+                                  )}
+                                  <span>{tokenText}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Background Graphic Interactive SVG Display */}
                     {q.questionType === 'BACKGROUND_GRAPHIC' && q.options && (() => {
                       const dropZones = q.options.drop_zones || [];
@@ -1467,18 +1627,42 @@ export default function AIGeneratePage() {
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 10 : 0 }}>
                         {(() => {
                           let ansObj = null;
-                          if (typeof q.answer === 'object' && q.answer !== null) {
-                            ansObj = q.answer;
-                          } else if (typeof q.answer === 'string' && (q.answer.trim().startsWith('{') || q.answer.includes(':'))) {
-                            const raw = q.answer.trim();
-                            try {
-                              ansObj = JSON.parse(raw);
-                            } catch (_) {
+                          let ansArray = null;
+
+                          if (Array.isArray(q.answer)) {
+                            ansArray = q.answer;
+                          } else if (typeof q.answer === 'string') {
+                            const trimmed = q.answer.trim();
+                            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
                               try {
-                                const fixed = raw.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
-                                ansObj = JSON.parse(fixed);
+                                const parsed = JSON.parse(trimmed);
+                                if (Array.isArray(parsed)) ansArray = parsed;
                               } catch (_) {}
+                            } else if (trimmed.startsWith('{') || trimmed.includes(':')) {
+                              try {
+                                ansObj = JSON.parse(trimmed);
+                              } catch (_) {
+                                try {
+                                  const fixed = trimmed.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+                                  ansObj = JSON.parse(fixed);
+                                } catch (_) {}
+                              }
                             }
+                          } else if (typeof q.answer === 'object' && q.answer !== null) {
+                            ansObj = q.answer;
+                          }
+
+                          if (ansArray && ansArray.length > 0) {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {ansArray.map((ansText, i) => (
+                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#15803d', fontWeight: 600, fontSize: 13 }}>
+                                    <span>✓</span>
+                                    <span>"{ansText}"</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
                           }
 
                           if (ansObj && typeof ansObj === 'object') {

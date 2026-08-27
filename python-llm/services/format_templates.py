@@ -406,7 +406,35 @@ IMPORTANT for MATRIX_INTERACTION:
 - "options.rows": List of 3 to 6 distinct row objects, each with "id" ("row_1", "row_2", ...) and "value" (statement or item string).
 - "answer": JSON dictionary mapping each row statement value (or row id) to its exact matching column category value string.
 - MANDATORY: Every row in "options.rows" MUST be mapped to one valid column value in "answer".
-- MANDATORY RATIONALE: The "explanation" field MUST contain a bulleted item for EVERY row statement explaining why that particular column choice is correct."""
+- MANDATORY RATIONALE: The "explanation" field MUST contain a bulleted item for EVERY row statement explaining why that particular column choice is correct.""",
+
+    "SELECT_TEXT": """Each question object must follow this exact format:
+{
+  "questionType": "SELECT_TEXT",
+  "difficulty": "<difficulty>",
+  "contentArea": "<content_area>",
+  "grade": "<grade>",
+  "text": "<A clear, direct instruction asking the student to find and select specific evidence, sentences, words, or paragraphs from the passage. Clearly indicate how many items to select if more than one.>",
+  "options": {
+    "selection_type": "<'Sentence' | 'Paragraph' | 'Words' | 'Manual selection' - choose the level of text matching what is asked in 'text', default is 'Sentence'>",
+    "max_selections": <integer count of target selections required by the question, e.g. 1, 2, or 3>,
+    "passage": "<A grade-appropriate passage, story, or text excerpt (3-6 sentences) containing both the target answer text and surrounding context.>"
+  },
+  "answer": [
+    "<Verbatim target text element 1 directly from the passage>",
+    "<Verbatim target text element 2 directly from the passage (if max_selections > 1)>"
+  ],
+  "explanation": "• <For each target item, provide the educational rationale explaining why it correctly answers the prompt and why distractors do not>",
+  "sourceChunkIds": [<list of chunk_id integers used>]
+}
+
+IMPORTANT RULES for SELECT_TEXT:
+1. "text": Write a natural, direct instruction stem (e.g., "Select the sentence from the passage that..." or "Select the [N] sentences that demonstrate...").
+2. "options.selection_type": Must match the grain requested in the prompt ("Sentence", "Words", "Paragraph", or "Manual selection").
+3. "options.max_selections": Must be an integer (e.g. 1, 2, or 3) that precisely matches the number of items asked in "text".
+4. "options.passage": Must be a well-written, grade-appropriate passage containing both the correct target answer(s) and plausible distractor statements.
+5. "answer": A JSON array containing EXACT, verbatim string copies of the target sentences or words directly from "options.passage". The array length MUST exactly equal "max_selections".
+6. "explanation": Must explain why each correct selected item answers the question and why the remaining passage elements do not."""
 }
 
 # Backward compatibility alias
