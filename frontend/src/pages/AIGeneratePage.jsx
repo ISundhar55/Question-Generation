@@ -123,7 +123,25 @@ export default function AIGeneratePage() {
     const combinedCustomPrompt = promptParts.length > 0 ? promptParts.join('\n\n') : undefined;
 
     try {
-      const requests = activeTypes.map(([type, count]) =>
+      // Execute requests with a concurrency limit of 3 to avoid burst rate limits on LLMs
+      const runWithConcurrency = async (items, limit, fn) => {
+        const results = [];
+        const executing = [];
+        for (const item of items) {
+          const p = Promise.resolve().then(() => fn(item));
+          results.push(p);
+          if (limit <= items.length) {
+            const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+            executing.push(e);
+            if (executing.length >= limit) {
+              await Promise.race(executing);
+            }
+          }
+        }
+        return Promise.all(results);
+      };
+
+      const responses = await runWithConcurrency(activeTypes, 3, ([type, count]) =>
         aiAPI.generateFromInternet({
           content_area: contentArea,
           grade,
@@ -133,7 +151,6 @@ export default function AIGeneratePage() {
           custom_prompt: combinedCustomPrompt,
         })
       );
-      const responses = await Promise.all(requests);
       const allQuestions = responses.flatMap(res =>
         (res.data.questions || []).map(q => ({ ...q, _internetSource: true }))
       );
@@ -1146,6 +1163,21 @@ export default function AIGeneratePage() {
                       const optionBuckets = Array.isArray(q.options.option_buckets) ? q.options.option_buckets : [];
                       const dropBuckets = Array.isArray(q.options.drop_buckets) ? q.options.drop_buckets : [];
 
+                      let answersObj = {};
+                      const rawAns = q.answer;
+                      if (typeof rawAns === 'object' && rawAns !== null && !Array.isArray(rawAns)) {
+                        answersObj = rawAns;
+                      } else if (typeof rawAns === 'string') {
+                        try {
+                          answersObj = JSON.parse(rawAns);
+                        } catch (_) {
+                          try {
+                            const fixed = rawAns.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+                            answersObj = JSON.parse(fixed);
+                          } catch (_) {}
+                        }
+                      }
+
                       return (
                         <div style={{ marginBottom: 16 }}>
                           {/* Option Buckets */}
@@ -1194,29 +1226,55 @@ export default function AIGeneratePage() {
                                 📥 Target Drop Buckets
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(dropBuckets.length, 3)}, 1fr)`, gap: 10 }}>
-                                {dropBuckets.map((dBucket, dIdx) => (
-                                  <div
-                                    key={dBucket.id || dIdx}
-                                    style={{
-                                      padding: '12px 14px',
-                                      background: '#f0f9ff',
-                                      borderRadius: 8,
-                                      border: '2px dashed #0284c7',
-                                      minHeight: 90,
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: 6,
-                                    }}
-                                  >
-                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <span>📥</span>
-                                      <span>{dBucket.name || `Category ${dIdx + 1}`}</span>
+                                {dropBuckets.map((dBucket, dIdx) => {
+                                  const assigned = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
+                                  const assignedList = Array.isArray(assigned) ? assigned : [assigned].filter(Boolean);
+
+                                  return (
+                                    <div
+                                      key={dBucket.id || dIdx}
+                                      style={{
+                                        padding: '12px 14px',
+                                        background: '#f0f9ff',
+                                        borderRadius: 8,
+                                        border: '2px dashed #0284c7',
+                                        minHeight: 100,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 6,
+                                      }}
+                                    >
+                                      <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span>📥</span>
+                                        <span>{dBucket.name || `Category ${dIdx + 1}`}</span>
+                                      </div>
+                                      {assignedList.length === 0 ? (
+                                        <div style={{ fontSize: 11, color: '#0284c7', fontStyle: 'italic', opacity: 0.7, marginTop: 6 }}>
+                                          [ Drop items here ]
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                                          {assignedList.map((item, i) => (
+                                            <span
+                                              key={i}
+                                              style={{
+                                                padding: '4px 10px',
+                                                borderRadius: 6,
+                                                background: '#ffffff',
+                                                border: '1px solid #7dd3fc',
+                                                color: '#0369a1',
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                              }}
+                                            >
+                                              {item}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                    <div style={{ fontSize: 11, color: '#0284c7', fontStyle: 'italic', opacity: 0.7, marginTop: 6 }}>
-                                      [ Drop items here ]
-                                    </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1234,24 +1292,58 @@ export default function AIGeneratePage() {
 
                       let answersObj = {};
                       const rawAns = q.answer;
-                      if (typeof rawAns === 'object' && rawAns !== null) {
+                      if (typeof rawAns === 'object' && rawAns !== null && !Array.isArray(rawAns)) {
                         answersObj = rawAns;
                       } else if (typeof rawAns === 'string') {
+                        const trimmed = rawAns.trim();
                         try {
-                          answersObj = JSON.parse(rawAns);
+                          answersObj = JSON.parse(trimmed);
                         } catch (_) {
                           try {
-                            const fixed = rawAns.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
-                            answersObj = JSON.parse(fixed);
+                            const regex = /['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]/g;
+                            let match;
+                            while ((match = regex.exec(trimmed)) !== null) {
+                              answersObj[match[1].trim()] = match[2].trim();
+                            }
                           } catch (_) {}
                         }
                       }
 
-                      const isMatch = (row, col) => {
-                        const valByValue = answersObj[row.value];
-                        const valById = answersObj[row.id];
-                        const expected = col.value || col.id;
-                        return valByValue === expected || valById === expected || valByValue === col.id || valById === col.id;
+                      const clean = (s) => (s || '').toString().trim().toLowerCase().replace(/[^\w\s]/g, '');
+
+                      const isMatch = (row, col, rIdx, cIdx) => {
+                        const cRowVal = clean(row.value);
+                        const cRowId = clean(row.id);
+                        const cColVal = clean(col.value);
+                        const cColId = clean(col.id);
+
+                        for (const [k, v] of Object.entries(answersObj)) {
+                          const cK = clean(k);
+                          const cV = clean(v);
+
+                          const rowMatches =
+                            k === row.value ||
+                            k === row.id ||
+                            cK === cRowVal ||
+                            cK === cRowId ||
+                            cK === `row${rIdx + 1}` ||
+                            cK === `${rIdx + 1}` ||
+                            (cRowVal.length > 8 && (cK.includes(cRowVal) || cRowVal.includes(cK)));
+
+                          if (rowMatches) {
+                            const colMatches =
+                              v === col.value ||
+                              v === col.id ||
+                              cV === cColVal ||
+                              cV === cColId ||
+                              cV === `col${cIdx + 1}` ||
+                              cV === `${cIdx + 1}` ||
+                              (cColVal.length > 3 && (cV.includes(cColVal) || cColVal.includes(cV)));
+
+                            if (colMatches) return true;
+                          }
+                        }
+                        return false;
                       };
 
                       return (
@@ -1301,7 +1393,7 @@ export default function AIGeneratePage() {
                                       {row.value || `Row ${rIdx + 1}`}
                                     </td>
                                     {columns.map((col, cIdx) => {
-                                      const selected = isMatch(row, col);
+                                      const selected = isMatch(row, col, rIdx, cIdx);
 
                                       return (
                                         <td

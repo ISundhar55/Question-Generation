@@ -273,50 +273,76 @@ def _clean_response(raw: str) -> str:
 
 def _call_gemini(prompt: str) -> str:
     import google.generativeai as genai
+    import time
     client = _get_gemini()
-    response = client.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
-            temperature=0.4,
-            max_output_tokens=8192,
-            response_mime_type="application/json",
-        ),
-    )
-    # Log token consumption from Gemini's usage_metadata
-    usage = getattr(response, 'usage_metadata', None)
-    if usage:
-        prompt_tok  = getattr(usage, 'prompt_token_count', '?')
-        output_tok  = getattr(usage, 'candidates_token_count', '?')
-        total_tok   = getattr(usage, 'total_token_count', '?')
-        print(f"[llm] Token usage (Gemini) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
-    return response.text
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            response = client.generate_content(
+                prompt,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.4,
+                    max_output_tokens=8192,
+                    response_mime_type="application/json",
+                ),
+            )
+            usage = getattr(response, 'usage_metadata', None)
+            if usage:
+                prompt_tok  = getattr(usage, 'prompt_token_count', '?')
+                output_tok  = getattr(usage, 'candidates_token_count', '?')
+                total_tok   = getattr(usage, 'total_token_count', '?')
+                print(f"[llm] Token usage (Gemini) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
+            return response.text
+        except Exception as e:
+            last_err = e
+            if _is_quota_error(str(e)) and attempt == 0:
+                print(f"[llm] Rate limit on Gemini — waiting 2s before retry...")
+                time.sleep(2.0)
+                continue
+            raise e
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("Gemini call failed with unknown error.")
 
 
 def _call_groq(prompt: str) -> str:
+    import time
     client = _get_groq()
-    completion = client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are an expert assessment question generator. "
-                    "Follow all instructions exactly. Return only valid JSON."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.4,
-        max_tokens=8192,
-    )
-    # Log token consumption from Groq's usage object
-    usage = getattr(completion, 'usage', None)
-    if usage:
-        prompt_tok  = getattr(usage, 'prompt_tokens', '?')
-        output_tok  = getattr(usage, 'completion_tokens', '?')
-        total_tok   = getattr(usage, 'total_tokens', '?')
-        print(f"[llm] Token usage (Groq) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
-    return completion.choices[0].message.content
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            completion = client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert assessment question generator. "
+                            "Follow all instructions exactly. Return only valid JSON."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.4,
+                max_tokens=8192,
+            )
+            usage = getattr(completion, 'usage', None)
+            if usage:
+                prompt_tok  = getattr(usage, 'prompt_tokens', '?')
+                output_tok  = getattr(usage, 'completion_tokens', '?')
+                total_tok   = getattr(usage, 'total_tokens', '?')
+                print(f"[llm] Token usage (Groq) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
+            return completion.choices[0].message.content
+        except Exception as e:
+            last_err = e
+            if ("429" in str(e) or "rate_limit" in str(e)) and attempt == 0:
+                print(f"[llm] Rate limit on Groq — waiting 3s before retry...")
+                time.sleep(3.0)
+                continue
+            raise e
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("Groq call failed with unknown error.")
 
 
 # ---------------------------------------------------------------------------
@@ -814,6 +840,27 @@ def normalize_question(q: dict) -> dict:
                 elif isinstance(row, str):
                     normalized_rows.append({"id": f"row_{idx + 1}", "value": row.strip()})
             opts["rows"] = normalized_rows
+
+        # Normalize answer to dict
+        ans = q.get("answer")
+        ans_dict = {}
+        if isinstance(ans, str):
+            import ast
+            try:
+                ans_dict = json.loads(ans)
+            except Exception:
+                try:
+                    ans_dict = ast.literal_eval(ans)
+                except Exception:
+                    pass
+        elif isinstance(ans, dict):
+            ans_dict = ans
+
+        if isinstance(ans_dict, dict):
+            normalized_ans = {}
+            for k, v in ans_dict.items():
+                normalized_ans[str(k).strip()] = str(v).strip()
+            q["answer"] = normalized_ans
 
     # 9. Normalize SELECT_TEXT questions
     elif q.get("questionType") in ["SELECT_TEXT", "HOTTEXT", "HOT_TEXT", "HIGHLIGHT_TEXT"]:

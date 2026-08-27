@@ -670,24 +670,58 @@ export function QuestionPreview({ question, onBack, backLabel }) {
 
         let answersObj = {};
         const rawAns = question?.answer;
-        if (typeof rawAns === 'object' && rawAns !== null) {
+        if (typeof rawAns === 'object' && rawAns !== null && !Array.isArray(rawAns)) {
           answersObj = rawAns;
         } else if (typeof rawAns === 'string') {
+          const trimmed = rawAns.trim();
           try {
-            answersObj = JSON.parse(rawAns);
+            answersObj = JSON.parse(trimmed);
           } catch (_) {
             try {
-              const fixed = rawAns.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
-              answersObj = JSON.parse(fixed);
+              const regex = /['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]/g;
+              let match;
+              while ((match = regex.exec(trimmed)) !== null) {
+                answersObj[match[1].trim()] = match[2].trim();
+              }
             } catch (_) {}
           }
         }
 
-        const isMatch = (row, col) => {
-          const valByValue = answersObj[row.value];
-          const valById = answersObj[row.id];
-          const expected = col.value || col.id;
-          return valByValue === expected || valById === expected || valByValue === col.id || valById === col.id;
+        const clean = (s) => (s || '').toString().trim().toLowerCase().replace(/[^\w\s]/g, '');
+
+        const isMatch = (row, col, rIdx, cIdx) => {
+          const cRowVal = clean(row.value);
+          const cRowId = clean(row.id);
+          const cColVal = clean(col.value);
+          const cColId = clean(col.id);
+
+          for (const [k, v] of Object.entries(answersObj)) {
+            const cK = clean(k);
+            const cV = clean(v);
+
+            const rowMatches =
+              k === row.value ||
+              k === row.id ||
+              cK === cRowVal ||
+              cK === cRowId ||
+              cK === `row${rIdx + 1}` ||
+              cK === `${rIdx + 1}` ||
+              (cRowVal.length > 8 && (cK.includes(cRowVal) || cRowVal.includes(cK)));
+
+            if (rowMatches) {
+              const colMatches =
+                v === col.value ||
+                v === col.id ||
+                cV === cColVal ||
+                cV === cColId ||
+                cV === `col${cIdx + 1}` ||
+                cV === `${cIdx + 1}` ||
+                (cColVal.length > 3 && (cV.includes(cColVal) || cColVal.includes(cV)));
+
+              if (colMatches) return true;
+            }
+          }
+          return false;
         };
 
         return (
@@ -746,7 +780,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
                         {row.value || `Row ${rIdx + 1}`}
                       </td>
                       {columns.map((col, cIdx) => {
-                        const selected = isMatch(row, col);
+                        const selected = isMatch(row, col, rIdx, cIdx);
 
                         return (
                           <td
