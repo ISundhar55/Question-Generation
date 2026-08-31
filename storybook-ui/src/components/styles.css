@@ -482,6 +482,31 @@ sub {
   font-family: inherit;
 }
 
+/* Inline Vector Diagram Card */
+.md-diagram-card {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 12px 0;
+  padding: 14px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.md-diagram-svg {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: 100%;
+}
+
+.md-diagram-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ============================================
    Ordering Drag & Drop Question Styles
    ============================================ */

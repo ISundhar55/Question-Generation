@@ -62,7 +62,7 @@ const cleanErrorMessage = (errorMsg) => {
 
 const generateQuestions = async (req, res) => {
   try {
-    const { content_area, grade, chapter, question_type, difficulty, count, custom_prompt } = req.body;
+    const { content_area, grade, chapter, question_type, difficulty, count, custom_prompt, include_visuals } = req.body;
 
     // Validate required fields
     if (!content_area || !grade || !question_type || !difficulty || !count) {
@@ -93,7 +93,16 @@ const generateQuestions = async (req, res) => {
       pyRes = await fetch(`${PYTHON_SERVICE}/generate`, {
         method: 'POST',
         headers: internalHeaders(),
-        body: JSON.stringify({ content_area, grade, chapter: chapter || null, question_type, difficulty, count: questionCount, custom_prompt: custom_prompt || null }),
+        body: JSON.stringify({
+          content_area,
+          grade,
+          chapter: chapter || null,
+          question_type,
+          difficulty,
+          count: questionCount,
+          custom_prompt: custom_prompt || null,
+          include_visuals: Boolean(include_visuals),
+        }),
       });
     } catch (err) {
       return res.status(503).json({ message: 'Python LLM service is unavailable.', detail: err.message });
@@ -250,7 +259,7 @@ module.exports = { generateQuestions, regenerateQuestion, submitFeedback, genera
 
 async function generateFromInternet(req, res) {
   try {
-    const { content_area, grade, question_type, difficulty, count, custom_prompt } = req.body;
+    const { content_area, grade, question_type, difficulty, count, custom_prompt, preferred_website, include_visuals } = req.body;
 
     // Validate required fields
     if (!content_area || !grade || !question_type || !difficulty || !count) {
@@ -288,6 +297,8 @@ async function generateFromInternet(req, res) {
           difficulty,
           count: questionCount,
           custom_prompt: custom_prompt || null,
+          preferred_website: preferred_website || null,
+          include_visuals: Boolean(include_visuals),
         }),
       });
     } catch (err) {

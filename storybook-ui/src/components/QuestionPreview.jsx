@@ -5,6 +5,7 @@ import { TrueFalseQuestion } from './TrueFalseQuestion';
 import { ShortAnswerQuestion } from './ShortAnswerQuestion';
 import { FillBlankQuestion } from './FillBlankQuestion';
 import { MarkdownText } from './MarkdownText';
+import { DiagramViewer } from './DiagramViewer';
 
 /**
  * QuestionPreview
@@ -37,7 +38,9 @@ export function QuestionPreview({ question, onBack, backLabel }) {
       case 'MULTIPLE_SELECT': {
         const rawOpts = question.options || [];
         const isDict = typeof rawOpts === 'object' && !Array.isArray(rawOpts);
-        const processedOptions = isDict ? Object.values(rawOpts) : rawOpts;
+        const processedOptions = isDict
+          ? Object.entries(rawOpts).filter(([k]) => k !== 'visual' && k.length <= 3).map(([, v]) => v)
+          : rawOpts;
 
         let processedAnswer = question.answer || '';
         if (isDict && typeof processedAnswer === 'string') {
@@ -1112,6 +1115,13 @@ export function QuestionPreview({ question, onBack, backLabel }) {
           </button>
         )}
       </div>
+      {(question.options?.visual || question.visual) && (
+        <DiagramViewer
+          svgCode={question.options?.visual || question.visual}
+          title="Question Diagram"
+          filename="question_diagram"
+        />
+      )}
       {renderPreview()}
       <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', display: 'flex', gap: 16, fontSize: 12, color: 'var(--color-text-muted)' }}>
         <span>Difficulty: <strong style={{ color: 'var(--color-text)' }}>{question.difficulty || 'medium'}</strong></span>

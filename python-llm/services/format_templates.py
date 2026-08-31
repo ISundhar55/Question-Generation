@@ -29,17 +29,20 @@ IMPORTANT for SINGLE_SELECT:
   "difficulty": "<difficulty>",
   "contentArea": "<content_area>",
   "grade": "<grade>",
-  "text": "<question text>",
-  "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>"},
-  "answer": "<pipe-separated list of correct letters, e.g. A|C or B|D>",
-  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
+  "text": "<question text, e.g. 'Which TWO of the following...' or 'Select the THREE statements that...'>",
+  "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>", "E": "<option E>"},
+  "answer": "<pipe-separated list of EXACTLY 2 or 3 correct letters, e.g. A|C or B|D|E>",
+  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D, E...)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
 IMPORTANT for MULTIPLE_SELECT:
-- Default: 4 options (A, B, C, D). Always use consecutive letters starting from A.
-- MANDATORY: The answer field MUST contain AT LEAST 2 pipe-separated letters (minimum 2 correct answers). A MULTIPLE_SELECT question with only 1 correct answer is INVALID and will be rejected.
-- The answer field must list all correct letters in alphabetical order, joined with | (pipe).
-- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options', explaining why each correct choice is right and why each distractor is wrong.""",
+- MANDATORY 5 OPTIONS: Always provide exactly 5 options (A, B, C, D, E). Always use consecutive letters starting from A.
+- STRICT CORRECT ANSWER COUNT (EXACTLY 2 OR 3): The answer field MUST contain EXACTLY 2 OR 3 correct letters (e.g., 'A|C' or 'B|D|E').
+  * STRICTLY FORBIDDEN: Having 4 correct answers out of 5 is INVALID (because it leaves only 1 distractor).
+  * STRICTLY FORBIDDEN: Having 1 correct answer is INVALID.
+- MANDATORY DISTRACTORS: Ensure there are ALWAYS 2 or 3 plausible incorrect distractors (e.g., 2 correct + 3 distractors, or 3 correct + 2 distractors).
+- The answer field must list all correct letters in alphabetical order, joined with | (pipe), e.g. "A|C" or "B|D|E".
+- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options' (A, B, C, D, E), explaining why each correct choice is right and why each distractor is wrong.""",
 
     "MCQ": """Each question object must follow this exact format:
 {

@@ -52,6 +52,7 @@ class GenerateRequest(BaseModel):
     difficulty: str = Field(..., description="easy | medium | hard")
     count: int = Field(..., ge=1, le=20, description="Number of questions (1-20)")
     custom_prompt: Optional[str] = Field(None, description="Optional additional instructions for the AI")
+    include_visuals: Optional[bool] = Field(False, description="Whether to generate visual SVG diagrams for the questions")
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +70,7 @@ class GenerateInternetRequest(BaseModel):
     count: int = Field(..., ge=1, le=20, description="Number of questions (1-20)")
     custom_prompt: Optional[str] = Field(None, description="Optional additional instructions for the AI")
     preferred_website: Optional[str] = Field(None, description="Optional user-preferred website URL for sourcing questions")
+    include_visuals: Optional[bool] = Field(False, description="Whether to generate visual SVG diagrams for the questions")
 
 
 class SourceRef(BaseModel):

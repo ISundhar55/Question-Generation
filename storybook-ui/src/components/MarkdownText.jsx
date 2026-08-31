@@ -178,9 +178,22 @@ function inlineMarkdown(raw) {
  * Convert full Markdown text to an HTML string.
  * Splits content into table blocks and text paragraphs.
  */
+/**
+ * Convert full Markdown text to an HTML string.
+ * Splits content into table blocks, diagrams, and text paragraphs.
+ */
 export function markdownToHtml(rawText) {
   if (!rawText) return '';
-  const text = normalizeTableText(rawText);
+
+  // Extract any raw <svg ...>...</svg> blocks before escaping
+  const svgBlocks = [];
+  const withSvgPlaceholders = rawText.replace(/<svg[\s\S]*?<\/svg>/gi, (match) => {
+    const idx = svgBlocks.length;
+    svgBlocks.push(match);
+    return `__SVG_DIAGRAM_BLOCK_${idx}__`;
+  });
+
+  const text = normalizeTableText(withSvgPlaceholders);
 
   const parts = [];
   // Split on table blocks: lines starting with |
@@ -212,7 +225,17 @@ export function markdownToHtml(rawText) {
     parts.push(renderParagraph(tail));
   }
 
-  return parts.join('');
+  let finalHtml = parts.join('');
+
+  // Restore SVG vector diagrams safely into clean diagram containers
+  svgBlocks.forEach((svg, idx) => {
+    finalHtml = finalHtml.replace(
+      new RegExp(`__SVG_DIAGRAM_BLOCK_${idx}__`, 'g'),
+      `<div class="md-diagram-card"><div class="md-diagram-svg">${svg}</div></div>`
+    );
+  });
+
+  return finalHtml;
 }
 
 function renderParagraph(text) {

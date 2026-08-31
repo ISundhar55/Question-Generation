@@ -455,6 +455,7 @@ async def generate(req: GenerateRequest):
         count=req.count,
         chunks=chunks_for_prompt,
         custom_prompt=clean_custom_prompt or None,
+        include_visuals=bool(req.include_visuals),
     )
 
     if not parse_success:
@@ -623,6 +624,7 @@ async def generate_internet(req: GenerateInternetRequest):
         count=req.count,
         custom_prompt=clean_custom_prompt or None,
         preferred_website=req.preferred_website or None,
+        include_visuals=bool(req.include_visuals),
     )
 
     if not parse_success:

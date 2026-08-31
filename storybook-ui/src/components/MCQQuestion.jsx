@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import './styles.css';
 import { MarkdownText } from './MarkdownText';
+import { downloadSvgAsPng } from './DiagramViewer';
 
 /**
  * MCQQuestion - Multiple Choice Question component
@@ -57,24 +58,68 @@ export function MCQQuestion({ question, options = [], correctAnswer, mode = 'pre
       <div className="qc-preview-question">
         <MarkdownText text={question || 'Question text will appear here...'} />
       </div>
-      <div>
+      <div style={{ display: options.some(o => typeof o === 'string' && o.includes('<svg')) ? 'grid' : 'block', gridTemplateColumns: options.some(o => typeof o === 'string' && o.includes('<svg')) ? '1fr 1fr' : '1fr', gap: 10 }}>
         {options.map((opt, i) => (
           <div
             key={i}
             className={getOptionClass(opt)}
             onClick={() => mode === 'preview' && handleSelect(opt)}
+            style={{
+              display: 'flex',
+              flexDirection: typeof opt === 'string' && opt.includes('<svg') ? 'column' : 'row',
+              alignItems: typeof opt === 'string' && opt.includes('<svg') ? 'stretch' : 'center',
+              gap: 8,
+            }}
           >
-            <span style={{
-              width: 24, height: 24, borderRadius: type === 'MULTIPLE_SELECT' ? 4 : '50%',
-              background: isSelected(opt) ? 'var(--color-primary)' : 'var(--color-bg)',
-              border: '1.5px solid var(--color-border)',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 700, color: isSelected(opt) ? '#fff' : 'var(--color-text-muted)',
-              flexShrink: 0
-            }}>
-              {letters[i] || i + 1}
-            </span>
-            <span style={{ marginLeft: 8 }}>{opt}</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <span style={{
+                width: 24, height: 24, borderRadius: type === 'MULTIPLE_SELECT' ? 4 : '50%',
+                background: isSelected(opt) ? 'var(--color-primary)' : 'var(--color-bg)',
+                border: '1.5px solid var(--color-border)',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 700, color: isSelected(opt) ? '#fff' : 'var(--color-text-muted)',
+                flexShrink: 0
+              }}>
+                {letters[i] || i + 1}
+              </span>
+              {typeof opt === 'string' && opt.includes('<svg') && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = opt;
+                    const svgEl = tempDiv.querySelector('svg');
+                    if (svgEl) {
+                      document.body.appendChild(tempDiv);
+                      downloadSvgAsPng(svgEl, `option_${letters[i] || i + 1}.png`, 2.5);
+                      document.body.removeChild(tempDiv);
+                    }
+                  }}
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: '#0284c7',
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    borderRadius: 4,
+                    padding: '2px 6px',
+                    cursor: 'pointer',
+                  }}
+                  title={`Download Option ${letters[i] || i + 1} image as PNG`}
+                >
+                  ⬇ PNG
+                </button>
+              )}
+            </div>
+            {typeof opt === 'string' && opt.includes('<svg') ? (
+              <div
+                style={{ flex: 1, width: '100%', display: 'flex', justifyContent: 'center', padding: '6px 0', overflowX: 'auto' }}
+                dangerouslySetInnerHTML={{ __html: opt }}
+              />
+            ) : (
+              <span style={{ marginLeft: 4 }}><MarkdownText text={String(opt)} /></span>
+            )}
           </div>
         ))}
       </div>

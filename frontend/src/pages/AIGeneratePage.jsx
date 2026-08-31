@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { aiAPI, questionsAPI } from '../services/api';
-import { MarkdownText } from 'question-storybook-ui';
+import { MarkdownText, DiagramViewer } from 'question-storybook-ui';
 import {
   CONTENT_AREAS,
   GRADES,
@@ -21,6 +21,7 @@ export default function AIGeneratePage() {
   const [grade, setGrade] = useState(GRADES[0]);
   const [difficulty, setDifficulty] = useState('medium');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [includeVisuals, setIncludeVisuals] = useState(false);
 
   // Multi-type selection with individual counts (max 20 per type, 50 total)
   const [typeCounts, setTypeCounts] = useState({
@@ -149,6 +150,7 @@ export default function AIGeneratePage() {
           difficulty,
           count,
           custom_prompt: combinedCustomPrompt,
+          include_visuals: includeVisuals,
         })
       );
       const allQuestions = responses.flatMap(res =>
@@ -610,6 +612,44 @@ export default function AIGeneratePage() {
             )}
           </div>
 
+          {/* Visual Diagrams Toggle */}
+          <div
+            id="ai-include-visuals-toggle"
+            onClick={() => setIncludeVisuals(!includeVisuals)}
+            style={{
+              marginBottom: 20,
+              padding: '12px 14px',
+              background: includeVisuals ? '#f0fdfa' : '#f8fafc',
+              border: `1.5px solid ${includeVisuals ? '#2dd4bf' : 'var(--color-border)'}`,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              transition: 'all 0.18s ease',
+              boxShadow: includeVisuals ? '0 2px 8px rgba(13, 148, 136, 0.12)' : 'none',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>🎨</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: includeVisuals ? '#0f766e' : 'var(--color-text)' }}>
+                  Include Visual Diagrams
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
+                  Generate items with vector geometry, circuits, cycles, or charts
+                </div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              id="ai-include-visuals"
+              checked={includeVisuals}
+              onChange={e => setIncludeVisuals(e.target.checked)}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0d9488' }}
+            />
+          </div>
+
           {/* Generate Button */}
           <button
             id="generate-btn"
@@ -860,6 +900,15 @@ export default function AIGeneratePage() {
                       </div>
                     </div>
 
+                    {/* Visual Diagram if present */}
+                    {(q.options?.visual || q.visual) && (
+                      <DiagramViewer
+                        svgCode={q.options?.visual || q.visual}
+                        title={`${TYPE_META[q.questionType]?.label || 'Question'} Visual Diagram`}
+                        filename={`diagram_Q${idx + 1}`}
+                      />
+                    )}
+
                     {/* Question text */}
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12, lineHeight: 1.5 }}>
                       <MarkdownText text={q.text} />
@@ -869,22 +918,79 @@ export default function AIGeneratePage() {
                     {(q.questionType === 'SINGLE_SELECT' || q.questionType === 'MULTIPLE_SELECT' || q.questionType === 'MULTI_SELECT' || q.questionType === 'MCQ') && q.options && (() => {
                       const correctAnswers = (q.answer || '').replace(/,/g, '|').split('|').map(s => s.trim());
                       const isCorrect = (letter) => correctAnswers.includes(letter);
+                      const validEntries = Object.entries(q.options).filter(([k]) => k !== 'visual' && k.length <= 3);
                       return (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                          {Object.entries(q.options).map(([letter, text]) => (
-                            <div key={letter} style={{
-                              display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px',
-                              borderRadius: q.questionType === 'MULTIPLE_SELECT' ? 6 : 8,
-                              border: `1.5px solid ${isCorrect(letter) ? '#bbf7d0' : 'var(--color-border)'}`,
-                              background: isCorrect(letter) ? '#f0fdf4' : '#fafbfc',
-                            }}>
-                              <span style={{
-                                fontWeight: 700, fontSize: 12, color: isCorrect(letter) ? 'var(--color-success)' : 'var(--color-text-muted)',
-                                flexShrink: 0, marginTop: 1,
-                              }}>{letter}.</span>
-                              <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{text}</span>
-                            </div>
-                          ))}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                          {validEntries.map(([letter, text]) => {
+                            const isSvg = typeof text === 'string' && text.includes('<svg');
+                            return (
+                              <div key={letter} style={{
+                                display: 'flex',
+                                flexDirection: isSvg ? 'column' : 'row',
+                                alignItems: isSvg ? 'stretch' : 'flex-start',
+                                gap: 8,
+                                padding: '10px 14px',
+                                borderRadius: q.questionType === 'MULTIPLE_SELECT' ? 6 : 8,
+                                border: `1.5px solid ${isCorrect(letter) ? '#86efac' : 'var(--color-border)'}`,
+                                background: isCorrect(letter) ? '#f0fdf4' : '#fafbfc',
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{
+                                      fontWeight: 700, fontSize: 12, color: isCorrect(letter) ? 'var(--color-success)' : 'var(--color-text-muted)',
+                                      flexShrink: 0,
+                                    }}>{letter}.</span>
+                                    {isCorrect(letter) && (
+                                      <span style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>
+                                        Correct
+                                      </span>
+                                    )}
+                                  </div>
+                                  {isSvg && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const tempDiv = document.createElement('div');
+                                        tempDiv.innerHTML = text;
+                                        const svgEl = tempDiv.querySelector('svg');
+                                        if (svgEl) {
+                                          document.body.appendChild(tempDiv);
+                                          import('question-storybook-ui').then(({ downloadSvgAsPng }) => {
+                                            downloadSvgAsPng(svgEl, `option_${letter}.png`, 2.5);
+                                            document.body.removeChild(tempDiv);
+                                          });
+                                        }
+                                      }}
+                                      style={{
+                                        fontSize: 10,
+                                        fontWeight: 600,
+                                        color: '#0284c7',
+                                        background: '#f0f9ff',
+                                        border: '1px solid #bae6fd',
+                                        borderRadius: 4,
+                                        padding: '2px 6px',
+                                        cursor: 'pointer',
+                                      }}
+                                      title={`Download Option ${letter} image as PNG`}
+                                    >
+                                      ⬇ PNG
+                                    </button>
+                                  )}
+                                </div>
+                                {isSvg ? (
+                                  <div
+                                    style={{ width: '100%', display: 'flex', justifyContent: 'center', padding: '6px 0', overflowX: 'auto' }}
+                                    dangerouslySetInnerHTML={{ __html: text }}
+                                  />
+                                ) : (
+                                  <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>
+                                    <MarkdownText text={String(text)} />
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })()}

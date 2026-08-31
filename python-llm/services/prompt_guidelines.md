@@ -13,13 +13,12 @@ QUALITY STANDARDS — apply to every question in this batch:
    - Sourced from related-but-wrong syllabus concepts, common misconceptions, or partial knowledge.
    - Structurally parallel: same grammatical form and similar length as the correct answer.
    - Each distractor must be wrong for a different reason. No "I and II only" constructs.
+   - MULTIPLE_SELECT: MUST provide exactly 5 options (A, B, C, D, E). The question MUST have EXACTLY 2 or 3 correct answers (e.g., 'A|C' or 'B|D|E'), leaving at least 2 or 3 plausible distractors. STRICTLY PROHIBIT 4 correct answers out of 5 (only 1 distractor is invalid assessment design).
 
 3. CORRECT ANSWER
    - Must be explicitly supported by the provided syllabus excerpts — not general knowledge.
-   - SINGLE_SELECT: exactly one correct option; others definitively incorrect per the text.
-   - MULTIPLE_SELECT: MUST have at least 2 correct answers. A single-letter answer (e.g. "A")
-     is structurally invalid and will be rejected. Design the question so 2-3 options are
-     genuinely correct. Every correct letter must be independently verifiable from the text.
+   - SINGLE_SELECT: exactly one correct option; others definitively incorrect per the text (4 options: A, B, C, D).
+   - MULTIPLE_SELECT: MUST have 5 options (A, B, C, D, E) and EXACTLY 2 or 3 correct answers (e.g. "A|C" or "B|D|E"). Items with only 1 correct answer or with 4 correct answers out of 5 are structurally invalid and will be rejected. Every correct letter must be independently verifiable from the text.
    - ORDERING: sequence explicitly stated or unambiguously implied by the text.
 
 4. RATIONALE & EXPLANATION (MANDATORY PER-ITEM BREAKDOWN)
