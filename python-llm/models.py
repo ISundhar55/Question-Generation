@@ -98,6 +98,8 @@ class QuestionResult(BaseModel):
     grounded: bool = True            # Result of the post-generation fact-check layer
     groundingScore: float = 1.0      # 0.0-1.0 confidence from the fact-check layer
     groundingNote: Optional[str] = None
+    visual: Optional[str] = None     # Standalone SVG diagram markup
+    webSources: Optional[list] = []  # Web sources citations for internet generation
 
 
 class GenerateResponse(BaseModel):
