@@ -72,6 +72,24 @@ export default function AIGeneratePage() {
   const [savedIds, setSavedIds] = useState(new Set());
   const [savingId, setSavingId] = useState(null);
   const [showSource, setShowSource] = useState({});   // {idx: bool}
+  const [collapsedIds, setCollapsedIds] = useState(new Set()); // Set of collapsed question indices
+
+  const toggleCollapse = (idx) => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const toggleAllCollapse = () => {
+    if (collapsedIds.size === questions.length) {
+      setCollapsedIds(new Set()); // Expand all
+    } else {
+      setCollapsedIds(new Set(questions.map((_, i) => i))); // Collapse all
+    }
+  };
 
   // Regenerate modal state
   const [regenModal, setRegenModal] = useState(null); // null | { idx, question }
@@ -338,7 +356,7 @@ export default function AIGeneratePage() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '390px 1fr', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '390px minmax(0, 1fr)', gap: 24, alignItems: 'start', width: '100%' }}>
 
         {/* ─── Left Panel: Form ─── */}
         <div style={{
@@ -675,7 +693,7 @@ export default function AIGeneratePage() {
         </div>
 
         {/* ─── Right Panel: Results ─── */}
-        <div>
+        <div style={{ minWidth: 0, width: '100%' }}>
           {/* Error */}
           {error && (
             <div style={{
@@ -713,6 +731,27 @@ export default function AIGeneratePage() {
                 )}
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  id="toggle-all-collapse-btn"
+                  onClick={toggleAllCollapse}
+                  title={collapsedIds.size === questions.length ? "Expand all questions" : "Minimize all questions to reduce scrolling"}
+                  style={{
+                    padding: '9px 16px',
+                    background: '#f8fafc',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 8,
+                    color: 'var(--color-text)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {collapsedIds.size === questions.length ? '🔽 Expand All' : '🔼 Minimize All'}
+                </button>
                 <button
                   id="save-all-btn"
                   className="btn-save-all"
@@ -782,6 +821,7 @@ export default function AIGeneratePage() {
               {questions.map((q, idx) => {
                 const isSaved = savedIds.has(idx);
                 const isSaving = savingId === idx;
+                const isCollapsed = collapsedIds.has(idx);
                 const qType = TYPE_META[q.questionType] || TYPE_META.MCQ;
                 const qDiff = DIFFICULTIES.find(d => d.value === q.difficulty) || DIFFICULTIES[1];
                 const src = showSource[idx];
@@ -797,45 +837,51 @@ export default function AIGeneratePage() {
                           ? '#fca5a5'
                           : 'var(--color-border)'
                         }`,
-                      borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)',
-                      transition: 'border-color 0.2s',
+                      borderRadius: 12,
+                      padding: isCollapsed ? '14px 20px' : 20,
+                      marginBottom: 16,
+                      boxShadow: 'var(--shadow)',
+                      boxSizing: 'border-box',
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     {/* Card Header */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#0c0101ff' }}>Q{idx + 1}</span>
-                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: qType.bg, color: qType.color }}>
-                        {q.questionType?.replace('_', ' ')}
-                      </span>
-                      <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize' }}>
-                        {q.difficulty}
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#0c0101ff', flexShrink: 0 }}>Q{idx + 1}</span>
+                        <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: qType.bg, color: qType.color, flexShrink: 0 }}>
+                          {q.questionType?.replace('_', ' ')}
+                        </span>
+                        <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize', flexShrink: 0 }}>
+                          {q.difficulty}
+                        </span>
 
-                      {/* Grounding Status badge — only for syllabus-sourced questions */}
-                      {!q._internetSource && (() => {
-                        const score = typeof q.groundingScore === 'number'
-                          ? q.groundingScore
-                          : (q.grounded === false ? 0 : 1);
-                        let label, bg, color, border;
-                        if (score >= 0.6) {
-                          label = 'Passed'; bg = '#dcfce7'; color = '#15803d'; border = '#bbf7d0';
-                        } else if (score >= 0.4) {
-                          label = 'Fair'; bg = '#fef9c3'; color = '#854d0e'; border = '#fde68a';
-                        } else {
-                          label = 'Failed'; bg = '#fee2e2'; color = '#b91c1c'; border = '#fecaca';
-                        }
-                        return (
-                          <span style={{
-                            display: 'inline-flex', padding: '3px 10px', borderRadius: 5,
-                            fontSize: 11, fontWeight: 700,
-                            background: bg, color, border: `1px solid ${border}`,
-                          }}>
-                            {label}
-                          </span>
-                        );
-                      })()}
+                        {/* Grounding Status badge — only for syllabus-sourced questions */}
+                        {!q._internetSource && (() => {
+                          const score = typeof q.groundingScore === 'number'
+                            ? q.groundingScore
+                            : (q.grounded === false ? 0 : 1);
+                          let label, bg, color, border;
+                          if (score >= 0.6) {
+                            label = 'Passed'; bg = '#dcfce7'; color = '#15803d'; border = '#bbf7d0';
+                          } else if (score >= 0.4) {
+                            label = 'Fair'; bg = '#fef9c3'; color = '#854d0e'; border = '#fde68a';
+                          } else {
+                            label = 'Failed'; bg = '#fee2e2'; color = '#b91c1c'; border = '#fecaca';
+                          }
+                          return (
+                            <span style={{
+                              display: 'inline-flex', padding: '3px 10px', borderRadius: 5,
+                              fontSize: 11, fontWeight: 700, flexShrink: 0,
+                              background: bg, color, border: `1px solid ${border}`,
+                            }}>
+                              {label}
+                            </span>
+                          );
+                        })()}
+                      </div>
 
-                      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                         {/* Source toggle */}
                         {(q.sources?.length > 0 || q.sourceChunkIds?.length > 0) && (
                           <button
@@ -897,22 +943,80 @@ export default function AIGeneratePage() {
                         >
                           {isSaving ? '💾 Saving...' : isSaved ? '✅ Saved' : '💾 Save'}
                         </button>
+
+                        {/* Minimize / Expand Toggle (-) (+) Icon Button */}
+                        <button
+                          id={`toggle-collapse-q-${idx}`}
+                          onClick={() => toggleCollapse(idx)}
+                          title={isCollapsed ? "Expand question" : "Minimize question"}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            padding: 0,
+                            borderRadius: 6,
+                            fontSize: 16,
+                            fontWeight: 700,
+                            border: '1px solid var(--color-border)',
+                            background: isCollapsed ? '#eff6ff' : '#f8fafc',
+                            color: isCollapsed ? '#1d4ed8' : 'var(--color-text-muted)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            transition: 'all 0.12s',
+                            lineHeight: 1,
+                          }}
+                        >
+                          {isCollapsed ? '+' : '−'}
+                        </button>
                       </div>
                     </div>
 
-                    {/* Visual Diagram if present */}
-                    {(q.options?.visual || q.visual) && (
-                      <DiagramViewer
-                        svgCode={q.options?.visual || q.visual}
-                        title={`${TYPE_META[q.questionType]?.label || 'Question'} Visual Diagram`}
-                        filename={`diagram_Q${idx + 1}`}
-                      />
+                    {/* Minimized 1-line stem snippet on its own dedicated row */}
+                    {isCollapsed && (
+                      <div
+                        onClick={() => toggleCollapse(idx)}
+                        style={{
+                          marginTop: 10,
+                          fontSize: 13,
+                          color: 'var(--color-text)',
+                          fontWeight: 500,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          cursor: 'pointer',
+                          padding: '6px 12px',
+                          borderRadius: 6,
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          width: '100%',
+                          minWidth: 0,
+                          boxSizing: 'border-box',
+                        }}
+                        title="Click to expand question details"
+                      >
+                        <span style={{ color: 'var(--color-text-muted)', marginRight: 6, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Stem:</span>
+                        {q.text}
+                      </div>
                     )}
 
-                    {/* Question text */}
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12, lineHeight: 1.5 }}>
-                      <MarkdownText text={q.text} />
-                    </div>
+                    {/* Question Body (Hidden when collapsed) */}
+                    {!isCollapsed && (
+                      <>
+                        {/* Visual Diagram if present */}
+                        {(q.options?.visual || q.visual) && (
+                          <DiagramViewer
+                            svgCode={q.options?.visual || q.visual}
+                            title={`${TYPE_META[q.questionType]?.label || 'Question'} Visual Diagram`}
+                            filename={`diagram_Q${idx + 1}`}
+                          />
+                        )}
+
+                        {/* Question text */}
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12, lineHeight: 1.5 }}>
+                          <MarkdownText text={q.text} />
+                        </div>
 
                     {/* Multiple Choice Options */}
                     {(q.questionType === 'SINGLE_SELECT' || q.questionType === 'MULTIPLE_SELECT' || q.questionType === 'MULTI_SELECT' || q.questionType === 'MCQ') && q.options && (() => {
@@ -2000,6 +2104,8 @@ export default function AIGeneratePage() {
                           </div>
                         )}
                       </div>
+                    )}
+                      </>
                     )}
                   </div>
                 );
