@@ -113,21 +113,26 @@ export function OrderingEditor({
                   </svg>
                 </button>
               </div>
-              <input
-                className="qc-input"
-                placeholder={`💡 Rationale for Option ${i + 1}...`}
-                style={{ marginBottom: 0, fontSize: 12, border: '1px dashed #cbd5e1', background: '#ffffff' }}
-                value={rationales[opt] || rationales[String(i + 1)] || ''}
-                onChange={e => {
-                  if (setRationales) {
-                    setRationales(prev => ({
-                      ...(typeof prev === 'object' ? prev : {}),
-                      [opt]: e.target.value,
-                      [String(i + 1)]: e.target.value,
-                    }));
-                  }
-                }}
-              />
+              <div style={{ marginTop: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4338ca', display: 'block', marginBottom: 4 }}>
+                  💡 Rationale for Option {i + 1}
+                </label>
+                <input
+                  className="qc-input"
+                  placeholder={`Explain why this option belongs in its position...`}
+                  style={{ marginBottom: 0, fontSize: 12, border: '1px dashed #cbd5e1', background: '#ffffff' }}
+                  value={rationales[opt] || rationales[String(i + 1)] || ''}
+                  onChange={e => {
+                    if (setRationales) {
+                      setRationales(prev => ({
+                        ...(typeof prev === 'object' ? prev : {}),
+                        [opt]: e.target.value,
+                        [String(i + 1)]: e.target.value,
+                      }));
+                    }
+                  }}
+                />
+              </div>
             </div>
           ))}
           {err('options')}

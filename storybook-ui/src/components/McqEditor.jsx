@@ -150,6 +150,9 @@ export function McqEditor({
 
               {/* Bottom Row: Per-Option Rationale Input */}
               <div style={{ marginTop: 8, paddingLeft: 36 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4338ca', display: 'block', marginBottom: 4 }}>
+                  💡 Rationale for Option {letter}
+                </label>
                 <input
                   className="qc-input"
                   style={{
@@ -162,7 +165,7 @@ export function McqEditor({
                     marginBottom: 0,
                     width: '100%',
                   }}
-                  placeholder={`💡 Rationale for Option ${letter} (${correct ? 'Why correct' : 'Why incorrect'})...`}
+                  placeholder={`Explain rationale for Option ${letter}...`}
                   value={rationales[i] || ''}
                   onChange={(e) => updateRationale && updateRationale(i, e.target.value)}
                 />

@@ -239,9 +239,12 @@ export function GapMatchEditor({
                   </div>
 
                   <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#4338ca', display: 'block', marginBottom: 4 }}>
+                      💡 Rationale for {gapKey.replace(/^gap/i, 'Gap')}
+                    </label>
                     <input
                       className="qc-input"
-                      placeholder={`💡 Rationale for ${gapKey.replace(/^gap/i, 'Gap')} (why this assigned word belongs here)...`}
+                      placeholder={`Explain why this assigned word belongs in ${gapKey.replace(/^gap/i, 'Gap')}...`}
                       style={{ fontSize: 12, padding: '6px 10px', marginBottom: 0, border: '1px dashed #cbd5e1', background: '#fafbfc' }}
                       value={rationales[gapKey] || ''}
                       onChange={(e) => updateRationale(gapKey, e.target.value)}
