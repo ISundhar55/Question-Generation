@@ -743,7 +743,9 @@ def normalize_question(q: dict, allow_visuals: bool = True) -> dict:
     # 0. Safety pre-normalization: Convert answer field to string if it is a list/boolean/null
     if "answer" in q:
         ans = q["answer"]
-        if isinstance(ans, list):
+        if isinstance(ans, dict):
+            q["answer"] = ans
+        elif isinstance(ans, list):
             # E.g. ['B'] -> 'B', ['A', 'C'] -> 'A|C'
             clean_items = [str(a).strip() for a in ans if a is not None]
             q["answer"] = "|".join(clean_items)

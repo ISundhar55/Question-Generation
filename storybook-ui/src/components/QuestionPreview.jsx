@@ -650,16 +650,37 @@ export function QuestionPreview({ question, onBack, backLabel }) {
         const dropBuckets = Array.isArray(qOptions?.drop_buckets) ? qOptions.drop_buckets : [];
         let answersObj = {};
         const rawAns = question?.answer;
-        if (typeof rawAns === 'object' && rawAns !== null) {
+        if (typeof rawAns === 'object' && rawAns !== null && !Array.isArray(rawAns)) {
           answersObj = rawAns;
         } else if (typeof rawAns === 'string') {
           try {
             answersObj = JSON.parse(rawAns);
           } catch (_) {
             try {
-              const fixed = rawAns.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+              const fixed = rawAns
+                .replace(/True/g, 'true').replace(/False/g, 'false').replace(/None/g, 'null')
+                .replace(/(^|[{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+                .replace(/:\s*'([^']+?)'/g, ': "$1"')
+                .replace(/\[\s*'([^']+?)'/g, '["$1"')
+                .replace(/,\s*'([^']+?)'/g, ', "$1"');
               answersObj = JSON.parse(fixed);
-            } catch (_) {}
+            } catch (_) {
+              const res = {};
+              const regex = /['"]?([a-zA-Z0-9_\s-]+)['"]?\s*:\s*\[([\s\S]*?)\]/g;
+              let match;
+              while ((match = regex.exec(rawAns)) !== null) {
+                const key = match[1].trim();
+                const itemsRaw = match[2];
+                const items = [];
+                const itemRegex = /['"](.*?)['"](?=\s*,|\s*\]|\s*$)/g;
+                let itemMatch;
+                while ((itemMatch = itemRegex.exec(itemsRaw)) !== null) {
+                  items.push(itemMatch[1].trim());
+                }
+                if (items.length > 0) res[key] = items;
+              }
+              answersObj = res;
+            }
           }
         }
 

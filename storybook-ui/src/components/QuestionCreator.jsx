@@ -380,7 +380,7 @@ export function QuestionCreator({
 
   const parsedAnswerObj = (() => {
     if (!initialData?.answer) return {};
-    if (typeof initialData.answer === 'object' && initialData.answer !== null) {
+    if (typeof initialData.answer === 'object' && initialData.answer !== null && !Array.isArray(initialData.answer)) {
       return initialData.answer;
     }
     if (typeof initialData.answer === 'string') {
@@ -393,28 +393,35 @@ export function QuestionCreator({
         if (typeof p === 'object' && p !== null) return p;
       } catch (_) { }
 
-      // 2. Python-style single quotes: {'zone_1': 'Photosphere', 'zone_2': 'Core'}
+      // 2. Python-style dict string without corrupting contractions
       try {
         const fixed = trimmed
-          .replace(/'/g, '"')
-          .replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+          .replace(/True/g, 'true').replace(/False/g, 'false').replace(/None/g, 'null')
+          .replace(/(^|[{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+          .replace(/:\s*'([^']+?)'/g, ': "$1"')
+          .replace(/\[\s*'([^']+?)'/g, '["$1"')
+          .replace(/,\s*'([^']+?)'/g, ', "$1"');
         const p = JSON.parse(fixed);
         if (typeof p === 'object' && p !== null) return p;
       } catch (_) { }
 
-      // 3. Key-value string: "zone_1: Photosphere, zone_2: Core"
+      // 3. Fallback regex match for bucket arrays
       try {
-        const result = {};
-        const pairs = trimmed.replace(/[{}]/g, '').split(',');
-        pairs.forEach(pair => {
-          const parts = pair.split(':');
-          if (parts.length >= 2) {
-            const k = parts[0].replace(/['" ]/g, '').trim();
-            const v = parts.slice(1).join(':').replace(/['" ]/g, '').trim();
-            if (k && v) result[k] = v;
+        const res = {};
+        const regex = /['"]?([a-zA-Z0-9_\s-]+)['"]?\s*:\s*\[([\s\S]*?)\]/g;
+        let match;
+        while ((match = regex.exec(trimmed)) !== null) {
+          const key = match[1].trim();
+          const itemsRaw = match[2];
+          const items = [];
+          const itemRegex = /['"](.*?)['"](?=\s*,|\s*\]|\s*$)/g;
+          let itemMatch;
+          while ((itemMatch = itemRegex.exec(itemsRaw)) !== null) {
+            items.push(itemMatch[1].trim());
           }
-        });
-        if (Object.keys(result).length > 0) return result;
+          if (items.length > 0) res[key] = items;
+        }
+        if (Object.keys(res).length > 0) return res;
       } catch (_) { }
     }
     return {};
