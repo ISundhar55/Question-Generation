@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import EditQuestionModal from '../components/EditQuestionModal';
 import { aiAPI, questionsAPI } from '../services/api';
 import { MarkdownText, DiagramViewer } from 'question-storybook-ui';
 import {
@@ -91,6 +92,26 @@ export default function AIGeneratePage() {
     }
   };
 
+  // Edit modal state (uses standalone EditQuestionModal & QuestionCreator)
+  const [editModal, setEditModal] = useState(null); // null | { idx, question }
+
+  const openEditModal = (idx, q) => {
+    setEditModal({ idx, question: q });
+  };
+
+  const closeEditModal = () => {
+    setEditModal(null);
+  };
+
+  const handleEditSaveSuccess = (updatedQuestion, idx) => {
+    setQuestions(prev => {
+      const next = [...prev];
+      next[idx] = updatedQuestion;
+      return next;
+    });
+    setSavedIds(prev => new Set([...prev, idx]));
+  };
+
   // Regenerate modal state
   const [regenModal, setRegenModal] = useState(null); // null | { idx, question }
   const [regenInstructions, setRegenInstructions] = useState('');
@@ -171,8 +192,14 @@ export default function AIGeneratePage() {
           include_visuals: includeVisuals,
         })
       );
+      const computeDefaultPoints = (diff) => (diff === 'hard' ? 3 : diff === 'medium' ? 2 : 1);
+
       const allQuestions = responses.flatMap(res =>
-        (res.data.questions || []).map(q => ({ ...q, _internetSource: true }))
+        (res.data.questions || []).map(q => ({
+          ...q,
+          points: q.points || computeDefaultPoints(q.difficulty || difficulty),
+          _internetSource: true,
+        }))
       );
       setQuestions(allQuestions);
       setGenMeta({
@@ -191,13 +218,19 @@ export default function AIGeneratePage() {
   const saveQuestion = async (q, idx) => {
     setSavingId(idx);
     try {
-      await questionsAPI.create({
+      const res = await questionsAPI.create({
         type: q.questionType,
         text: q.text,
         options: q.options || null,
         answer: q.answer,
         difficulty: q.difficulty,
-        points: difficulty === 'hard' ? 3 : difficulty === 'medium' ? 2 : 1,
+        points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
+      });
+      const savedId = res.data?.id;
+      setQuestions(prev => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], id: savedId };
+        return next;
       });
       setSavedIds(prev => new Set([...prev, idx]));
     } catch (err) {
@@ -214,13 +247,19 @@ export default function AIGeneratePage() {
       const q = unsaved[i];
       const idx = questions.indexOf(q);
       try {
-        await questionsAPI.create({
+        const res = await questionsAPI.create({
           type: q.questionType,
           text: q.text,
           options: q.options || null,
           answer: q.answer,
           difficulty: q.difficulty,
-          points: difficulty === 'hard' ? 3 : difficulty === 'medium' ? 2 : 1,
+          points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
+        });
+        const savedId = res.data?.id;
+        setQuestions(prev => {
+          const next = [...prev];
+          next[idx] = { ...next[idx], id: savedId };
+          return next;
         });
         setSavedIds(prev => new Set([...prev, idx]));
       } catch {
@@ -280,6 +319,7 @@ export default function AIGeneratePage() {
       });
       const newQuestion = {
         ...res.data.question,
+        points: res.data.question.points || question.points || (question.difficulty === 'hard' ? 3 : question.difficulty === 'medium' ? 2 : 1),
         _internetSource: question._internetSource
       };
       setQuestions(prev => {
@@ -898,6 +938,19 @@ export default function AIGeneratePage() {
                             📍 Source{q.sources?.length > 1 ? 's' : ''}
                           </button>
                         )}
+                        {/* Edit button */}
+                        <button
+                          id={`edit-q-${idx}`}
+                          onClick={() => openEditModal(idx, q)}
+                          title="Edit this question stem, choices, or rationale"
+                          style={{
+                            padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            border: '1px solid #fed7aa', background: '#fff7ed', color: '#c2410c',
+                            cursor: 'pointer', transition: 'all 0.12s',
+                          }}
+                        >
+                          ✏️ Edit
+                        </button>
                         {/* Feedback button */}
                         <button
                           id={`feedback-q-${idx}`}
@@ -2594,6 +2647,15 @@ export default function AIGeneratePage() {
             )}
           </div>
         </div>
+      )}
+      {/* ─── Edit Question Modal (Encapsulates Save & Update Lifecycle) ─── */}
+      {editModal && (
+        <EditQuestionModal
+          question={editModal.question}
+          idx={editModal.idx}
+          onSaveSuccess={handleEditSaveSuccess}
+          onClose={closeEditModal}
+        />
       )}
     </Layout>
   );

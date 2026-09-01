@@ -29,7 +29,14 @@ const QUESTION_TYPES = [
 
 const DEFAULT_MCQ_OPTIONS = ['', '', '', ''];
 
-export function QuestionCreator({ onSave, onClose, onPreview, initialData = null }) {
+export function QuestionCreator({
+  onSave,
+  onClose,
+  onPreview,
+  initialData = null,
+  hideHeader = false,
+  hideTypeSelect = false,
+}) {
   const [type, setType] = useState(() => {
     const rawType = initialData?.type || '';
     if (rawType === 'MCQ') return 'SINGLE_SELECT'; // Map MCQ to SINGLE_SELECT in editor
@@ -514,37 +521,41 @@ export function QuestionCreator({ onSave, onClose, onPreview, initialData = null
     <div className="qc-card" style={{ width: '100%', maxWidth: '100%', margin: '0 auto' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>
-            {initialData ? 'Edit Question' : 'New Question'}
-          </h2>
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
-            Fill in the details below
-          </p>
+      {!hideHeader && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>
+              {initialData ? 'Edit Question' : 'New Question'}
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
+              Fill in the details below
+            </p>
+          </div>
+          {onClose && (
+            <button className="qc-btn qc-btn-ghost" onClick={onClose}>
+              Close
+            </button>
+          )}
         </div>
-        {onClose && (
-          <button className="qc-btn qc-btn-ghost" onClick={onClose}>
-            Close
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Question Type Dropdown */}
-      <div className="qc-field">
-        <label className="qc-label">Question Type</label>
-        <select
-          className="qc-input qc-select"
-          value={type}
-          onChange={(e) => { setType(e.target.value); setErrors({}); setAnswer(''); }}
-        >
-          <option value="">— Select a type —</option>
-          {QUESTION_TYPES.map(t => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
-        {err('type')}
-      </div>
+      {!hideTypeSelect && (
+        <div className="qc-field">
+          <label className="qc-label">Question Type</label>
+          <select
+            className="qc-input qc-select"
+            value={type}
+            onChange={(e) => { setType(e.target.value); setErrors({}); setAnswer(''); }}
+          >
+            <option value="">— Select a type —</option>
+            {QUESTION_TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+          {err('type')}
+        </div>
+      )}
 
       {/* Question Text */}
       {type && (
