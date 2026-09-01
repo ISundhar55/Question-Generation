@@ -1080,19 +1080,18 @@ export default function AIGeneratePage() {
                     {/* Question Body (Hidden when collapsed) */}
                     {!isCollapsed && (
                       <>
-                        {/* Visual Diagram if present */}
-                        {(q.options?.visual || q.visual) && (
+                        {/* Question Stem Text + Diagram (Unified Container) */}
+                        {(q.options?.visual || q.visual) ? (
                           <DiagramViewer
                             svgCode={q.options?.visual || q.visual}
-                            title={`${TYPE_META[q.questionType]?.label || 'Question'} Visual Diagram`}
+                            stemText={q.text}
                             filename={`diagram_Q${idx + 1}`}
                           />
+                        ) : (
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12, lineHeight: 1.5 }}>
+                            <MarkdownText text={q.text} />
+                          </div>
                         )}
-
-                        {/* Question text */}
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12, lineHeight: 1.5 }}>
-                          <MarkdownText text={q.text} />
-                        </div>
 
                     {/* Multiple Choice Options */}
                     {(q.questionType === 'SINGLE_SELECT' || q.questionType === 'MULTIPLE_SELECT' || q.questionType === 'MULTI_SELECT' || q.questionType === 'MCQ') && q.options && (() => {

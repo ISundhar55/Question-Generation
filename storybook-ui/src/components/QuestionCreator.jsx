@@ -11,6 +11,7 @@ import { GapMatchEditor } from './GapMatchEditor';
 import { MultipleDropBucketEditor } from './MultipleDropBucketEditor';
 import { MatrixInteractionEditor } from './MatrixInteractionEditor';
 import { SelectTextEditor } from './SelectTextEditor';
+import { DiagramViewer } from './DiagramViewer';
 
 const QUESTION_TYPES = [
   { value: 'SINGLE_SELECT', label: 'Multiple Choice (Single Select)', badge: 'qc-badge-mcq' },
@@ -18,11 +19,11 @@ const QUESTION_TYPES = [
   { value: 'TRUE_FALSE', label: 'True / False', badge: 'qc-badge-tf' },
   { value: 'CONSTRUCTED_RESPONSE', label: 'Constructed Response', badge: 'qc-badge-cr' },
   { value: 'DROPDOWN', label: 'Dropdown', badge: 'qc-badge-dd' },
-  { value: 'MATCHING_LINES', label: 'Matching Lines', badge: 'qc-badge-ml' },
+  { value: 'MATCHING_LINES', label: 'Matching Lines', badge: 'qc-badge-match' },
   { value: 'ORDERING', label: 'Ordering', badge: 'qc-badge-ord' },
   { value: 'GAP_MATCH', label: 'Gap Match', badge: 'qc-badge-gm' },
   { value: 'MULTIPLE_DROP_BUCKET', label: 'Multiple Drop Bucket', badge: 'qc-badge-mdb' },
-  { value: 'MATRIX_INTERACTION', label: 'Matrix Interaction', badge: 'qc-badge-mi' },
+  { value: 'MATRIX_INTERACTION', label: 'Matrix Interaction', badge: 'qc-badge-matrix' },
   { value: 'SELECT_TEXT', label: 'Select Text', badge: 'qc-badge-st' },
   // { value: 'BACKGROUND_GRAPHIC', label: 'Background Graphic', badge: 'qc-badge-bg' },
 ];
@@ -30,10 +31,11 @@ const QUESTION_TYPES = [
 const DEFAULT_MCQ_OPTIONS = ['', '', '', ''];
 
 export function QuestionCreator({
+  initialData = {},
   onSave,
+  onCancel,
   onClose,
   onPreview,
-  initialData = null,
   hideHeader = false,
   hideTypeSelect = false,
 }) {
@@ -45,16 +47,20 @@ export function QuestionCreator({
       try {
         const p = JSON.parse(trimmed);
         if (typeof p === 'object' && p !== null) return p;
-      } catch (_) {}
+      } catch (_) { }
       try {
         const fixed = trimmed.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
         const p = JSON.parse(fixed);
         if (typeof p === 'object' && p !== null) return p;
-      } catch (_) {}
+      } catch (_) { }
       return {};
     }
     return typeof initialData.options === 'object' && initialData.options !== null ? initialData.options : {};
   })();
+
+  const [visualSvg, setVisualSvg] = useState(() => {
+    return initialData?.visual || parsedOptions?.visual || null;
+  });
 
   const [type, setType] = useState(() => {
     const rawType = initialData?.type || '';
@@ -385,7 +391,7 @@ export function QuestionCreator({
       try {
         const p = JSON.parse(trimmed);
         if (typeof p === 'object' && p !== null) return p;
-      } catch (_) {}
+      } catch (_) { }
 
       // 2. Python-style single quotes: {'zone_1': 'Photosphere', 'zone_2': 'Core'}
       try {
@@ -394,7 +400,7 @@ export function QuestionCreator({
           .replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
         const p = JSON.parse(fixed);
         if (typeof p === 'object' && p !== null) return p;
-      } catch (_) {}
+      } catch (_) { }
 
       // 3. Key-value string: "zone_1: Photosphere, zone_2: Core"
       try {
@@ -409,7 +415,7 @@ export function QuestionCreator({
           }
         });
         if (Object.keys(result).length > 0) return result;
-      } catch (_) {}
+      } catch (_) { }
     }
     return {};
   })();
@@ -506,7 +512,7 @@ export function QuestionCreator({
       try {
         const p = JSON.parse(raw);
         if (Array.isArray(p)) return p;
-      } catch (_) {}
+      } catch (_) { }
       return raw ? [raw] : [];
     }
     return [];
@@ -611,6 +617,9 @@ export function QuestionCreator({
         optionsObj[letter] = opt;
       });
       optionsObj.rationales = optionRationales.slice(0, validOpts.length);
+      if (visualSvg) {
+        optionsObj.visual = visualSvg;
+      }
 
       return {
         type,
@@ -620,6 +629,7 @@ export function QuestionCreator({
         difficulty,
         points,
         explanation: compiledMcqExplanation,
+        visual: visualSvg || undefined,
       };
     }
     if (type === 'TRUE_FALSE') {
@@ -840,7 +850,7 @@ export function QuestionCreator({
         explanation,
       };
     }
-    return { type, text, options, answer, difficulty, points, explanation };
+    return { type, text, options, answer, difficulty, points, explanation, visual: visualSvg || undefined };
   };
 
   const handleSave = async () => {
@@ -922,7 +932,7 @@ export function QuestionCreator({
         </div>
       )}
 
-      {/* Question Text */}
+      {/* Question Text & Diagram Container */}
       {type && (
         <div className="qc-field">
           <label className="qc-label">
@@ -930,16 +940,37 @@ export function QuestionCreator({
               ? 'Question Text (use ___ for each blank)'
               : 'Question Text'}
           </label>
-          <textarea
-            className="qc-input qc-textarea"
-            placeholder={
-              type === 'FILL_IN_BLANK'
-                ? 'e.g. The capital of France is ___ and it is known for the ___ Tower.'
-                : 'Enter your question here...'
-            }
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
+          <div style={{
+            borderRadius: 10,
+            border: '1.5px solid var(--color-border)',
+            background: '#ffffff',
+            overflow: 'hidden',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+          }}>
+            <textarea
+              className="qc-input qc-textarea"
+              style={{
+                border: 'none',
+                borderRadius: 0,
+                borderBottom: visualSvg ? '1px solid #e2e8f0' : 'none',
+                background: '#f8fafc',
+                boxShadow: 'none',
+                resize: 'vertical',
+              }}
+              placeholder={
+                type === 'FILL_IN_BLANK'
+                  ? 'e.g. The capital of France is ___ and it is known for the ___ Tower.'
+                  : 'Enter your question here...'
+              }
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+            {visualSvg && (
+              <div style={{ background: '#ffffff', padding: '10px 0 0' }}>
+                <DiagramViewer svgCode={visualSvg} filename="diagram_edit" hideBorder={true} />
+              </div>
+            )}
+          </div>
           {err('text')}
         </div>
       )}

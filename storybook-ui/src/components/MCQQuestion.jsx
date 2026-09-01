@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './styles.css';
 import { MarkdownText } from './MarkdownText';
-import { downloadSvgAsPng } from './DiagramViewer';
+import { DiagramViewer, downloadSvgAsPng } from './DiagramViewer';
 
 /**
  * MCQQuestion - Multiple Choice Question component
@@ -16,6 +16,7 @@ export function MCQQuestion({
   type = 'SINGLE_SELECT',
   rationales = [],
   explanation = '',
+  visual = null,
 }) {
   const [selected, setSelected] = useState(() => {
     return type === 'MULTIPLE_SELECT' ? [] : null;
@@ -92,9 +93,13 @@ export function MCQQuestion({
           {type === 'MULTIPLE_SELECT' ? 'Multiple Choice (Multiple Select)' : 'Multiple Choice (Single Select)'}
         </span>
       </div>
-      <div className="qc-preview-question">
-        <MarkdownText text={question || 'Question text will appear here...'} />
-      </div>
+      {visual ? (
+        <DiagramViewer svgCode={visual} stemText={question} />
+      ) : (
+        <div className="qc-preview-question">
+          <MarkdownText text={question || 'Question text will appear here...'} />
+        </div>
+      )}
       <div style={{ display: options.some(o => typeof o === 'string' && o.includes('<svg')) ? 'grid' : 'block', gridTemplateColumns: options.some(o => typeof o === 'string' && o.includes('<svg')) ? '1fr 1fr' : '1fr', gap: 10 }}>
         {options.map((opt, i) => {
           const letter = letters[i] || String(i + 1);

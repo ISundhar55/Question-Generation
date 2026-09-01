@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { MarkdownText } from './MarkdownText';
 
 /**
  * Download an SVG DOM element as a crisp high-res PNG image.
@@ -53,91 +54,155 @@ export function downloadSvgAsPng(svgElement, filename = 'question_diagram.png', 
 
 /**
  * DiagramViewer Component
- * Renders an inline SVG diagram with a clean container and a 1-click PNG download button.
+ * Renders an inline SVG diagram unified with stem text in a single container with a 1-click PNG download button.
  */
-export function DiagramViewer({ svgCode, title = 'Visual Diagram', filename = 'diagram' }) {
+export function DiagramViewer({
+  svgCode,
+  stemText = null,
+  filename = 'diagram',
+  hideBorder = false,
+}) {
   const containerRef = useRef(null);
   const [downloading, setDownloading] = useState(false);
 
   if (!svgCode) return null;
 
+  let cleanSvg = typeof svgCode === 'string' ? svgCode.trim() : '';
+
+  // 1. Remove markdown code fences if present
+  cleanSvg = cleanSvg.replace(/^```(?:xml|svg|html)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // 2. Decode HTML entities if present (&lt;svg...&gt;)
+  if (cleanSvg.includes('&lt;svg') || cleanSvg.includes('&lt;/svg&gt;')) {
+    cleanSvg = cleanSvg
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&');
+  }
+
+  // 3. Extract SVG markup if embedded in other text
+  const svgMatch = cleanSvg.match(/<svg[\s\S]*?<\/svg>/i);
+  if (svgMatch) {
+    cleanSvg = svgMatch[0];
+  }
+
+  // 4. Ensure svg has xmlns attribute
+  if (cleanSvg.startsWith('<svg') && !cleanSvg.includes('xmlns=')) {
+    cleanSvg = cleanSvg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+
+  const isImgUrl = cleanSvg.startsWith('http://') || cleanSvg.startsWith('https://') || cleanSvg.startsWith('data:image/');
+
   const handleDownloadPng = (e) => {
     e && e.stopPropagation();
     if (!containerRef.current) return;
     const svg = containerRef.current.querySelector('svg');
-    if (!svg) return;
+    if (!svg) {
+      const img = containerRef.current.querySelector('img');
+      if (img && img.src) {
+        const a = document.createElement('a');
+        a.download = `${filename}.png`;
+        a.href = img.src;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      return;
+    }
     setDownloading(true);
     downloadSvgAsPng(svg, `${filename}.png`, 2.5);
     setTimeout(() => setDownloading(false), 800);
   };
 
+  const downloadBtn = (
+    <button
+      type="button"
+      onClick={handleDownloadPng}
+      disabled={downloading}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '5px 12px',
+        borderRadius: 6,
+        border: '1px solid #bae6fd',
+        background: '#f0f9ff',
+        fontSize: 12,
+        fontWeight: 600,
+        color: '#0284c7',
+        cursor: downloading ? 'wait' : 'pointer',
+        transition: 'all 0.15s ease',
+        flexShrink: 0,
+      }}
+      title="Download diagram as high-resolution PNG image"
+    >
+      <span>⬇</span>
+      <span>{downloading ? 'Downloading...' : 'Download'}</span>
+    </button>
+  );
+
   return (
     <div
       style={{
-        margin: '14px 0',
+        margin: hideBorder ? '0' : '14px 0',
         borderRadius: 10,
-        border: '1.5px solid #e2e8f0',
+        border: hideBorder ? 'none' : '1.5px solid #e2e8f0',
         background: '#ffffff',
         overflow: 'hidden',
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+        boxShadow: hideBorder ? 'none' : '0 2px 6px rgba(0, 0, 0, 0.04)',
       }}
     >
-      {/* Header bar with title and PNG download button */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '8px 14px',
-          background: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
-          fontSize: 12,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, color: '#334155' }}>
-          <span style={{ fontSize: 14 }}>📐</span>
-          <span>{title}</span>
+      {/* Full-width Question Stem Text */}
+      {stemText && (
+        <div
+          style={{
+            padding: '14px 18px',
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            fontSize: 14,
+            fontWeight: 600,
+            color: 'var(--color-text)',
+            lineHeight: 1.5,
+          }}
+        >
+          {typeof stemText === 'string' ? <MarkdownText text={stemText} /> : stemText}
+        </div>
+      )}
+
+      {/* Diagram Canvas Area with Download Button below stem */}
+      <div style={{ position: 'relative', background: '#ffffff', minHeight: 160 }}>
+        <div style={{ position: 'absolute', top: 12, right: 14, zIndex: 2 }}>
+          {downloadBtn}
         </div>
 
-        <button
-          type="button"
-          onClick={handleDownloadPng}
-          disabled={downloading}
+        {/* Diagram Canvas */}
+        <div
+          ref={containerRef}
           style={{
-            display: 'inline-flex',
+            padding: '36px 16px 16px',
+            display: 'flex',
+            justifyContent: 'center',
             alignItems: 'center',
-            gap: 5,
-            padding: '5px 12px',
-            borderRadius: 6,
-            border: '1px solid #bae6fd',
-            background: '#f0f9ff',
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#0284c7',
-            cursor: downloading ? 'wait' : 'pointer',
-            transition: 'all 0.15s ease',
+            minHeight: 140,
+            overflowX: 'auto',
           }}
-          title="Download diagram as high-resolution PNG image"
         >
-          <span>⬇</span>
-          <span>{downloading ? 'Downloading...' : 'Download Image (PNG)'}</span>
-        </button>
+          {isImgUrl ? (
+            <img
+              src={cleanSvg}
+              alt="Question Diagram"
+              style={{ maxWidth: '100%', maxHeight: 320, objectFit: 'contain', display: 'block' }}
+            />
+          ) : (
+            <div
+              style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+              dangerouslySetInnerHTML={{ __html: cleanSvg }}
+            />
+          )}
+        </div>
       </div>
-
-      {/* SVG Canvas Area */}
-      <div
-        ref={containerRef}
-        style={{
-          padding: '16px',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: '#ffffff',
-          minHeight: 140,
-          overflowX: 'auto',
-        }}
-        dangerouslySetInnerHTML={{ __html: svgCode }}
-      />
     </div>
   );
 }

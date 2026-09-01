@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import './styles.css';
 import { MarkdownText } from './MarkdownText';
+import { DiagramViewer } from './DiagramViewer';
 
 export function TrueFalseQuestion({
   question,
@@ -9,6 +10,7 @@ export function TrueFalseQuestion({
   onAnswerSelect,
   rationales = {},
   explanation = '',
+  visual = null,
 }) {
   const [selected, setSelected] = useState(null);
   const [revealed, setRevealed] = useState(mode === 'preview');
@@ -54,7 +56,13 @@ export function TrueFalseQuestion({
       <div className="qc-preview-title">
         <span className="qc-badge qc-badge-tf">True / False</span>
       </div>
-      <div className="qc-preview-question"><MarkdownText text={question || 'Question text will appear here...'} /></div>
+      {visual ? (
+        <DiagramViewer svgCode={visual} stemText={question} />
+      ) : (
+        <div className="qc-preview-question">
+          <MarkdownText text={question || 'Question text will appear here...'} />
+        </div>
+      )}
       <div className="qc-tf-buttons">
         <button className={getBtnClass('true')} onClick={() => mode === 'preview' && handleSelect('true')}>
           ✓ True

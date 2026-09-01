@@ -16,6 +16,7 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
     ...question,
     type: question.questionType || question.type || 'SINGLE_SELECT',
     points: question.points || (question.difficulty === 'hard' ? 3 : question.difficulty === 'medium' ? 2 : 1),
+    visual: question.visual || (typeof question.options === 'object' && question.options !== null ? question.options.visual : null) || null,
   };
 
   const handleSaveEditedQuestion = async (payload) => {

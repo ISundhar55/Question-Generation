@@ -83,6 +83,8 @@ export function QuestionPreview({ question, onBack, backLabel }) {
     return '';
   })();
 
+  const visualSvg = question.options?.visual || question.visual || null;
+
   const renderPreview = () => {
     switch (qType) {
       case 'MCQ':
@@ -116,6 +118,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
             type={qType === 'MULTI_SELECT' ? 'MULTIPLE_SELECT' : (qType || 'SINGLE_SELECT')}
             rationales={parsedOptions.rationales}
             explanation={explanationText}
+            visual={visualSvg}
           />
         );
       }
@@ -127,6 +130,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
             mode="preview"
             rationales={parsedOptions.rationales}
             explanation={explanationText}
+            visual={visualSvg}
           />
         );
       case 'SHORT_ANSWER':
@@ -1186,13 +1190,6 @@ export function QuestionPreview({ question, onBack, backLabel }) {
           </button>
         )}
       </div>
-      {(question.options?.visual || question.visual) && (
-        <DiagramViewer
-          svgCode={question.options?.visual || question.visual}
-          title="Question Diagram"
-          filename="question_diagram"
-        />
-      )}
       {renderPreview()}
       {/* Pedagogical Rationale */}
       {Boolean(explanationText) && (
