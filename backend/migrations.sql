@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS questions (
   answer       TEXT NOT NULL,
   difficulty   VARCHAR(10) DEFAULT 'medium' CHECK (difficulty IN ('easy', 'medium', 'hard')),
   points       INTEGER DEFAULT 1,
+  explanation  TEXT,
   created_at   TIMESTAMP DEFAULT NOW(),
   updated_at   TIMESTAMP DEFAULT NOW()
 );
@@ -79,4 +80,12 @@ DO $$ BEGIN
       'MATRIX_INTERACTION',
       'SELECT_TEXT'
     ));
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+-- ============================================
+-- Patch: Add explanation column to questions table
+-- Safe to run on existing databases
+-- ============================================
+DO $$ BEGIN
+  ALTER TABLE questions ADD COLUMN IF NOT EXISTS explanation TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;

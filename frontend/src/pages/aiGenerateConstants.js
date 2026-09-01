@@ -172,9 +172,17 @@ export const getRefinementTargetsForType = (qType) => {
 export function parseMatchingAnswer(answerStr) {
   if (!answerStr) return {};
   const result = {};
-  answerStr.split(',').forEach(pair => {
-    const [left, right] = pair.trim().split('-');
-    if (left && right) result[left.trim()] = right.trim();
+  const pairs = String(answerStr).split(/[,;\n|]/).map(s => s.trim()).filter(Boolean);
+  pairs.forEach(pair => {
+    const match = pair.match(/^([a-zA-Z0-9_-]+)\s*[-–—:>→]\s*([a-zA-Z0-9_-]+)$/);
+    if (match) {
+      result[match[1].trim()] = match[2].trim();
+    } else {
+      const parts = pair.split('-');
+      if (parts.length >= 2) {
+        result[parts[0].trim()] = parts.slice(1).join('-').trim();
+      }
+    }
   });
   return result;
 }

@@ -36,7 +36,7 @@ const getQuestionById = async (req, res) => {
 
 // POST /api/questions
 const createQuestion = async (req, res) => {
-  const { bank_id, type, text, options, answer, difficulty, points } = req.body;
+  const { bank_id, type, text, options, answer, difficulty, points, explanation } = req.body;
 
   if (!type || !text || answer === undefined || answer === null || answer === '')
     return res.status(400).json({ message: 'type, text, and answer are required' });
@@ -45,8 +45,8 @@ const createQuestion = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO questions (bank_id, user_id, type, text, options, answer, difficulty, points)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO questions (bank_id, user_id, type, text, options, answer, difficulty, points, explanation)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         bank_id || null,
@@ -57,6 +57,7 @@ const createQuestion = async (req, res) => {
         answerVal,
         difficulty || 'medium',
         points || 1,
+        explanation || null,
       ]
     );
     res.status(201).json(result.rows[0]);
@@ -68,16 +69,16 @@ const createQuestion = async (req, res) => {
 
 // PUT /api/questions/:id
 const updateQuestion = async (req, res) => {
-  const { type, text, options, answer, difficulty, points } = req.body;
+  const { type, text, options, answer, difficulty, points, explanation } = req.body;
   const answerVal = typeof answer === 'object' ? JSON.stringify(answer) : String(answer);
 
   try {
     const result = await pool.query(
       `UPDATE questions
-       SET type=$1, text=$2, options=$3, answer=$4, difficulty=$5, points=$6, updated_at=NOW()
-       WHERE id=$7 AND user_id=$8
+       SET type=$1, text=$2, options=$3, answer=$4, difficulty=$5, points=$6, explanation=$7, updated_at=NOW()
+       WHERE id=$8 AND user_id=$9
        RETURNING *`,
-      [type, text, options ? JSON.stringify(options) : null, answerVal, difficulty, points, req.params.id, req.user.id]
+      [type, text, options ? JSON.stringify(options) : null, answerVal, difficulty, points, explanation || null, req.params.id, req.user.id]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ message: 'Question not found' });

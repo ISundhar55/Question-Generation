@@ -7,6 +7,8 @@ export function MultipleDropBucketEditor({
   setDropBuckets,
   answers,
   setAnswers,
+  rationales = {},
+  setRationales,
   err,
 }) {
   // -------------------------------------------------------------
@@ -50,24 +52,28 @@ export function MultipleDropBucketEditor({
   const addOptionToBucket = (bIdx) => {
     const next = [...optionBuckets];
     const currentOpts = next[bIdx].options || [];
-    next[bIdx] = { ...next[bIdx], options: [...currentOpts, ''] };
+    if (currentOpts.length >= 10) return;
+    next[bIdx] = {
+      ...next[bIdx],
+      options: [...currentOpts, ''],
+    };
     setOptionBuckets(next);
   };
 
   const updateOptionValue = (bIdx, optIdx, val) => {
+    const oldVal = optionBuckets[bIdx]?.options?.[optIdx];
     const next = [...optionBuckets];
-    const oldVal = next[bIdx].options[optIdx];
-    const nextOpts = [...next[bIdx].options];
+    const nextOpts = [...(next[bIdx].options || [])];
     nextOpts[optIdx] = val;
     next[bIdx] = { ...next[bIdx], options: nextOpts };
     setOptionBuckets(next);
 
-    // Update in answers if value changed
+    // Update mapped answers value if renamed
     if (oldVal && oldVal !== val) {
       const nextAnswers = { ...answers };
       Object.keys(nextAnswers).forEach((bId) => {
         if (Array.isArray(nextAnswers[bId])) {
-          nextAnswers[bId] = nextAnswers[bId].map((o) => (o === oldVal ? val : o));
+          nextAnswers[bId] = nextAnswers[bId].map((opt) => (opt === oldVal ? val : opt));
         }
       });
       setAnswers(nextAnswers);
@@ -76,17 +82,21 @@ export function MultipleDropBucketEditor({
 
   const removeOptionFromBucket = (bIdx, optIdx) => {
     const next = [...optionBuckets];
-    const removedVal = next[bIdx].options[optIdx];
-    const nextOpts = next[bIdx].options.filter((_, i) => i !== optIdx);
-    next[bIdx] = { ...next[bIdx], options: nextOpts.length > 0 ? nextOpts : [''] };
+    const currentOpts = next[bIdx].options || [];
+    if (currentOpts.length <= 1) return;
+    const removedVal = currentOpts[optIdx];
+    next[bIdx] = {
+      ...next[bIdx],
+      options: currentOpts.filter((_, i) => i !== optIdx),
+    };
     setOptionBuckets(next);
 
-    // Clean up in answers
+    // Clean up answers for this option
     if (removedVal) {
       const nextAnswers = { ...answers };
       Object.keys(nextAnswers).forEach((bId) => {
         if (Array.isArray(nextAnswers[bId])) {
-          nextAnswers[bId] = nextAnswers[bId].filter((o) => o !== removedVal);
+          nextAnswers[bId] = nextAnswers[bId].filter((opt) => opt !== removedVal);
         }
       });
       setAnswers(nextAnswers);
@@ -98,9 +108,8 @@ export function MultipleDropBucketEditor({
   // -------------------------------------------------------------
   const addDropBucket = () => {
     const nextIdx = dropBuckets.length + 1;
-    const newId = `drop_bucket_${Date.now()}_${nextIdx}`;
     const newBucket = {
-      id: newId,
+      id: `drop_bucket_${Date.now()}_${nextIdx}`,
       name: '',
     };
     setDropBuckets([...dropBuckets, newBucket]);
@@ -108,42 +117,91 @@ export function MultipleDropBucketEditor({
 
   const removeDropBucket = (dIdx) => {
     if (dropBuckets.length <= 1) return;
-    const removed = dropBuckets[dIdx];
+    const removedBucket = dropBuckets[dIdx];
     const next = dropBuckets.filter((_, i) => i !== dIdx);
     setDropBuckets(next);
 
-    // Remove from answers
-    if (removed?.id) {
+    // Clean up answers & rationales for removed bucket
+    if (removedBucket?.id) {
       const nextAnswers = { ...answers };
-      delete nextAnswers[removed.id];
+      delete nextAnswers[removedBucket.id];
+      delete nextAnswers[removedBucket.name];
       setAnswers(nextAnswers);
+
+      if (setRationales) {
+        setRationales(prev => {
+          const nr = { ...(typeof prev === 'object' ? prev : {}) };
+          delete nr[removedBucket.id];
+          delete nr[removedBucket.name];
+          return nr;
+        });
+      }
     }
   };
 
   const updateDropBucketField = (dIdx, field, val) => {
+    const oldName = dropBuckets[dIdx]?.name;
+    const bucketId = dropBuckets[dIdx]?.id;
     const next = [...dropBuckets];
     next[dIdx] = { ...next[dIdx], [field]: val };
     setDropBuckets(next);
+
+    if (field === 'name' && oldName && oldName !== val && setRationales) {
+      setRationales(prev => {
+        const nr = { ...(typeof prev === 'object' ? prev : {}) };
+        if (nr[oldName]) {
+          const rVal = nr[oldName];
+          delete nr[oldName];
+          nr[val] = rVal;
+        }
+        return nr;
+      });
+    }
+  };
+
+  // -------------------------------------------------------------
+  // Helper to reliably resolve assigned items for a drop bucket
+  // -------------------------------------------------------------
+  const getAssignedItems = (bucket, idx) => {
+    if (!answers || typeof answers !== 'object') return [];
+    if (bucket?.id && Array.isArray(answers[bucket.id])) return answers[bucket.id];
+    if (bucket?.name && Array.isArray(answers[bucket.name])) return answers[bucket.name];
+    if (Array.isArray(answers[`drop_bucket_${idx + 1}`])) return answers[`drop_bucket_${idx + 1}`];
+    if (Array.isArray(answers[`bucket_${idx + 1}`])) return answers[`bucket_${idx + 1}`];
+    if (Array.isArray(answers[String(idx)])) return answers[String(idx)];
+    if (Array.isArray(answers[idx])) return answers[idx];
+
+    // Case-insensitive name match fallback
+    if (bucket?.name) {
+      const targetName = bucket.name.trim().toLowerCase();
+      const foundKey = Object.keys(answers).find(k => k.trim().toLowerCase() === targetName);
+      if (foundKey && Array.isArray(answers[foundKey])) return answers[foundKey];
+    }
+    return [];
   };
 
   // -------------------------------------------------------------
   // Answer Mapping (Option -> Drop Bucket)
   // -------------------------------------------------------------
-  const toggleOptionInDropBucket = (dropBucketId, optionText) => {
+  const toggleOptionInDropBucket = (dBucket, dIdx, optionText) => {
     if (!optionText || !optionText.trim()) return;
-    const currentList = Array.isArray(answers[dropBucketId]) ? answers[dropBucketId] : [];
+    const currentList = getAssignedItems(dBucket, dIdx);
     const nextAnswers = { ...answers };
+    const bucketKey = dBucket.id || `drop_bucket_${dIdx + 1}`;
 
-    if (currentList.includes(optionText)) {
-      nextAnswers[dropBucketId] = currentList.filter((o) => o !== optionText);
-    } else {
-      // Remove option from any other bucket to maintain single-category classification
-      Object.keys(nextAnswers).forEach((bId) => {
-        if (Array.isArray(nextAnswers[bId])) {
-          nextAnswers[bId] = nextAnswers[bId].filter((o) => o !== optionText);
-        }
-      });
-      nextAnswers[dropBucketId] = [...(nextAnswers[dropBucketId] || []), optionText];
+    // Clean option from all buckets to avoid duplicate assignments
+    Object.keys(nextAnswers).forEach((bKey) => {
+      if (Array.isArray(nextAnswers[bKey])) {
+        nextAnswers[bKey] = nextAnswers[bKey].filter((o) => o !== optionText);
+      }
+    });
+
+    if (!currentList.includes(optionText)) {
+      const updatedList = [...currentList, optionText];
+      nextAnswers[bucketKey] = updatedList;
+      if (dBucket.name && dBucket.name !== bucketKey) {
+        nextAnswers[dBucket.name] = updatedList;
+      }
     }
     setAnswers(nextAnswers);
   };
@@ -171,7 +229,7 @@ export function MultipleDropBucketEditor({
               type="button"
               className="qc-btn qc-btn-primary"
               onClick={addOptionBucket}
-              style={{ padding: '10px 14px', fontSize: 12, whiteSpace: 'nowrap' }}
+              style={{ padding: '8px 12px', fontSize: 12, whiteSpace: 'nowrap' }}
             >
               + Add Option Bucket
             </button>
@@ -205,7 +263,6 @@ export function MultipleDropBucketEditor({
                   }}
                 />
 
-                {/* SVG Trash Delete Button */}
                 <button
                   type="button"
                   disabled={optionBuckets.length <= 1}
@@ -223,20 +280,6 @@ export function MultipleDropBucketEditor({
                     transition: 'all 0.15s',
                     opacity: optionBuckets.length <= 1 ? 0.4 : 1,
                   }}
-                  onMouseEnter={(e) => {
-                    if (optionBuckets.length > 1) {
-                      e.currentTarget.style.background = 'var(--color-danger)';
-                      e.currentTarget.style.color = '#fff';
-                      e.currentTarget.style.borderColor = 'var(--color-danger)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (optionBuckets.length > 1) {
-                      e.currentTarget.style.background = '#fef2f2';
-                      e.currentTarget.style.color = 'var(--color-danger)';
-                      e.currentTarget.style.borderColor = '#fecaca';
-                    }
-                  }}
                   title="Remove Option Bucket"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -248,72 +291,48 @@ export function MultipleDropBucketEditor({
                 </button>
               </div>
 
-              {/* Options Header Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Response Options
-                </span>
-                <button
-                  type="button"
-                  className="qc-btn qc-btn-primary"
-                  onClick={() => addOptionToBucket(bIdx)}
-                  style={{ padding: '8px 12px', fontSize: 11, whiteSpace: 'nowrap' }}
-                >
-                  + Add Response Option
-                </button>
-              </div>
-
-              {/* Options Inputs List */}
+              {/* Options list in this bucket */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {(bucket.options || []).map((opt, optIdx) => (
-                  <div key={optIdx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Options ({bucket.options?.length || 0})
+                  </span>
+                  <button
+                    type="button"
+                    className="qc-btn qc-btn-primary"
+                    onClick={() => addOptionToBucket(bIdx)}
+                    style={{ padding: '4px 10px', fontSize: 11 }}
+                  >
+                    + Add Option
+                  </button>
+                </div>
+
+                {(bucket.options || []).map((optVal, optIdx) => (
+                  <div key={optIdx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <input
                       type="text"
                       className="qc-input"
-                      placeholder="Enter response option"
-                      value={opt}
+                      placeholder={`Option ${optIdx + 1}`}
+                      value={optVal}
                       onChange={(e) => updateOptionValue(bIdx, optIdx, e.target.value)}
-                      style={{
-                        fontSize: 13,
-                        marginBottom: 0,
-                      }}
+                      style={{ marginBottom: 0, fontSize: 13 }}
                     />
-
-                    {/* SVG Trash Delete Button */}
                     <button
                       type="button"
-                      disabled={bucket.options.length <= 1}
+                      disabled={(bucket.options || []).length <= 1}
                       onClick={() => removeOptionFromBucket(bIdx, optIdx)}
                       style={{
-                        padding: '8px 10px',
+                        padding: '6px 8px',
                         background: '#fef2f2',
-                        border: '1.5px solid #fecaca',
-                        borderRadius: 8,
+                        border: '1px solid #fecaca',
+                        borderRadius: 6,
                         color: 'var(--color-danger)',
-                        cursor: bucket.options.length <= 1 ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s',
-                        opacity: bucket.options.length <= 1 ? 0.4 : 1,
+                        cursor: (bucket.options || []).length <= 1 ? 'not-allowed' : 'pointer',
+                        opacity: (bucket.options || []).length <= 1 ? 0.4 : 1,
                       }}
-                      onMouseEnter={(e) => {
-                        if (bucket.options.length > 1) {
-                          e.currentTarget.style.background = 'var(--color-danger)';
-                          e.currentTarget.style.color = '#fff';
-                          e.currentTarget.style.borderColor = 'var(--color-danger)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (bucket.options.length > 1) {
-                          e.currentTarget.style.background = '#fef2f2';
-                          e.currentTarget.style.color = 'var(--color-danger)';
-                          e.currentTarget.style.borderColor = '#fecaca';
-                        }
-                      }}
-                      title="Remove response option"
+                      title="Remove Option"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 6 5 6 21 6"></polyline>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                         <line x1="10" y1="11" x2="10" y2="17"></line>
@@ -340,7 +359,7 @@ export function MultipleDropBucketEditor({
               type="button"
               className="qc-btn qc-btn-primary"
               onClick={addDropBucket}
-              style={{ padding: '10px 14px', fontSize: 12, whiteSpace: 'nowrap' }}
+              style={{ padding: '8px 12px', fontSize: 12, whiteSpace: 'nowrap' }}
             >
               + Add Drop Bucket
             </button>
@@ -383,20 +402,6 @@ export function MultipleDropBucketEditor({
                     transition: 'all 0.15s',
                     opacity: dropBuckets.length <= 1 ? 0.4 : 1,
                   }}
-                  onMouseEnter={(e) => {
-                    if (dropBuckets.length > 1) {
-                      e.currentTarget.style.background = 'var(--color-danger)';
-                      e.currentTarget.style.color = '#fff';
-                      e.currentTarget.style.borderColor = 'var(--color-danger)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (dropBuckets.length > 1) {
-                      e.currentTarget.style.background = '#fef2f2';
-                      e.currentTarget.style.color = 'var(--color-danger)';
-                      e.currentTarget.style.borderColor = '#fecaca';
-                    }
-                  }}
                   title="Remove Drop Bucket"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -418,6 +423,32 @@ export function MultipleDropBucketEditor({
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              />
+
+              {/* Category Rationale Input */}
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#4338ca', display: 'block', marginBottom: 2, marginTop: 4 }}>
+                💡 Rationale for Category
+              </label>
+              <input
+                type="text"
+                className="qc-input"
+                placeholder={`Explain why items belong to ${bucket.name || 'this bucket'}...`}
+                value={rationales[bucket.name] || rationales[bucket.id] || ''}
+                onChange={(e) => {
+                  if (setRationales) {
+                    setRationales(prev => ({
+                      ...(typeof prev === 'object' ? prev : {}),
+                      [bucket.name || bucket.id]: e.target.value,
+                      [bucket.id]: e.target.value,
+                    }));
+                  }
+                }}
+                style={{
+                  fontSize: 12,
+                  border: '1px dashed #cbd5e1',
+                  background: '#ffffff',
                   marginBottom: 0,
                 }}
               />
@@ -455,12 +486,12 @@ export function MultipleDropBucketEditor({
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(dropBuckets.length, 3)}, 1fr)`, gap: 14 }}>
-            {dropBuckets.map((dBucket) => {
-              const assigned = Array.isArray(answers[dBucket.id]) ? answers[dBucket.id] : [];
+            {dropBuckets.map((dBucket, dIdx) => {
+              const assigned = getAssignedItems(dBucket, dIdx);
 
               return (
                 <div
-                  key={dBucket.id}
+                  key={dBucket.id || dIdx}
                   style={{
                     background: '#f8fafc',
                     borderRadius: 8,
@@ -504,7 +535,7 @@ export function MultipleDropBucketEditor({
                           <input
                             type="checkbox"
                             checked={isAssigned}
-                            onChange={() => toggleOptionInDropBucket(dBucket.id, opt)}
+                            onChange={() => toggleOptionInDropBucket(dBucket, dIdx, opt)}
                             style={{ cursor: 'pointer' }}
                           />
                           <span>{opt}</span>

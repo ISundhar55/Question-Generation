@@ -4,13 +4,13 @@ export function ConstructedResponseEditor({ text, crBlanks, setCrBlanks, err }) 
   const blankCount = (text.match(/___/g) || []).length;
   const effectiveCrBlanks = Array.from(
     { length: Math.max(blankCount, 1) },
-    (_, i) => crBlanks[i] || { correct: '', acceptable: '' }
+    (_, i) => crBlanks[i] || { correct: '', acceptable: '', rationale: '' }
   );
 
   const updateCrBlank = (i, field, val) => {
     setCrBlanks(prev => {
       const next = [...prev];
-      while (next.length <= i) next.push({ correct: '', acceptable: '' });
+      while (next.length <= i) next.push({ correct: '', acceptable: '', rationale: '' });
       next[i] = { ...next[i], [field]: val };
       return next;
     });
@@ -18,7 +18,7 @@ export function ConstructedResponseEditor({ text, crBlanks, setCrBlanks, err }) 
 
   return (
     <div className="qc-field">
-      <label className="qc-label">Blank Responses</label>
+      <label className="qc-label">Blank Responses & Per-Blank Rationales</label>
       {blankCount === 0 && (
         <p style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 8 }}>
           Add at least one ___ blank to your question text above.
@@ -28,30 +28,41 @@ export function ConstructedResponseEditor({ text, crBlanks, setCrBlanks, err }) 
         <div key={i} style={{ border: '1.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 10, background: '#fafbfc' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 }}>Blank {i + 1}</div>
 
-          <div style={{ marginBottom: 6 }}>
+          <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Correct Answer</label>
             <input
               className="qc-input"
               placeholder="e.g. Paris"
-              style={{ marginBottom: 0 }}
+              style={{ marginBottom: 0, background: '#ffffff' }}
               value={blank.correct}
               onChange={(e) => updateCrBlank(i, 'correct', e.target.value)}
             />
           </div>
 
-          <div>
+          <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>Acceptable Alternatives (comma-separated)</label>
             <input
               className="qc-input"
               placeholder="e.g. capital of France, city of light"
-              style={{ marginBottom: 0 }}
+              style={{ marginBottom: 0, background: '#ffffff' }}
               value={blank.acceptable}
               onChange={(e) => updateCrBlank(i, 'acceptable', e.target.value)}
             />
           </div>
+
+          <div>
+            <label style={{ fontSize: 11, color: '#4338ca', fontWeight: 600, display: 'block', marginBottom: 4 }}>💡 Rationale for Blank {i + 1}</label>
+            <input
+              className="qc-input"
+              placeholder="Explain why this concept/answer is correct..."
+              style={{ marginBottom: 0, fontSize: 12, background: '#ffffff', border: '1px dashed #cbd5e1' }}
+              value={blank.rationale || ''}
+              onChange={(e) => updateCrBlank(i, 'rationale', e.target.value)}
+            />
+          </div>
         </div>
       ))}
-      {err('answer')}
+      {err && err('answer')}
     </div>
   );
 }

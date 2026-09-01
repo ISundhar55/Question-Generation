@@ -215,6 +215,27 @@ export default function AIGeneratePage() {
     }
   };
 
+  const resolveExplanation = (q) => {
+    if (q.explanation && typeof q.explanation === 'string' && q.explanation.trim()) return q.explanation.trim();
+    if (q.rationale && typeof q.rationale === 'string' && q.rationale.trim()) return q.rationale.trim();
+    if (q.options?.explanation && typeof q.options.explanation === 'string' && q.options.explanation.trim()) return q.options.explanation.trim();
+    if (q.options?.rationale && typeof q.options.rationale === 'string' && q.options.rationale.trim()) return q.options.rationale.trim();
+
+    // If options.rationales array/dict exists, compile bullets
+    if (Array.isArray(q.options?.rationales) && q.options.rationales.length > 0) {
+      const bullets = q.options.rationales
+        .map((r, i) => (typeof r === 'string' && r.trim()) ? `• Option ${String.fromCharCode(65 + i)}: ${r.trim()}` : null)
+        .filter(Boolean);
+      if (bullets.length > 0) return bullets.join('\n');
+    } else if (q.options?.rationales && typeof q.options.rationales === 'object') {
+      const bullets = Object.entries(q.options.rationales)
+        .map(([k, r]) => (typeof r === 'string' && r.trim()) ? `• ${k}: ${r.trim()}` : null)
+        .filter(Boolean);
+      if (bullets.length > 0) return bullets.join('\n');
+    }
+    return null;
+  };
+
   const saveQuestion = async (q, idx) => {
     setSavingId(idx);
     try {
@@ -225,6 +246,7 @@ export default function AIGeneratePage() {
         answer: q.answer,
         difficulty: q.difficulty,
         points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
+        explanation: resolveExplanation(q),
       });
       const savedId = res.data?.id;
       setQuestions(prev => {
@@ -254,6 +276,7 @@ export default function AIGeneratePage() {
           answer: q.answer,
           difficulty: q.difficulty,
           points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
+          explanation: resolveExplanation(q),
         });
         const savedId = res.data?.id;
         setQuestions(prev => {
@@ -1153,10 +1176,17 @@ export default function AIGeneratePage() {
                     })()}
 
                     {/* Matching Lines columns */}
-                    {q.questionType === 'MATCHING_LINES' && q.options?.left && q.options?.right && (() => {
+                    {q.questionType === 'MATCHING_LINES' && (() => {
+                      let opts = q.options;
+                      if (typeof opts === 'string') {
+                        try { opts = JSON.parse(opts); } catch (_) {
+                          try { opts = JSON.parse(opts.replace(/'/g, '"')); } catch (_) {}
+                        }
+                      }
+                      if (!opts?.left || !opts?.right) return null;
                       const correctPairs = parseMatchingAnswer(q.answer);
-                      const leftItems = Object.entries(q.options.left);
-                      const rightItems = Object.entries(q.options.right);
+                      const leftItems = Object.entries(opts.left);
+                      const rightItems = Object.entries(opts.right);
                       return (
                         <div style={{ marginBottom: 14 }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
@@ -1185,14 +1215,11 @@ export default function AIGeneratePage() {
                             <div style={{ marginTop: 12 }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Answer Key</div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                {leftItems.map(([leftKey]) => {
-                                  const rightKey = correctPairs[leftKey];
-                                  return (
-                                    <div key={leftKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#ecfeff', border: '1px solid #a5f3fc', fontSize: 12, fontWeight: 600, color: '#0891b2' }}>
-                                      <span>{leftKey}</span><span style={{ color: '#94a3b8' }}>→</span><span>{rightKey}</span>
-                                    </div>
-                                  );
-                                })}
+                                {Object.entries(correctPairs).map(([leftKey, rightKey]) => (
+                                  <div key={leftKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#ecfeff', border: '1px solid #a5f3fc', fontSize: 12, fontWeight: 600, color: '#0891b2' }}>
+                                    <span>{leftKey}</span><span style={{ color: '#94a3b8' }}>→</span><span>{rightKey}</span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           )}
@@ -1490,8 +1517,20 @@ export default function AIGeneratePage() {
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(dropBuckets.length, 3)}, 1fr)`, gap: 10 }}>
                                 {dropBuckets.map((dBucket, dIdx) => {
-                                  const assigned = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
-                                  const assignedList = Array.isArray(assigned) ? assigned : [assigned].filter(Boolean);
+                                  const getAssigned = () => {
+                                    if (dBucket.id && Array.isArray(answersObj[dBucket.id])) return answersObj[dBucket.id];
+                                    if (dBucket.name && Array.isArray(answersObj[dBucket.name])) return answersObj[dBucket.name];
+                                    if (Array.isArray(answersObj[`drop_bucket_${dIdx + 1}`])) return answersObj[`drop_bucket_${dIdx + 1}`];
+                                    if (Array.isArray(answersObj[String(dIdx)])) return answersObj[String(dIdx)];
+                                    if (dBucket.name) {
+                                      const tName = dBucket.name.trim().toLowerCase();
+                                      const fKey = Object.keys(answersObj).find(k => k.trim().toLowerCase() === tName);
+                                      if (fKey && Array.isArray(answersObj[fKey])) return answersObj[fKey];
+                                    }
+                                    const fallback = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
+                                    return Array.isArray(fallback) ? fallback : [fallback].filter(Boolean);
+                                  };
+                                  const assignedList = getAssigned();
 
                                   return (
                                     <div

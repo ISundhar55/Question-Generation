@@ -29,6 +29,7 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
       answer: payload.answer,
       difficulty: payload.difficulty || question.difficulty || 'medium',
       points: computedPoints,
+      explanation: payload.explanation || question.explanation || null,
     };
 
     try {
@@ -105,7 +106,7 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
           background: 'var(--color-surface, #ffffff)',
           borderRadius: 16,
           width: '100%',
-          maxWidth: 960,
+          maxWidth: 1080,
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',

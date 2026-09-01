@@ -9,6 +9,8 @@ export function MatrixInteractionEditor({
   setRows,
   answers,
   setAnswers,
+  rationales = {},
+  setRationales,
   err,
 }) {
   // -------------------------------------------------------------
@@ -425,7 +427,41 @@ export function MatrixInteractionEditor({
             </tbody>
           </table>
         </div>
-        {err('answer')}
+        {err && err('answer')}
+
+        {/* Per-Statement Rationales */}
+        {rows.some(r => r.value?.trim()) && (
+          <div className="qc-field" style={{ marginTop: 14 }}>
+            <label className="qc-label">💡 Per-Statement Rationales</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {rows.map((row, rIdx) => {
+                const rowKey = row.value || row.id || `row_${rIdx + 1}`;
+                if (!row.value?.trim()) return null;
+                return (
+                  <div key={row.id || rIdx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', width: 140, flexShrink: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={row.value}>
+                      {row.value}:
+                    </span>
+                    <input
+                      className="qc-input"
+                      placeholder={`Explain why this statement is mapped to its column...`}
+                      style={{ marginBottom: 0, fontSize: 12, border: '1px dashed #cbd5e1', background: '#fafbfc' }}
+                      value={rationales[rowKey] || rationales[row.id] || ''}
+                      onChange={e => {
+                        if (setRationales) {
+                          setRationales(prev => ({
+                            ...(typeof prev === 'object' ? prev : {}),
+                            [rowKey]: e.target.value,
+                          }));
+                        }
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

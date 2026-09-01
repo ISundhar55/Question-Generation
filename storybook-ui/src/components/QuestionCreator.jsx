@@ -37,89 +37,7 @@ export function QuestionCreator({
   hideHeader = false,
   hideTypeSelect = false,
 }) {
-  const [type, setType] = useState(() => {
-    const rawType = initialData?.type || '';
-    if (rawType === 'MCQ') return 'SINGLE_SELECT'; // Map MCQ to SINGLE_SELECT in editor
-    return rawType;
-  });
-  const [text, setText] = useState(initialData?.text || '');
-  const [options, setOptions] = useState(() => {
-    if (!initialData?.options) return DEFAULT_MCQ_OPTIONS;
-    if (Array.isArray(initialData.options)) return initialData.options;
-    if (typeof initialData.options === 'object') {
-      // It's a dictionary (e.g. {"A": "option A text", ...})
-      return Object.values(initialData.options);
-    }
-    return DEFAULT_MCQ_OPTIONS;
-  });
-  const [answer, setAnswer] = useState(() => {
-    const rawAns = initialData?.answer || '';
-    if (!initialData?.options || Array.isArray(initialData.options)) {
-      return rawAns;
-    }
-    if (typeof initialData.options === 'object') {
-      // Map letter-based answers (e.g. 'A|C') to actual option text values
-      const opts = initialData.options;
-      const letters = typeof rawAns === 'string' ? rawAns.split('|').map(s => s.trim()) : [];
-      const mapped = letters.map(l => opts[l]).filter(Boolean);
-      return mapped.length > 0 ? mapped.join('|') : rawAns;
-    }
-    return rawAns;
-  });
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty || 'medium');
-  const [points, setPoints] = useState(initialData?.points || 1);
-  const [tfAnswers, setTfAnswers] = useState(() => {
-    const raw = initialData?.answer;
-    if (raw === true || raw === 'true') return 'true';
-    if (raw === false || raw === 'false') return 'false';
-    if (typeof raw === 'string') {
-      const lower = raw.trim().toLowerCase();
-      if (lower === 'true' || lower === 't') return 'true';
-      if (lower === 'false' || lower === 'f') return 'false';
-      if (lower === 'a') {
-        const optA = initialData?.options?.A || (Array.isArray(initialData?.options) ? initialData?.options[0] : null);
-        if (typeof optA === 'string' && optA.toLowerCase().includes('false')) return 'false';
-        return 'true';
-      }
-      if (lower === 'b') {
-        const optB = initialData?.options?.B || (Array.isArray(initialData?.options) ? initialData?.options[1] : null);
-        if (typeof optB === 'string' && optB.toLowerCase().includes('true')) return 'true';
-        return 'false';
-      }
-    }
-    return '';
-  });
-  // CONSTRUCTED_RESPONSE — one entry per blank: { correct: '', acceptable: '' }
-  const [crBlanks, setCrBlanks] = useState(() => {
-    if (!initialData?.options?.answers) return [{ correct: '', acceptable: '' }, { correct: '', acceptable: '' }];
-    return initialData.options.answers.map(ans => {
-      if (Array.isArray(ans)) {
-        return { correct: ans[0] || '', acceptable: ans.slice(1).join(', ') };
-      }
-      return { correct: ans || '', acceptable: '' };
-    });
-  });
-  // DROPDOWN — one entry per blank: { choices: '', correct: '' }
-  const [ddBlanks, setDdBlanks] = useState(
-    initialData?.options?.blanks
-      ? initialData.options.blanks.map(b => ({ choices: b.choices.join(', '), correct: b.correct }))
-      : [{ choices: '', correct: '' }, { choices: '', correct: '' }]
-  );
-  // MATCHING_LINES state — left keys A-D, right keys 1-4
-  const [matchLeft, setMatchLeft] = useState(
-    initialData?.options?.left || { A: '', B: '', C: '', D: '' }
-  );
-  const [matchRight, setMatchRight] = useState(
-    initialData?.options?.right || { '1': '', '2': '', '3': '', '4': '' }
-  );
-  const [matchAnswer, setMatchAnswer] = useState(initialData?.answer || '');
-  const [correctOrder, setCorrectOrder] = useState(() => {
-    if (initialData?.type === 'ORDERING' && initialData?.answer) {
-      return initialData.answer.split('|').map(s => s.trim());
-    }
-    return [];
-  });
-  // Parse options and answers if passed as serialized JSON strings or Python dict strings from DB
+  // Safe parsing of options if passed as serialized JSON strings or Python dict strings
   const parsedOptions = (() => {
     if (!initialData?.options) return {};
     if (typeof initialData.options === 'string') {
@@ -137,6 +55,322 @@ export function QuestionCreator({
     }
     return typeof initialData.options === 'object' && initialData.options !== null ? initialData.options : {};
   })();
+
+  const [type, setType] = useState(() => {
+    const rawType = initialData?.type || '';
+    if (rawType === 'MCQ') return 'SINGLE_SELECT'; // Map MCQ to SINGLE_SELECT in editor
+    return rawType;
+  });
+  const [text, setText] = useState(initialData?.text || '');
+  const [options, setOptions] = useState(() => {
+    if (Array.isArray(parsedOptions)) return parsedOptions;
+    if (Array.isArray(initialData?.options)) return initialData.options;
+    if (typeof parsedOptions === 'object' && parsedOptions !== null && Object.keys(parsedOptions).length > 0) {
+      // Filter out non-option keys like rationales, left, right, blanks, visual
+      const letterKeys = Object.keys(parsedOptions).filter(k => k.length <= 2 && k !== 'id');
+      if (letterKeys.length > 0) {
+        return letterKeys.map(k => parsedOptions[k]);
+      }
+    }
+    return DEFAULT_MCQ_OPTIONS;
+  });
+  const [answer, setAnswer] = useState(() => {
+    const rawAns = initialData?.answer || '';
+    if (!parsedOptions || Array.isArray(parsedOptions)) {
+      return rawAns;
+    }
+    if (typeof parsedOptions === 'object') {
+      // Map letter-based answers (e.g. 'A|C') to actual option text values
+      const opts = parsedOptions;
+      const letters = typeof rawAns === 'string' ? rawAns.split('|').map(s => s.trim()) : [];
+      const mapped = letters.map(l => opts[l]).filter(Boolean);
+      return mapped.length > 0 ? mapped.join('|') : rawAns;
+    }
+    return rawAns;
+  });
+  const [difficulty, setDifficulty] = useState(initialData?.difficulty || 'medium');
+  const [points, setPoints] = useState(initialData?.points || 1);
+  const [explanation, setExplanation] = useState(
+    initialData?.explanation || initialData?.rationale || parsedOptions?.explanation || ''
+  );
+  // Per-option rationales for Multiple Choice / Single Select / Multi-Select
+  const [optionRationales, setOptionRationales] = useState(() => {
+    const optCount = Array.isArray(parsedOptions)
+      ? parsedOptions.length
+      : typeof parsedOptions === 'object' && parsedOptions !== null
+        ? Object.keys(parsedOptions).filter(k => k.length <= 3 && k !== 'visual' && k !== 'rationales').length || 4
+        : 4;
+
+    if (Array.isArray(parsedOptions?.rationales) && parsedOptions.rationales.length > 0) {
+      const res = parsedOptions.rationales.slice(0, optCount);
+      while (res.length < optCount) res.push('');
+      return res;
+    }
+    if (typeof parsedOptions?.rationales === 'object' && parsedOptions?.rationales !== null) {
+      const res = [];
+      for (let i = 0; i < optCount; i++) {
+        const letter = String.fromCharCode(65 + i);
+        res.push(parsedOptions.rationales[letter] || parsedOptions.rationales[String(i)] || parsedOptions.rationales[String(i + 1)] || '');
+      }
+      if (res.some(Boolean)) return res;
+    }
+
+    const exp = initialData?.explanation || initialData?.rationale || parsedOptions?.explanation || '';
+    if (exp) {
+      const result = [];
+      for (let i = 0; i < optCount; i++) {
+        const letter = String.fromCharCode(65 + i);
+        const num = String(i + 1);
+
+        // 1. Match letter formats: • Option A: ..., • Option A (Incorrect): ..., • Choice A: ..., • A: ..., • (A): ...
+        const regexLetter = new RegExp(`•\\s*(?:Option\\s*|Choice\\s*)?\\(?${letter}\\)?(?:\\s*\\([^)]*\\))?[:\\-–—]\\s*(.*?)(?=(?:\\n•|$))`, 'is');
+        const mLetter = exp.match(regexLetter);
+        if (mLetter) {
+          result.push(mLetter[1].trim());
+          continue;
+        }
+
+        // 2. Match numeric formats: • Option 1: ..., • 1: ...
+        const regexNum = new RegExp(`•\\s*(?:Option\\s*|Choice\\s*)?\\(?${num}\\)?(?:\\s*\\([^)]*\\))?[:\\-–—]\\s*(.*?)(?=(?:\\n•|$))`, 'is');
+        const mNum = exp.match(regexNum);
+        if (mNum) {
+          result.push(mNum[1].trim());
+          continue;
+        }
+
+        result.push('');
+      }
+
+      // 3. Sequential bullet fallback if specific keys were not found
+      if (!result.some(Boolean)) {
+        const bullets = exp.split(/\n\s*•\s*/).map(b => b.replace(/^•\s*/, '').trim()).filter(Boolean);
+        for (let i = 0; i < optCount; i++) {
+          if (bullets[i]) {
+            const colonIdx = bullets[i].indexOf(':');
+            result[i] = colonIdx !== -1 ? bullets[i].slice(colonIdx + 1).trim() : bullets[i];
+          }
+        }
+      }
+
+      if (result.some(Boolean)) {
+        while (result.length < optCount) result.push('');
+        return result;
+      }
+    }
+
+    return Array.from({ length: optCount }, () => '');
+  });
+
+  const updateOptionRationale = (i, val) => {
+    setOptionRationales(prev => {
+      const next = [...prev];
+      next[i] = val;
+      return next;
+    });
+  };
+  const [tfAnswers, setTfAnswers] = useState(() => {
+    const raw = initialData?.answer;
+    if (raw === true || raw === 'true') return 'true';
+    if (raw === false || raw === 'false') return 'false';
+    if (typeof raw === 'string') {
+      const lower = raw.trim().toLowerCase();
+      if (lower === 'true' || lower === 't') return 'true';
+      if (lower === 'false' || lower === 'f') return 'false';
+      if (lower === 'a') {
+        const optA = parsedOptions?.A || (Array.isArray(parsedOptions) ? parsedOptions[0] : null);
+        if (typeof optA === 'string' && optA.toLowerCase().includes('false')) return 'false';
+        return 'true';
+      }
+      if (lower === 'b') {
+        const optB = parsedOptions?.B || (Array.isArray(parsedOptions) ? parsedOptions[1] : null);
+        if (typeof optB === 'string' && optB.toLowerCase().includes('true')) return 'true';
+        return 'false';
+      }
+    }
+    return '';
+  });
+  // True/False rationales
+  const [tfRationales, setTfRationales] = useState(() => {
+    if (parsedOptions?.rationales && typeof parsedOptions.rationales === 'object') {
+      return {
+        true: parsedOptions.rationales.true || parsedOptions.rationales['True'] || '',
+        false: parsedOptions.rationales.false || parsedOptions.rationales['False'] || '',
+      };
+    }
+    const exp = initialData?.explanation || initialData?.rationale || parsedOptions?.explanation || '';
+    const res = { true: '', false: '' };
+    if (exp) {
+      const mTrue = exp.match(/•\s*(?:Option\\s*)?True(?:\s*\([^)]*\))?[:\-–—]\s*(.*?)(?=(?:\n•|$))/is);
+      if (mTrue) res.true = mTrue[1].trim();
+      const mFalse = exp.match(/•\s*(?:Option\\s*)?False(?:\s*\([^)]*\))?[:\-–—]\s*(.*?)(?=(?:\n•|$))/is);
+      if (mFalse) res.false = mFalse[1].trim();
+
+      // Sequential fallback if not matched by label
+      if (!res.true && !res.false) {
+        const bullets = exp.split(/\n\s*•\s*/).map(b => b.replace(/^•\s*/, '').trim()).filter(Boolean);
+        if (bullets[0]) {
+          const colonIdx = bullets[0].indexOf(':');
+          res.true = colonIdx !== -1 ? bullets[0].slice(colonIdx + 1).trim() : bullets[0];
+        }
+        if (bullets[1]) {
+          const colonIdx = bullets[1].indexOf(':');
+          res.false = colonIdx !== -1 ? bullets[1].slice(colonIdx + 1).trim() : bullets[1];
+        }
+      }
+    }
+    return res;
+  });
+
+  // CONSTRUCTED_RESPONSE — one entry per blank: { correct: '', acceptable: '', rationale: '' }
+  const [crBlanks, setCrBlanks] = useState(() => {
+    const answersList = parsedOptions?.answers || (Array.isArray(initialData?.options?.answers) ? initialData.options.answers : null);
+    if (!answersList) return [{ correct: '', acceptable: '', rationale: '' }, { correct: '', acceptable: '', rationale: '' }];
+    return answersList.map((ans, idx) => {
+      let r = '';
+      const exp = initialData?.explanation || initialData?.rationale || '';
+      if (exp) {
+        const m = exp.match(new RegExp(`•\\s*Blank\\s*${idx + 1}[^:]*:\\s*(.*?)(?=(?:\\n•|$))`, 'is'));
+        if (m) r = m[1].trim();
+      }
+      if (Array.isArray(ans)) {
+        return { correct: ans[0] || '', acceptable: ans.slice(1).join(', '), rationale: r };
+      }
+      return { correct: ans || '', acceptable: '', rationale: r };
+    });
+  });
+
+  // DROPDOWN — one entry per blank: { choices: '', correct: '', rationale: '' }
+  const [ddBlanks, setDdBlanks] = useState(() => {
+    const blanksList = parsedOptions?.blanks || (Array.isArray(initialData?.options?.blanks) ? initialData.options.blanks : null);
+    if (!blanksList) return [{ choices: '', correct: '', rationale: '' }, { choices: '', correct: '', rationale: '' }];
+    return blanksList.map((b, idx) => {
+      let r = b.rationale || '';
+      if (!r) {
+        const exp = initialData?.explanation || initialData?.rationale || '';
+        if (exp) {
+          const m = exp.match(new RegExp(`•\\s*Blank\\s*${idx + 1}[^:]*:\\s*(.*?)(?=(?:\\n•|$))`, 'is'));
+          if (m) r = m[1].trim();
+        }
+      }
+      return {
+        choices: Array.isArray(b.choices) ? b.choices.join(', ') : (b.choices || ''),
+        correct: b.correct || '',
+        rationale: r,
+      };
+    });
+  });
+
+  // MATCHING_LINES state — left keys A-D, right keys 1-4, rationales
+  const [matchLeft, setMatchLeft] = useState(() => {
+    return parsedOptions?.left || { A: '', B: '', C: '', D: '' };
+  });
+  const [matchRight, setMatchRight] = useState(() => {
+    return parsedOptions?.right || { '1': '', '2': '', '3': '', '4': '' };
+  });
+  const [matchRationales, setMatchRationales] = useState(() => {
+    const res = {};
+    if (parsedOptions?.rationales && typeof parsedOptions.rationales === 'object') {
+      Object.entries(parsedOptions.rationales).forEach(([k, v]) => {
+        if (typeof v === 'string' && v.trim()) res[k] = v.trim();
+      });
+    }
+    const exp = initialData?.explanation || initialData?.rationale || '';
+    if (exp) {
+      const rightKeys = parsedOptions?.right ? Object.keys(parsedOptions.right) : ['1', '2', '3', '4'];
+      rightKeys.forEach(numKey => {
+        if (!res[numKey]) {
+          const regex = new RegExp(`•\\s*Match\\s*(?:[A-Z]\\s*[-–—>→:]\\s*)?${numKey}[^:]*:\\s*(.*?)(?=(?:\\n•|$))`, 'is');
+          const m = exp.match(regex);
+          if (m) res[numKey] = m[1].trim();
+        }
+      });
+    }
+    return res;
+  });
+  const [matchAnswer, setMatchAnswer] = useState(initialData?.answer || '');
+
+  // ORDERING rationales
+  const [orderRationales, setOrderRationales] = useState(() => {
+    const res = {};
+    if (parsedOptions?.rationales && typeof parsedOptions.rationales === 'object') {
+      Object.assign(res, parsedOptions.rationales);
+    }
+    const exp = initialData?.explanation || initialData?.rationale || '';
+    if (exp) {
+      const bullets = exp.split(/\n\s*•\s*/).map(b => b.replace(/^•\s*/, '').trim()).filter(Boolean);
+      bullets.forEach((bullet, idx) => {
+        const colonIdx = bullet.indexOf(':');
+        const content = colonIdx !== -1 ? bullet.slice(colonIdx + 1).trim() : bullet;
+        res[String(idx + 1)] = content;
+      });
+    }
+    return res;
+  });
+  const [correctOrder, setCorrectOrder] = useState(() => {
+    if (initialData?.type === 'ORDERING' && initialData?.answer) {
+      return initialData.answer.split('|').map(s => s.trim());
+    }
+    return [];
+  });
+
+  // GAP_MATCH rationales
+  const [gmRationales, setGmRationales] = useState(() => {
+    const res = {};
+    if (parsedOptions?.rationales && typeof parsedOptions.rationales === 'object') {
+      Object.assign(res, parsedOptions.rationales);
+    }
+    const exp = initialData?.explanation || initialData?.rationale || '';
+    if (exp) {
+      const bullets = exp.split(/\n\s*•\s*/).map(b => b.replace(/^•\s*/, '').trim()).filter(Boolean);
+      bullets.forEach((bullet, idx) => {
+        const colonIdx = bullet.indexOf(':');
+        const content = colonIdx !== -1 ? bullet.slice(colonIdx + 1).trim() : bullet;
+        res[`gap_${idx + 1}`] = content;
+      });
+    }
+    return res;
+  });
+
+  // MATRIX rationales
+  const [matrixRationales, setMatrixRationales] = useState(() => {
+    const res = {};
+    if (parsedOptions?.rationales && typeof parsedOptions.rationales === 'object') {
+      Object.assign(res, parsedOptions.rationales);
+    }
+    const exp = initialData?.explanation || initialData?.rationale || '';
+    if (exp) {
+      const bullets = exp.split(/\n\s*•\s*/).map(b => b.replace(/^•\s*/, '').trim()).filter(Boolean);
+      bullets.forEach((bullet, idx) => {
+        const colonIdx = bullet.indexOf(':');
+        const content = colonIdx !== -1 ? bullet.slice(colonIdx + 1).trim() : bullet;
+        res[`row_${idx + 1}`] = content;
+      });
+    }
+    return res;
+  });
+
+  // MULTIPLE_DROP_BUCKET rationales
+  const [mdbRationales, setMdbRationales] = useState(() => {
+    const res = {};
+    if (parsedOptions?.rationales && typeof parsedOptions.rationales === 'object') {
+      Object.assign(res, parsedOptions.rationales);
+    }
+    const exp = initialData?.explanation || initialData?.rationale || '';
+    if (exp) {
+      const dropBucketsList = parsedOptions?.drop_buckets || (Array.isArray(initialData?.options?.drop_buckets) ? initialData.options.drop_buckets : []);
+      dropBucketsList.forEach(b => {
+        const bName = b.name || b.id;
+        if (!bName) return;
+        const regex = new RegExp(`•\\s*(?:Category\\s*)?${bName}[^:]*:\\s*(.*?)(?=(?:\\n•|$))`, 'is');
+        const m = exp.match(regex);
+        if (m) {
+          res[bName] = m[1].trim();
+          if (b.id) res[b.id] = m[1].trim();
+        }
+      });
+    }
+    return res;
+  });
 
   const parsedAnswerObj = (() => {
     if (!initialData?.answer) return {};
@@ -356,14 +590,57 @@ export function QuestionCreator({
   };
 
   const buildPayload = () => {
-    if (type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT' || type === 'MCQ') {
-      return { type, text, options: options.filter(o => o.trim()), answer, difficulty, points };
+    if (type === 'MCQ' || type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT') {
+      const validOpts = options.filter(o => o.trim());
+      const compiledMcqExplanation = validOpts
+        .map((opt, i) => {
+          const letter = String.fromCharCode(65 + i);
+          const r = optionRationales[i]?.trim();
+          if (!r) return null;
+          const isCorr = type === 'MULTIPLE_SELECT'
+            ? answer.split('|').map(s => s.trim()).includes(opt.trim())
+            : answer.trim() === opt.trim();
+          return `• Option ${letter} (${isCorr ? 'Correct' : 'Incorrect'}): ${r}`;
+        })
+        .filter(Boolean)
+        .join('\n') || explanation;
+
+      const optionsObj = {};
+      validOpts.forEach((opt, i) => {
+        const letter = String.fromCharCode(65 + i);
+        optionsObj[letter] = opt;
+      });
+      optionsObj.rationales = optionRationales.slice(0, validOpts.length);
+
+      return {
+        type,
+        text,
+        options: optionsObj,
+        answer,
+        difficulty,
+        points,
+        explanation: compiledMcqExplanation,
+      };
     }
     if (type === 'TRUE_FALSE') {
-      return { type, text, options: null, answer: tfAnswers, difficulty, points };
+      const isTrue = tfAnswers === 'true';
+      const compiledTfExp = [
+        tfRationales.true ? `• True (${isTrue ? 'Correct' : 'Incorrect'}): ${tfRationales.true}` : null,
+        tfRationales.false ? `• False (${!isTrue ? 'Correct' : 'Incorrect'}): ${tfRationales.false}` : null,
+      ].filter(Boolean).join('\n') || explanation;
+
+      return {
+        type,
+        text,
+        options: { rationales: tfRationales },
+        answer: tfAnswers,
+        difficulty,
+        points,
+        explanation: compiledTfExp,
+      };
     }
     if (type === 'SHORT_ANSWER') {
-      return { type, text, options: null, answer, difficulty, points };
+      return { type, text, options: null, answer, difficulty, points, explanation };
     }
     if (type === 'CONSTRUCTED_RESPONSE') {
       const answers = effectiveCrBlanks.map(b => {
@@ -372,27 +649,63 @@ export function QuestionCreator({
         return [correct, ...alts].filter(Boolean);
       });
       const primaryAnswers = answers.map(b => b[0] || '');
+      const compiledCrExp = effectiveCrBlanks
+        .map((b, i) => b.rationale?.trim() ? `• Blank ${i + 1}: ${b.rationale.trim()}` : null)
+        .filter(Boolean)
+        .join('\n') || explanation;
+
       return {
         type,
         text,
         options: { answers },
         answer: primaryAnswers.join('|'),
         difficulty,
-        points
+        points,
+        explanation: compiledCrExp,
       };
     }
     if (type === 'DROPDOWN') {
       const blanks = effectiveDdBlanks.map(b => ({
         choices: b.choices.split(',').map(c => c.trim()).filter(Boolean),
         correct: b.correct.trim(),
+        rationale: b.rationale?.trim() || undefined,
       }));
       const answer = blanks.map(b => b.correct).join('|');
-      return { type, text, options: { blanks }, answer, difficulty, points };
+      const compiledDdExp = effectiveDdBlanks
+        .map((b, i) => b.rationale?.trim() ? `• Blank ${i + 1}: ${b.rationale.trim()}` : null)
+        .filter(Boolean)
+        .join('\n') || explanation;
+
+      return { type, text, options: { blanks }, answer, difficulty, points, explanation: compiledDdExp };
     }
     if (type === 'MATCHING_LINES') {
       const left = Object.fromEntries(Object.entries(matchLeft).filter(([, v]) => v.trim()));
       const right = Object.fromEntries(Object.entries(matchRight).filter(([, v]) => v.trim()));
-      return { type, text, options: { left, right }, answer: matchAnswer.trim(), difficulty, points };
+
+      const cleanRationales = {};
+      Object.keys(right).forEach(k => {
+        if (matchRationales[k]?.trim()) {
+          cleanRationales[k] = matchRationales[k].trim();
+        }
+      });
+
+      const compiledMatchExp = Object.keys(right)
+        .map(k => {
+          const r = cleanRationales[k];
+          return r ? `• Match ${k}: ${r}` : null;
+        })
+        .filter(Boolean)
+        .join('\n') || explanation;
+
+      return {
+        type,
+        text,
+        options: { left, right, rationales: cleanRationales },
+        answer: matchAnswer.trim(),
+        difficulty,
+        points,
+        explanation: compiledMatchExp,
+      };
     }
     if (type === 'ORDERING') {
       const validOptions = options.filter(o => o.trim());
@@ -402,7 +715,23 @@ export function QuestionCreator({
           finalOrder.push(opt);
         }
       });
-      return { type, text, options: validOptions, answer: finalOrder.join('|'), difficulty, points };
+      const compiledOrderExp = finalOrder
+        .map((item, i) => {
+          const r = orderRationales[item] || orderRationales[String(i + 1)];
+          return r && r.trim() ? `• Step ${i + 1} (${item}): ${r.trim()}` : null;
+        })
+        .filter(Boolean)
+        .join('\n') || explanation;
+
+      return {
+        type,
+        text,
+        options: validOptions,
+        answer: finalOrder.join('|'),
+        difficulty,
+        points,
+        explanation: compiledOrderExp,
+      };
     }
     if (type === 'BACKGROUND_GRAPHIC') {
       return {
@@ -418,9 +747,15 @@ export function QuestionCreator({
         answer: bgAnswers,
         difficulty,
         points,
+        explanation,
       };
     }
     if (type === 'GAP_MATCH') {
+      const compiledGmExp = Object.entries(gmRationales)
+        .map(([gapKey, r]) => (r && r.trim() ? `• ${gapKey.replace(/^gap/i, 'Gap')}: ${r.trim()}` : null))
+        .filter(Boolean)
+        .join('\n') || explanation;
+
       return {
         type,
         text,
@@ -428,26 +763,53 @@ export function QuestionCreator({
           passage,
           gaps,
           response_options: responseOptions,
+          rationales: gmRationales,
         },
         answer: gmAnswers,
         difficulty,
         points,
+        explanation: compiledGmExp,
       };
     }
     if (type === 'MULTIPLE_DROP_BUCKET') {
+      const validDropBuckets = dropBuckets.filter(b => b.name?.trim());
+      const cleanRationales = {};
+      validDropBuckets.forEach(b => {
+        const r = mdbRationales[b.name] || mdbRationales[b.id];
+        if (r && r.trim()) {
+          cleanRationales[b.name] = r.trim();
+          if (b.id) cleanRationales[b.id] = r.trim();
+        }
+      });
+
+      const compiledMdbExp = validDropBuckets
+        .map(b => {
+          const r = cleanRationales[b.name];
+          return r ? `• ${b.name}: ${r}` : null;
+        })
+        .filter(Boolean)
+        .join('\n') || explanation;
+
       return {
         type,
         text,
         options: {
           option_buckets: optionBuckets.filter(b => b.title?.trim() || b.options?.some(o => o.trim())),
-          drop_buckets: dropBuckets.filter(b => b.name?.trim()),
+          drop_buckets: validDropBuckets,
+          rationales: cleanRationales,
         },
         answer: mdbAnswers,
         difficulty,
         points,
+        explanation: compiledMdbExp,
       };
     }
     if (type === 'MATRIX_INTERACTION') {
+      const compiledMatrixExp = Object.entries(matrixRationales)
+        .map(([rowKey, r]) => (r && r.trim() ? `• ${rowKey}: ${r.trim()}` : null))
+        .filter(Boolean)
+        .join('\n') || explanation;
+
       return {
         type,
         text,
@@ -455,10 +817,12 @@ export function QuestionCreator({
           header: matrixHeader,
           columns: matrixColumns.filter(c => c.value?.trim()),
           rows: matrixRows.filter(r => r.value?.trim()),
+          rationales: matrixRationales,
         },
         answer: matrixAnswers,
         difficulty,
         points,
+        explanation: compiledMatrixExp,
       };
     }
     if (type === 'SELECT_TEXT') {
@@ -473,9 +837,10 @@ export function QuestionCreator({
         answer: stAnswers,
         difficulty,
         points,
+        explanation,
       };
     }
-    return { type, text, options, answer, difficulty, points };
+    return { type, text, options, answer, difficulty, points, explanation };
   };
 
   const handleSave = async () => {
@@ -579,12 +944,15 @@ export function QuestionCreator({
         </div>
       )}
 
-      {/* MCQ / Choice Options */}
+      {/* MCQ / Choice Options with Per-Choice Rationales */}
       {(type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT' || type === 'MCQ') && (
         <McqEditor
           type={type}
           options={options}
           setOptions={setOptions}
+          rationales={optionRationales}
+          setRationales={setOptionRationales}
+          updateRationale={updateOptionRationale}
           answer={answer}
           setAnswer={setAnswer}
           updateOption={updateOption}
@@ -592,11 +960,13 @@ export function QuestionCreator({
         />
       )}
 
-      {/* True / False */}
+      {/* True / False with Per-Option Rationales */}
       {type === 'TRUE_FALSE' && (
         <TrueFalseEditor
           answer={tfAnswers}
           setAnswer={setTfAnswers}
+          rationales={tfRationales}
+          setRationales={setTfRationales}
           err={err}
         />
       )}
@@ -644,6 +1014,8 @@ export function QuestionCreator({
           setMatchRight={setMatchRight}
           matchAnswer={matchAnswer}
           setMatchAnswer={setMatchAnswer}
+          rationales={matchRationales}
+          setRationales={setMatchRationales}
           err={err}
         />
       )}
@@ -656,6 +1028,8 @@ export function QuestionCreator({
           correctOrder={correctOrder}
           setCorrectOrder={setCorrectOrder}
           updateOption={updateOption}
+          rationales={orderRationales}
+          setRationales={setOrderRationales}
           err={err}
         />
       )}
@@ -690,6 +1064,8 @@ export function QuestionCreator({
           setResponseOptions={setResponseOptions}
           answers={gmAnswers}
           setAnswers={setGmAnswers}
+          rationales={gmRationales}
+          setRationales={setGmRationales}
           err={err}
         />
       )}
@@ -703,6 +1079,8 @@ export function QuestionCreator({
           setDropBuckets={setDropBuckets}
           answers={mdbAnswers}
           setAnswers={setMdbAnswers}
+          rationales={mdbRationales}
+          setRationales={setMdbRationales}
           err={err}
         />
       )}
@@ -718,6 +1096,8 @@ export function QuestionCreator({
           setRows={setMatrixRows}
           answers={matrixAnswers}
           setAnswers={setMatrixAnswers}
+          rationales={matrixRationales}
+          setRationales={setMatrixRationales}
           err={err}
         />
       )}
@@ -759,6 +1139,26 @@ export function QuestionCreator({
               onChange={(e) => setPoints(Number(e.target.value))}
             />
           </div>
+        </div>
+      )}
+
+      {/* Dedicated Pedagogical Rationale Field for question types without per-item fields */}
+      {(type === 'SHORT_ANSWER' || type === 'SELECT_TEXT' || type === 'BACKGROUND_GRAPHIC') && (
+        <div className="qc-field" style={{ marginTop: 16 }}>
+          <label className="qc-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>💡 Pedagogical Rationale & Solution Explanation</span>
+            <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--color-text-muted)', textTransform: 'none' }}>
+              (Optional)
+            </span>
+          </label>
+          <textarea
+            className="qc-input qc-textarea"
+            rows={4}
+            placeholder="Provide step-by-step reasoning explaining why the answer is correct and why distractors are incorrect..."
+            value={explanation}
+            onChange={(e) => setExplanation(e.target.value)}
+            style={{ minHeight: 90, lineHeight: 1.5 }}
+          />
         </div>
       )}
 

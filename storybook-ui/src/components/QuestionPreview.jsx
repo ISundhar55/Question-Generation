@@ -31,21 +31,76 @@ export function QuestionPreview({ question, onBack, backLabel }) {
     );
   }
 
+  const qType = (question.type || question.questionType || question.question_type || '').toUpperCase();
+
+  const parsedOptions = (() => {
+    if (!question?.options) return {};
+    if (typeof question.options === 'object' && question.options !== null) return question.options;
+    if (typeof question.options === 'string') {
+      const trimmed = question.options.trim();
+      if (!trimmed) return {};
+      try {
+        const p = JSON.parse(trimmed);
+        if (typeof p === 'object' && p !== null) return p;
+      } catch (_) {}
+      try {
+        const fixed = trimmed
+          .replace(/'/g, '"')
+          .replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+        const p = JSON.parse(fixed);
+        if (typeof p === 'object' && p !== null) return p;
+      } catch (_) {}
+    }
+    return {};
+  })();
+
+  const explanationText = (() => {
+    if (typeof question.explanation === 'string' && question.explanation.trim()) {
+      return question.explanation.trim();
+    }
+    if (typeof question.rationale === 'string' && question.rationale.trim()) {
+      return question.rationale.trim();
+    }
+    if (typeof parsedOptions.explanation === 'string' && parsedOptions.explanation.trim()) {
+      return parsedOptions.explanation.trim();
+    }
+    if (typeof parsedOptions.rationale === 'string' && parsedOptions.rationale.trim()) {
+      return parsedOptions.rationale.trim();
+    }
+
+    // Auto-compile from parsedOptions.rationales fallback
+    if (Array.isArray(parsedOptions.rationales) && parsedOptions.rationales.length > 0) {
+      const list = parsedOptions.rationales
+        .map((r, i) => (typeof r === 'string' && r.trim()) ? `• Option ${String.fromCharCode(65 + i)}: ${r.trim()}` : null)
+        .filter(Boolean);
+      if (list.length > 0) return list.join('\n');
+    } else if (parsedOptions.rationales && typeof parsedOptions.rationales === 'object') {
+      const list = Object.entries(parsedOptions.rationales)
+        .map(([k, r]) => (typeof r === 'string' && r.trim()) ? `• ${k}: ${r.trim()}` : null)
+        .filter(Boolean);
+      if (list.length > 0) return list.join('\n');
+    }
+    return '';
+  })();
+
   const renderPreview = () => {
-    switch (question.type) {
+    switch (qType) {
       case 'MCQ':
       case 'SINGLE_SELECT':
-      case 'MULTIPLE_SELECT': {
-        const rawOpts = question.options || [];
-        const isDict = typeof rawOpts === 'object' && !Array.isArray(rawOpts);
+      case 'MULTIPLE_SELECT':
+      case 'MULTI_SELECT': {
+        const rawOpts = parsedOptions;
+        const isDict = typeof rawOpts === 'object' && !Array.isArray(rawOpts) && rawOpts !== null;
         const processedOptions = isDict
-          ? Object.entries(rawOpts).filter(([k]) => k !== 'visual' && k.length <= 3).map(([, v]) => v)
-          : rawOpts;
+          ? Object.entries(rawOpts)
+              .filter(([k]) => k !== 'visual' && k !== 'rationales' && k !== 'explanation' && k.length <= 3)
+              .map(([, v]) => v)
+          : (Array.isArray(rawOpts) ? rawOpts : []);
 
         let processedAnswer = question.answer || '';
         if (isDict && typeof processedAnswer === 'string') {
           // Map letter-based answers (e.g. 'A|C') to actual option text values
-          const letters = processedAnswer.split('|').map(s => s.trim());
+          const letters = processedAnswer.split(/[,|]/).map(s => s.trim());
           const mapped = letters.map(l => rawOpts[l]).filter(Boolean);
           if (mapped.length > 0) {
             processedAnswer = mapped.join('|');
@@ -58,7 +113,9 @@ export function QuestionPreview({ question, onBack, backLabel }) {
             options={processedOptions}
             correctAnswer={processedAnswer}
             mode="preview"
-            type={question.type}
+            type={qType === 'MULTI_SELECT' ? 'MULTIPLE_SELECT' : (qType || 'SINGLE_SELECT')}
+            rationales={parsedOptions.rationales}
+            explanation={explanationText}
           />
         );
       }
@@ -68,6 +125,8 @@ export function QuestionPreview({ question, onBack, backLabel }) {
             question={question.text}
             correctAnswer={question.answer}
             mode="preview"
+            rationales={parsedOptions.rationales}
+            explanation={explanationText}
           />
         );
       case 'SHORT_ANSWER':
@@ -83,12 +142,12 @@ export function QuestionPreview({ question, onBack, backLabel }) {
         return (
           <FillBlankQuestion
             questionTemplate={question.text}
-            correctAnswers={question.options?.answers || question.answer?.split('|') || []}
+            correctAnswers={parsedOptions.answers || question.answer?.split('|') || []}
             mode="preview"
           />
         );
       case 'DROPDOWN': {
-        const blanks = question.options?.blanks || [];
+        const blanks = parsedOptions.blanks || [];
         const parts  = (question.text || '').split('___');
         return (
           <div className="qc-preview">
@@ -125,8 +184,8 @@ export function QuestionPreview({ question, onBack, backLabel }) {
         );
       }
       case 'MATCHING_LINES': {
-        const left  = question.options?.left  || {};
-        const right = question.options?.right || {};
+        const left  = parsedOptions.left  || {};
+        const right = parsedOptions.right || {};
         const leftItems = Object.entries(left);
         const rightItems = Object.entries(right);
 
@@ -656,8 +715,20 @@ export function QuestionPreview({ question, onBack, backLabel }) {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(dropBuckets.length, 3)}, 1fr)`, gap: 12 }}>
                   {dropBuckets.map((dBucket, dIdx) => {
-                    const assigned = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
-                    const assignedList = Array.isArray(assigned) ? assigned : [assigned].filter(Boolean);
+                    const getAssigned = () => {
+                      if (dBucket.id && Array.isArray(answersObj[dBucket.id])) return answersObj[dBucket.id];
+                      if (dBucket.name && Array.isArray(answersObj[dBucket.name])) return answersObj[dBucket.name];
+                      if (Array.isArray(answersObj[`drop_bucket_${dIdx + 1}`])) return answersObj[`drop_bucket_${dIdx + 1}`];
+                      if (Array.isArray(answersObj[String(dIdx)])) return answersObj[String(dIdx)];
+                      if (dBucket.name) {
+                        const tName = dBucket.name.trim().toLowerCase();
+                        const fKey = Object.keys(answersObj).find(k => k.trim().toLowerCase() === tName);
+                        if (fKey && Array.isArray(answersObj[fKey])) return answersObj[fKey];
+                      }
+                      const fallback = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
+                      return Array.isArray(fallback) ? fallback : [fallback].filter(Boolean);
+                    };
+                    const assignedList = getAssigned();
 
                     return (
                       <div
@@ -1123,6 +1194,27 @@ export function QuestionPreview({ question, onBack, backLabel }) {
         />
       )}
       {renderPreview()}
+      {/* Pedagogical Rationale */}
+      {Boolean(explanationText) && (
+        <div style={{
+          marginTop: 16,
+          padding: '14px 18px',
+          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          borderRadius: 'var(--radius-sm)',
+          border: '1.5px solid #e2e8f0',
+          borderLeft: '4px solid #6366f1',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 16 }}>💡</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#4338ca', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Pedagogical Rationale & Solution Breakdown
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.6 }}>
+            <MarkdownText text={explanationText} />
+          </div>
+        </div>
+      )}
       <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', display: 'flex', gap: 16, fontSize: 12, color: 'var(--color-text-muted)' }}>
         <span>Difficulty: <strong style={{ color: 'var(--color-text)' }}>{question.difficulty || 'medium'}</strong></span>
         <span>Points: <strong style={{ color: 'var(--color-text)' }}>{question.points || 1}</strong></span>
