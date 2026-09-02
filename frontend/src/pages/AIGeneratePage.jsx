@@ -236,18 +236,34 @@ export default function AIGeneratePage() {
     return null;
   };
 
+  const buildSavePayload = (q) => {
+    let payloadOptions = q.options;
+    const visualSvg = q.visual || (typeof q.options === 'object' && q.options !== null ? q.options.visual : null);
+    if (visualSvg) {
+      if (typeof payloadOptions === 'object' && payloadOptions !== null && !Array.isArray(payloadOptions)) {
+        payloadOptions = { ...payloadOptions, visual: visualSvg };
+      } else if (Array.isArray(payloadOptions)) {
+        payloadOptions = { items: payloadOptions, visual: visualSvg };
+      } else if (!payloadOptions) {
+        payloadOptions = { visual: visualSvg };
+      }
+    }
+    return {
+      type: q.questionType,
+      text: q.text,
+      options: payloadOptions || null,
+      visual: visualSvg || undefined,
+      answer: q.answer,
+      difficulty: q.difficulty,
+      points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
+      explanation: resolveExplanation(q),
+    };
+  };
+
   const saveQuestion = async (q, idx) => {
     setSavingId(idx);
     try {
-      const res = await questionsAPI.create({
-        type: q.questionType,
-        text: q.text,
-        options: q.options || null,
-        answer: q.answer,
-        difficulty: q.difficulty,
-        points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
-        explanation: resolveExplanation(q),
-      });
+      const res = await questionsAPI.create(buildSavePayload(q));
       const savedId = res.data?.id;
       setQuestions(prev => {
         const next = [...prev];
@@ -269,15 +285,7 @@ export default function AIGeneratePage() {
       const q = unsaved[i];
       const idx = questions.indexOf(q);
       try {
-        const res = await questionsAPI.create({
-          type: q.questionType,
-          text: q.text,
-          options: q.options || null,
-          answer: q.answer,
-          difficulty: q.difficulty,
-          points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
-          explanation: resolveExplanation(q),
-        });
+        const res = await questionsAPI.create(buildSavePayload(q));
         const savedId = res.data?.id;
         setQuestions(prev => {
           const next = [...prev];

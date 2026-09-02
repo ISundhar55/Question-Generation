@@ -69,7 +69,9 @@ export function QuestionCreator({
   });
   const [text, setText] = useState(initialData?.text || '');
   const [options, setOptions] = useState(() => {
+    if (Array.isArray(parsedOptions?.items)) return parsedOptions.items;
     if (Array.isArray(parsedOptions)) return parsedOptions;
+    if (Array.isArray(initialData?.options?.items)) return initialData.options.items;
     if (Array.isArray(initialData?.options)) return initialData.options;
     if (typeof parsedOptions === 'object' && parsedOptions !== null && Object.keys(parsedOptions).length > 0) {
       // Filter out non-option keys like rationales, left, right, blanks, visual
@@ -603,6 +605,7 @@ export function QuestionCreator({
   };
 
   const buildPayload = () => {
+    let payload = null;
     if (type === 'MCQ' || type === 'SINGLE_SELECT' || type === 'MULTIPLE_SELECT') {
       const validOpts = options.filter(o => o.trim());
       const compiledMcqExplanation = validOpts
@@ -628,7 +631,7 @@ export function QuestionCreator({
         optionsObj.visual = visualSvg;
       }
 
-      return {
+      payload = {
         type,
         text,
         options: optionsObj,
@@ -636,17 +639,15 @@ export function QuestionCreator({
         difficulty,
         points,
         explanation: compiledMcqExplanation,
-        visual: visualSvg || undefined,
       };
-    }
-    if (type === 'TRUE_FALSE') {
+    } else if (type === 'TRUE_FALSE') {
       const isTrue = tfAnswers === 'true';
       const compiledTfExp = [
         tfRationales.true ? `• True (${isTrue ? 'Correct' : 'Incorrect'}): ${tfRationales.true}` : null,
         tfRationales.false ? `• False (${!isTrue ? 'Correct' : 'Incorrect'}): ${tfRationales.false}` : null,
       ].filter(Boolean).join('\n') || explanation;
 
-      return {
+      payload = {
         type,
         text,
         options: { rationales: tfRationales },
@@ -655,11 +656,9 @@ export function QuestionCreator({
         points,
         explanation: compiledTfExp,
       };
-    }
-    if (type === 'SHORT_ANSWER') {
-      return { type, text, options: null, answer, difficulty, points, explanation };
-    }
-    if (type === 'CONSTRUCTED_RESPONSE') {
+    } else if (type === 'SHORT_ANSWER') {
+      payload = { type, text, options: null, answer, difficulty, points, explanation };
+    } else if (type === 'CONSTRUCTED_RESPONSE') {
       const answers = effectiveCrBlanks.map(b => {
         const correct = b.correct.trim();
         const alts = b.acceptable.split(',').map(a => a.trim()).filter(Boolean);
@@ -671,7 +670,7 @@ export function QuestionCreator({
         .filter(Boolean)
         .join('\n') || explanation;
 
-      return {
+      payload = {
         type,
         text,
         options: { answers },
@@ -680,8 +679,7 @@ export function QuestionCreator({
         points,
         explanation: compiledCrExp,
       };
-    }
-    if (type === 'DROPDOWN') {
+    } else if (type === 'DROPDOWN') {
       const blanks = effectiveDdBlanks.map(b => ({
         choices: b.choices.split(',').map(c => c.trim()).filter(Boolean),
         correct: b.correct.trim(),
@@ -693,9 +691,8 @@ export function QuestionCreator({
         .filter(Boolean)
         .join('\n') || explanation;
 
-      return { type, text, options: { blanks }, answer, difficulty, points, explanation: compiledDdExp };
-    }
-    if (type === 'MATCHING_LINES') {
+      payload = { type, text, options: { blanks }, answer, difficulty, points, explanation: compiledDdExp };
+    } else if (type === 'MATCHING_LINES') {
       const left = Object.fromEntries(Object.entries(matchLeft).filter(([, v]) => v.trim()));
       const right = Object.fromEntries(Object.entries(matchRight).filter(([, v]) => v.trim()));
 
@@ -714,7 +711,7 @@ export function QuestionCreator({
         .filter(Boolean)
         .join('\n') || explanation;
 
-      return {
+      payload = {
         type,
         text,
         options: { left, right, rationales: cleanRationales },
@@ -723,8 +720,7 @@ export function QuestionCreator({
         points,
         explanation: compiledMatchExp,
       };
-    }
-    if (type === 'ORDERING') {
+    } else if (type === 'ORDERING') {
       const validOptions = options.filter(o => o.trim());
       let finalOrder = correctOrder.filter(item => validOptions.includes(item));
       validOptions.forEach(opt => {
@@ -740,7 +736,7 @@ export function QuestionCreator({
         .filter(Boolean)
         .join('\n') || explanation;
 
-      return {
+      payload = {
         type,
         text,
         options: validOptions,
@@ -749,9 +745,8 @@ export function QuestionCreator({
         points,
         explanation: compiledOrderExp,
       };
-    }
-    if (type === 'BACKGROUND_GRAPHIC') {
-      return {
+    } else if (type === 'BACKGROUND_GRAPHIC') {
+      payload = {
         type,
         text,
         options: {
@@ -766,14 +761,13 @@ export function QuestionCreator({
         points,
         explanation,
       };
-    }
-    if (type === 'GAP_MATCH') {
+    } else if (type === 'GAP_MATCH') {
       const compiledGmExp = Object.entries(gmRationales)
         .map(([gapKey, r]) => (r && r.trim() ? `• ${gapKey.replace(/^gap/i, 'Gap')}: ${r.trim()}` : null))
         .filter(Boolean)
         .join('\n') || explanation;
 
-      return {
+      payload = {
         type,
         text,
         options: {
@@ -787,8 +781,7 @@ export function QuestionCreator({
         points,
         explanation: compiledGmExp,
       };
-    }
-    if (type === 'MULTIPLE_DROP_BUCKET') {
+    } else if (type === 'MULTIPLE_DROP_BUCKET') {
       const validDropBuckets = dropBuckets.filter(b => b.name?.trim());
       const cleanRationales = {};
       validDropBuckets.forEach(b => {
@@ -807,7 +800,7 @@ export function QuestionCreator({
         .filter(Boolean)
         .join('\n') || explanation;
 
-      return {
+      payload = {
         type,
         text,
         options: {
@@ -820,14 +813,13 @@ export function QuestionCreator({
         points,
         explanation: compiledMdbExp,
       };
-    }
-    if (type === 'MATRIX_INTERACTION') {
+    } else if (type === 'MATRIX_INTERACTION') {
       const compiledMatrixExp = Object.entries(matrixRationales)
         .map(([rowKey, r]) => (r && r.trim() ? `• ${rowKey}: ${r.trim()}` : null))
         .filter(Boolean)
         .join('\n') || explanation;
 
-      return {
+      payload = {
         type,
         text,
         options: {
@@ -841,9 +833,8 @@ export function QuestionCreator({
         points,
         explanation: compiledMatrixExp,
       };
-    }
-    if (type === 'SELECT_TEXT') {
-      return {
+    } else if (type === 'SELECT_TEXT') {
+      payload = {
         type,
         text,
         options: {
@@ -856,8 +847,21 @@ export function QuestionCreator({
         points,
         explanation,
       };
+    } else {
+      payload = { type, text, options, answer, difficulty, points, explanation };
     }
-    return { type, text, options, answer, difficulty, points, explanation, visual: visualSvg || undefined };
+
+    if (visualSvg && payload) {
+      payload.visual = visualSvg;
+      if (payload.options && typeof payload.options === 'object' && !Array.isArray(payload.options)) {
+        payload.options.visual = visualSvg;
+      } else if (Array.isArray(payload.options)) {
+        payload.options = { items: payload.options, visual: visualSvg };
+      } else if (!payload.options) {
+        payload.options = { visual: visualSvg };
+      }
+    }
+    return payload;
   };
 
   const handleSave = async () => {

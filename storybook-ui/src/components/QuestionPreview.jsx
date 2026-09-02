@@ -83,7 +83,18 @@ export function QuestionPreview({ question, onBack, backLabel }) {
     return '';
   })();
 
-  const visualSvg = question.options?.visual || question.visual || null;
+  const visualSvg = question.visual || question.options?.visual || parsedOptions?.visual || null;
+
+  const renderStemWithDiagram = (stemText) => {
+    if (visualSvg) {
+      return (
+        <div style={{ marginBottom: 16 }}>
+          <DiagramViewer svgCode={visualSvg} stemText={stemText} filename="diagram_preview" />
+        </div>
+      );
+    }
+    return <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, lineHeight: 1.5 }}>{stemText}</p>;
+  };
 
   const renderPreview = () => {
     switch (qType) {
@@ -240,9 +251,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
                 🔗 Matching Lines
               </span>
             </div>
-            <div className="qc-preview-question">
-              <MarkdownText text={question.text || 'Match each item from Column A with its corresponding item from Column B.'} />
-            </div>
+            {renderStemWithDiagram(question.text || 'Match each item from Column A with its corresponding item from Column B.')}
 
             {/* Side-by-Side Modern Columns */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
@@ -308,7 +317,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
             <div className="qc-preview-title" style={{ marginBottom: 12 }}>
               <span className="qc-badge qc-badge-ord">Ordering</span>
             </div>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{question.text}</p>
+            {renderStemWithDiagram(question.text)}
             
             <div style={{ maxWidth: 480 }}>
               {studentOrder.map((item, idx) => {
@@ -567,7 +576,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
                 🧩 Gap Match
               </span>
             </div>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{question?.text}</p>
+            {renderStemWithDiagram(question?.text)}
 
             {/* Response Options Bank */}
             {responseOptions.length > 0 && (
@@ -691,7 +700,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
                 🗂️ Multiple Drop Bucket
               </span>
             </div>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{question?.text}</p>
+            {renderStemWithDiagram(question?.text)}
 
             {/* Option Buckets Section */}
             {optionBuckets.length > 0 && (
@@ -904,7 +913,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
                 📊 Matrix Interaction
               </span>
             </div>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{question?.text}</p>
+            {renderStemWithDiagram(question?.text)}
 
             {/* Matrix Table */}
             <div
@@ -1102,7 +1111,7 @@ export function QuestionPreview({ question, onBack, backLabel }) {
                 <strong style={{ color: '#1e40af' }}>{maxSelections}</strong>
               </div>
             </div>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{question?.text}</p>
+            {renderStemWithDiagram(question?.text)}
 
             {/* Passage Box with Highlighted Target Text */}
             <div

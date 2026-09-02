@@ -36,12 +36,23 @@ const getQuestionById = async (req, res) => {
 
 // POST /api/questions
 const createQuestion = async (req, res) => {
-  const { bank_id, type, text, options, answer, difficulty, points, explanation } = req.body;
+  const { bank_id, type, text, options, visual, answer, difficulty, points, explanation } = req.body;
 
   if (!type || !text || answer === undefined || answer === null || answer === '')
     return res.status(400).json({ message: 'type, text, and answer are required' });
 
   const answerVal = typeof answer === 'object' ? JSON.stringify(answer) : String(answer);
+
+  let finalOptions = options;
+  if (visual) {
+    if (typeof finalOptions === 'object' && finalOptions !== null && !Array.isArray(finalOptions)) {
+      finalOptions = { ...finalOptions, visual };
+    } else if (Array.isArray(finalOptions)) {
+      finalOptions = { items: finalOptions, visual };
+    } else if (!finalOptions) {
+      finalOptions = { visual };
+    }
+  }
 
   try {
     const result = await pool.query(
@@ -53,7 +64,7 @@ const createQuestion = async (req, res) => {
         req.user.id,
         type,
         text,
-        options ? JSON.stringify(options) : null,
+        finalOptions ? JSON.stringify(finalOptions) : null,
         answerVal,
         difficulty || 'medium',
         points || 1,
@@ -69,8 +80,19 @@ const createQuestion = async (req, res) => {
 
 // PUT /api/questions/:id
 const updateQuestion = async (req, res) => {
-  const { type, text, options, answer, difficulty, points, explanation } = req.body;
+  const { type, text, options, visual, answer, difficulty, points, explanation } = req.body;
   const answerVal = typeof answer === 'object' ? JSON.stringify(answer) : String(answer);
+
+  let finalOptions = options;
+  if (visual) {
+    if (typeof finalOptions === 'object' && finalOptions !== null && !Array.isArray(finalOptions)) {
+      finalOptions = { ...finalOptions, visual };
+    } else if (Array.isArray(finalOptions)) {
+      finalOptions = { items: finalOptions, visual };
+    } else if (!finalOptions) {
+      finalOptions = { visual };
+    }
+  }
 
   try {
     const result = await pool.query(
@@ -78,7 +100,7 @@ const updateQuestion = async (req, res) => {
        SET type=$1, text=$2, options=$3, answer=$4, difficulty=$5, points=$6, explanation=$7, updated_at=NOW()
        WHERE id=$8 AND user_id=$9
        RETURNING *`,
-      [type, text, options ? JSON.stringify(options) : null, answerVal, difficulty, points, explanation || null, req.params.id, req.user.id]
+      [type, text, finalOptions ? JSON.stringify(finalOptions) : null, answerVal, difficulty, points, explanation || null, req.params.id, req.user.id]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ message: 'Question not found' });
