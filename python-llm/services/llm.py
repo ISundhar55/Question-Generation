@@ -770,7 +770,9 @@ def normalize_question(q: dict, allow_visuals: bool = True) -> dict:
         ans = q.get("answer")
         if isinstance(ans, str):
             ans_clean = re.sub(r"[\s,;\|]+", "|", ans).strip("|").upper()
-            letters = sorted(list(set(ans_clean.split("|"))))
+            opts = q.get("options", {})
+            valid_keys = {k.upper() for k in opts.keys() if k != "visual" and len(k) <= 3} if isinstance(opts, dict) and opts else None
+            letters = sorted(list(set([l for l in ans_clean.split("|") if (valid_keys and l in valid_keys) or (not valid_keys and len(l) == 1 and l.isalpha())])))
             q["answer"] = "|".join(letters)
             
     # 3. Normalize answer representation for SINGLE_SELECT

@@ -29,7 +29,7 @@ IMPORTANT for SINGLE_SELECT:
   "difficulty": "<difficulty>",
   "contentArea": "<content_area>",
   "grade": "<grade>",
-  "text": "<question text, e.g. 'Which TWO of the following...' or 'Select the THREE statements that...'>",
+  "text": "<question text>",
   "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>", "E": "<option E>"},
   "answer": "<pipe-separated list of EXACTLY 2 or 3 correct letters, e.g. A|C or B|D|E>",
   "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D, E...)",
@@ -40,7 +40,11 @@ IMPORTANT for MULTIPLE_SELECT:
 - STRICT CORRECT ANSWER COUNT (EXACTLY 2 OR 3): The answer field MUST contain EXACTLY 2 OR 3 correct letters (e.g., 'A|C' or 'B|D|E').
   * STRICTLY FORBIDDEN: Having 4 correct answers out of 5 is INVALID (because it leaves only 1 distractor).
   * STRICTLY FORBIDDEN: Having 1 correct answer is INVALID.
-- MANDATORY DISTRACTORS: Ensure there are ALWAYS 2 or 3 plausible incorrect distractors (e.g., 2 correct + 3 distractors, or 3 correct + 2 distractors).
+- STEM-ANSWER COUNT AGREEMENT: The number specified in the question text MUST EXACTLY MATCH the number of correct options in the 'answer' field.
+  * If the question asks for TWO (e.g. 'Which TWO...', 'Select TWO...'), there MUST be EXACTLY 2 correct answers (e.g. 'A|C') and 3 incorrect distractors.
+  * If the question asks for THREE (e.g. 'Which THREE...', 'Select THREE...'), there MUST be EXACTLY 3 correct answers (e.g. 'B|D|E') and 2 incorrect distractors.
+  * NEVER ask for 'TWO' when 3 options are correct, and NEVER ask for 'THREE' when 2 options are correct.
+- MANDATORY DISTRACTORS: Ensure there are ALWAYS 2 or 3 plausible incorrect distractors (e.g., 2 correct + 3 distractors, or 3 correct + 2 distractors). Distractors must be UNAMBIGUOUSLY FALSE and factually flawed; they must NEVER accidentally be true or justifiable facts, as this ruins question quality.
 - The answer field must list all correct letters in alphabetical order, joined with | (pipe), e.g. "A|C" or "B|D|E".
 - MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options' (A, B, C, D, E), explaining why each correct choice is right and why each distractor is wrong.""",
 

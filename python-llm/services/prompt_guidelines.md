@@ -8,17 +8,16 @@ QUALITY STANDARDS — apply to every question in this batch:
    - CONSTRUCTED_RESPONSE/DROPDOWN: use EXACTLY three underscores (___) per blank — never ____ or _____.
 
 2. DISTRACTORS (MCQ/SINGLE_SELECT/MULTIPLE_SELECT)
-   - Plausible to a student with partial knowledge — never obviously absurd.
-   - Same semantic category as the correct answer (process vs. process, name vs. name, etc.).
-   - Sourced from related-but-wrong syllabus concepts, common misconceptions, or partial knowledge.
+   - MUST BE DEFINITIVELY AND UNAMBIGUOUSLY INCORRECT: Every distractor must be clearly false or factually flawed per the syllabus. A distractor must NEVER accidentally be true, partially true, or justifiable as a valid answer. Accidental correct options ruin question validity.
+   - Sourced from related-but-wrong syllabus concepts, common misconceptions, or inverted logic.
    - Structurally parallel: same grammatical form and similar length as the correct answer.
-   - Each distractor must be wrong for a different reason. No "I and II only" constructs.
-   - MULTIPLE_SELECT: MUST provide exactly 5 options (A, B, C, D, E). The question MUST have EXACTLY 2 or 3 correct answers (e.g., 'A|C' or 'B|D|E'), leaving at least 2 or 3 plausible distractors. STRICTLY PROHIBIT 4 correct answers out of 5 (only 1 distractor is invalid assessment design).
+   - Each distractor must be clearly wrong for a specific, identifiable reason. No "I and II only" constructs.
+   - MULTIPLE_SELECT: When asking for TWO correct statements, the remaining 3 options MUST be clearly FALSE statements (never true facts that just weren't selected). When asking for THREE, the remaining 2 options MUST be clearly FALSE statements. MUST have exactly 5 options (A, B, C, D, E) and EXACTLY 2 or 3 correct answers. The count in the stem ('Which TWO...', 'Select THREE...') MUST EXACTLY MATCH the number of correct options in 'answer'.
 
 3. CORRECT ANSWER
    - Must be explicitly supported by the provided syllabus excerpts — not general knowledge.
    - SINGLE_SELECT: exactly one correct option; others definitively incorrect per the text (4 options: A, B, C, D).
-   - MULTIPLE_SELECT: MUST have 5 options (A, B, C, D, E) and EXACTLY 2 or 3 correct answers (e.g. "A|C" or "B|D|E"). Items with only 1 correct answer or with 4 correct answers out of 5 are structurally invalid and will be rejected. Every correct letter must be independently verifiable from the text.
+   - MULTIPLE_SELECT: MUST have 5 options (A, B, C, D, E) and EXACTLY 2 or 3 correct answers (e.g. "A|C" or "B|D|E"). Items with only 1 correct answer or with 4 correct answers out of 5 are structurally invalid and will be rejected. Every correct letter must be independently verifiable from the text. The question stem count MUST match the correct answer count.
    - ORDERING: sequence explicitly stated or unambiguously implied by the text.
 
 4. RATIONALE & EXPLANATION (MANDATORY PER-ITEM BREAKDOWN)
