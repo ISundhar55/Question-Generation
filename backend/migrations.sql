@@ -90,3 +90,17 @@ EXCEPTION WHEN OTHERS THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE questions ADD COLUMN IF NOT EXISTS explanation TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+-- ============================================
+-- Patch: Add status column to questions table
+-- Values: 'draft', 'ready_for_review', 'approved', 'rejected'
+-- Default: 'ready_for_review'
+-- ============================================
+DO $$ BEGIN
+  ALTER TABLE questions ADD COLUMN IF NOT EXISTS status VARCHAR(30) DEFAULT 'ready_for_review';
+  ALTER TABLE questions DROP CONSTRAINT IF EXISTS questions_status_check;
+  ALTER TABLE questions
+    ADD CONSTRAINT questions_status_check
+    CHECK (status IN ('draft', 'ready_for_review', 'approved', 'rejected'));
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+

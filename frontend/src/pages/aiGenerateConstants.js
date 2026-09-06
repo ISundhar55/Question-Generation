@@ -39,21 +39,21 @@ export const DIFFICULTIES = [
 ];
 
 export const TYPE_META = {
-  SINGLE_SELECT: { color: '#4f6ef7', bg: '#eef1fe' },
-  MULTIPLE_SELECT: { color: '#3b82f6', bg: '#dbeafe' },
-  MCQ: { color: '#4f6ef7', bg: '#eef1fe' },
-  TRUE_FALSE: { color: '#22c55e', bg: '#f0fdf4' },
-  SHORT_ANSWER: { color: '#f59e0b', bg: '#fffbeb' },
-  FILL_IN_BLANK: { color: '#a855f7', bg: '#faf5ff' },   // legacy display
-  CONSTRUCTED_RESPONSE: { color: '#7c3aed', bg: '#f5f3ff' },
-  DROPDOWN: { color: '#0e7490', bg: '#ecfeff' },
-  MATCHING_LINES: { color: '#0891b2', bg: '#ecfeff' },
-  ORDERING: { color: '#db2777', bg: '#fdf2f8' },
-  GAP_MATCH: { color: '#2563eb', bg: '#eff6ff' },
-  MULTIPLE_DROP_BUCKET: { color: '#0284c7', bg: '#f0f9ff' },
-  MATRIX_INTERACTION: { color: '#16a34a', bg: '#f0fdf4' },
-  SELECT_TEXT: { color: '#7c3aed', bg: '#f5f3ff' },
-  BACKGROUND_GRAPHIC: { color: '#059669', bg: '#ecfdf5' },
+  SINGLE_SELECT: { label: 'Multiple Choice (Single)', shortLabel: 'MCQ (Single)', color: '#4f6ef7', bg: '#eef1fe' },
+  MULTIPLE_SELECT: { label: 'Multiple Choice (Multi)', shortLabel: 'MCQ (Multi)', color: '#3b82f6', bg: '#dbeafe' },
+  MCQ: { label: 'MCQ', shortLabel: 'MCQ', color: '#4f6ef7', bg: '#eef1fe' },
+  TRUE_FALSE: { label: 'True / False', shortLabel: 'True / False', color: '#22c55e', bg: '#f0fdf4' },
+  SHORT_ANSWER: { label: 'Short Answer', shortLabel: 'Short Answer', color: '#f59e0b', bg: '#fffbeb' },
+  FILL_IN_BLANK: { label: 'Fill in Blank', shortLabel: 'Fill Blank', color: '#a855f7', bg: '#faf5ff' },   // legacy display
+  CONSTRUCTED_RESPONSE: { label: 'Constructed Response', shortLabel: 'Constructed', color: '#7c3aed', bg: '#f5f3ff' },
+  DROPDOWN: { label: 'Dropdown', shortLabel: 'Dropdown', color: '#0e7490', bg: '#ecfeff' },
+  MATCHING_LINES: { label: 'Matching Lines', shortLabel: 'Matching', color: '#0891b2', bg: '#ecfeff' },
+  ORDERING: { label: 'Ordering', shortLabel: 'Ordering', color: '#db2777', bg: '#fdf2f8' },
+  GAP_MATCH: { label: 'Gap Match', shortLabel: 'Gap Match', color: '#2563eb', bg: '#eff6ff' },
+  MULTIPLE_DROP_BUCKET: { label: 'Multiple Drop Bucket', shortLabel: 'Drop Bucket', color: '#0284c7', bg: '#f0f9ff' },
+  MATRIX_INTERACTION: { label: 'Matrix Interaction', shortLabel: 'Matrix', color: '#16a34a', bg: '#f0fdf4' },
+  SELECT_TEXT: { label: 'Select Text', shortLabel: 'Select Text', color: '#7c3aed', bg: '#f5f3ff' },
+  BACKGROUND_GRAPHIC: { label: 'Background Graphic', shortLabel: 'Graphic', color: '#059669', bg: '#ecfdf5' },
 };
 
 /**

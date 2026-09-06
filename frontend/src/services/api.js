@@ -33,10 +33,12 @@ export const authAPI = {
 };
 
 export const questionsAPI = {
-  getAll: () => api.get('/questions'),
+  getAll: (params) => api.get('/questions', { params }),
   getById: (id) => api.get(`/questions/${id}`),
   create: (data) => api.post('/questions', data),
+  bulkCreate: (questions) => api.post('/questions/bulk', { questions }),
   update: (id, data) => api.put(`/questions/${id}`, data),
+  updateStatus: (id, status) => api.patch(`/questions/${id}/status`, { status }),
   delete: (id) => api.delete(`/questions/${id}`),
 };
 

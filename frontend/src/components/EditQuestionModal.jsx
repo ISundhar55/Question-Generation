@@ -8,7 +8,7 @@ import { questionsAPI } from '../services/api';
  * Standalone modal dialog that hosts QuestionCreator and encapsulates
  * the full save/update API lifecycle for editing AI-generated questions.
  */
-export default function EditQuestionModal({ question, idx, onSaveSuccess, onClose }) {
+export default function EditQuestionModal({ question, idx, onSaveSuccess, onClose, onRejectSuccess }) {
   if (!question) return null;
 
   // Prepare initialData for QuestionCreator with accurate points calculation
@@ -19,9 +19,10 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
     visual: question.visual || (typeof question.options === 'object' && question.options !== null ? question.options.visual : null) || null,
   };
 
-  const handleSaveEditedQuestion = async (payload) => {
+  const handleSaveEditedQuestion = async (payload, targetStatus = null) => {
     let savedId = question.id;
     const computedPoints = payload.points || question.points || (payload.difficulty === 'hard' ? 3 : payload.difficulty === 'medium' ? 2 : 1);
+    const newStatus = targetStatus || question.status || 'draft';
 
     const apiPayload = {
       type: payload.type || question.questionType || question.type,
@@ -31,6 +32,7 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
       difficulty: payload.difficulty || question.difficulty || 'medium',
       points: computedPoints,
       explanation: payload.explanation || question.explanation || null,
+      status: newStatus,
     };
 
     try {
@@ -49,6 +51,7 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
         ...question,
         ...apiPayload,
         id: savedId,
+        status: newStatus,
         questionType: apiPayload.type,
         // Preserve AI grounding, sources, and visual diagram metadata
         explanation: payload.explanation || question.explanation,
@@ -73,6 +76,7 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
       const fallbackQuestion = {
         ...question,
         ...apiPayload,
+        status: newStatus,
         questionType: apiPayload.type,
         explanation: payload.explanation || question.explanation,
       };
@@ -83,6 +87,29 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
         onClose();
       }
       alert(err.response?.data?.message || 'Failed to save changes to server. Please check your connection.');
+    }
+  };
+
+  const handleRejectQuestion = async () => {
+    const savedId = question.id;
+    try {
+      if (savedId) {
+        await questionsAPI.updateStatus(savedId, 'rejected');
+      }
+      const rejectedQ = { ...question, status: 'rejected' };
+      if (onRejectSuccess) {
+        onRejectSuccess(rejectedQ, idx);
+      } else if (onSaveSuccess) {
+        onSaveSuccess(rejectedQ, idx);
+      }
+      if (onClose) {
+        onClose();
+      }
+    } catch (err) {
+      console.error('Reject question error:', err);
+      const rejectedQ = { ...question, status: 'rejected' };
+      if (onSaveSuccess) onSaveSuccess(rejectedQ, idx);
+      if (onClose) onClose();
     }
   };
 
@@ -137,7 +164,7 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
                 Edit Question Q{idx + 1}
               </div>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted, #64748b)', marginTop: 1 }}>
-                Type: <strong>{initialData.type?.replace(/_/g, ' ')}</strong>
+                Type: <strong>{initialData.type?.replace(/_/g, ' ')}</strong> | Current Status: <strong>{question.status || 'draft'}</strong>
               </div>
             </div>
           </div>
@@ -188,7 +215,9 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
         >
           <QuestionCreator
             initialData={initialData}
-            onSave={handleSaveEditedQuestion}
+            onSave={(payload) => handleSaveEditedQuestion(payload, question.status || 'draft')}
+            onSaveAndAccept={(payload) => handleSaveEditedQuestion(payload, 'ready_for_review')}
+            onReject={handleRejectQuestion}
             onClose={onClose}
             hideHeader={true}
             hideTypeSelect={true}

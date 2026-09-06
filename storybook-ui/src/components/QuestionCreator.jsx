@@ -33,6 +33,8 @@ const DEFAULT_MCQ_OPTIONS = ['', '', '', ''];
 export function QuestionCreator({
   initialData = {},
   onSave,
+  onSaveAndAccept,
+  onReject,
   onCancel,
   onClose,
   onPreview,
@@ -864,15 +866,23 @@ export function QuestionCreator({
     return payload;
   };
 
-  const handleSave = async () => {
+  const handleCustomSave = async (actionType) => {
     const e = validate();
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setSaving(true);
     try {
-      await onSave(buildPayload());
+      if (actionType === 'accept' && onSaveAndAccept) {
+        await onSaveAndAccept(buildPayload());
+      } else if (onSave) {
+        await onSave(buildPayload());
+      }
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    await handleCustomSave('save');
   };
 
   const handlePreview = () => {
@@ -1206,7 +1216,27 @@ export function QuestionCreator({
 
       {/* Action Buttons */}
       {type && (
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center', marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
+          {onReject && (
+            <button
+              type="button"
+              className="qc-btn"
+              onClick={onReject}
+              style={{
+                background: '#fef2f2',
+                color: '#dc2626',
+                border: '1px solid #fca5a5',
+                fontWeight: 600,
+                cursor: 'pointer',
+                marginRight: 'auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <strong style={{ fontWeight: 900, fontSize: 13 }}>✕</strong> Reject Question
+            </button>
+          )}
           {onClose && (
             <button className="qc-btn qc-btn-ghost" onClick={onClose}>
               Cancel
@@ -1217,9 +1247,39 @@ export function QuestionCreator({
               👁 Preview
             </button>
           )}
-          <button className="qc-btn qc-btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : '💾 Save Question'}
-          </button>
+          {onSaveAndAccept ? (
+            <>
+              <button
+                type="button"
+                className="qc-btn qc-btn-ghost"
+                onClick={() => handleCustomSave('save')}
+                disabled={saving}
+                style={{ border: '1px solid var(--color-border)' }}
+              >
+                {saving ? 'Saving...' : '💾 Save Changes'}
+              </button>
+              <button
+                type="button"
+                className="qc-btn"
+                onClick={() => handleCustomSave('accept')}
+                disabled={saving}
+                style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
+                }}
+              >
+                {saving ? 'Saving...' : '✓ Save & Accept'}
+              </button>
+            </>
+          ) : (
+            <button className="qc-btn qc-btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : '💾 Save Question'}
+            </button>
+          )}
         </div>
       )}
     </div>

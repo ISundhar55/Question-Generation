@@ -109,7 +109,6 @@ export default function AIGeneratePage() {
       next[idx] = updatedQuestion;
       return next;
     });
-    setSavedIds(prev => new Set([...prev, idx]));
   };
 
   // Regenerate modal state
@@ -136,6 +135,52 @@ export default function AIGeneratePage() {
   // Stats from last generation
   const [genMeta, setGenMeta] = useState(null);
 
+  const resolveExplanation = (q) => {
+    if (q.explanation && typeof q.explanation === 'string' && q.explanation.trim()) return q.explanation.trim();
+    if (q.rationale && typeof q.rationale === 'string' && q.rationale.trim()) return q.rationale.trim();
+    if (q.options?.explanation && typeof q.options.explanation === 'string' && q.options.explanation.trim()) return q.options.explanation.trim();
+    if (q.options?.rationale && typeof q.options.rationale === 'string' && q.options.rationale.trim()) return q.options.rationale.trim();
+
+    // If options.rationales array/dict exists, compile bullets
+    if (Array.isArray(q.options?.rationales) && q.options.rationales.length > 0) {
+      const bullets = q.options.rationales
+        .map((r, i) => (typeof r === 'string' && r.trim()) ? `• Option ${String.fromCharCode(65 + i)}: ${r.trim()}` : null)
+        .filter(Boolean);
+      if (bullets.length > 0) return bullets.join('\n');
+    } else if (q.options?.rationales && typeof q.options.rationales === 'object') {
+      const bullets = Object.entries(q.options.rationales)
+        .map(([k, r]) => (typeof r === 'string' && r.trim()) ? `• ${k}: ${r.trim()}` : null)
+        .filter(Boolean);
+      if (bullets.length > 0) return bullets.join('\n');
+    }
+    return null;
+  };
+
+  const buildSavePayload = (q, targetStatus = 'draft') => {
+    let payloadOptions = q.options;
+    const visualSvg = q.visual || (typeof q.options === 'object' && q.options !== null ? q.options.visual : null);
+    if (visualSvg) {
+      if (typeof payloadOptions === 'object' && payloadOptions !== null && !Array.isArray(payloadOptions)) {
+        payloadOptions = { ...payloadOptions, visual: visualSvg };
+      } else if (Array.isArray(payloadOptions)) {
+        payloadOptions = { items: payloadOptions, visual: visualSvg };
+      } else if (!payloadOptions) {
+        payloadOptions = { visual: visualSvg };
+      }
+    }
+    return {
+      type: q.questionType || q.type,
+      text: q.text,
+      options: payloadOptions || null,
+      visual: visualSvg || undefined,
+      answer: q.answer,
+      difficulty: q.difficulty || difficulty,
+      points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
+      explanation: resolveExplanation(q),
+      status: targetStatus,
+    };
+  };
+
   const handleGenerate = async () => {
     const activeTypes = Object.entries(typeCounts).filter(([_, count]) => count > 0);
     if (activeTypes.length === 0 || totalCount > 50) return;
@@ -143,7 +188,6 @@ export default function AIGeneratePage() {
     setGenerating(true);
     setError(null);
     setQuestions([]);
-    setSavedIds(new Set());
     setGenMeta(null);
 
     // Combine structured assessment fields into priority instructions for the LLM
@@ -199,9 +243,27 @@ export default function AIGeneratePage() {
           ...q,
           points: q.points || computeDefaultPoints(q.difficulty || difficulty),
           _internetSource: true,
+          status: 'draft',
         }))
       );
-      setQuestions(allQuestions);
+
+      // Auto-save all generated questions as draft to DB immediately
+      let finalQuestionsWithIds = allQuestions;
+      try {
+        const payloads = allQuestions.map(q => buildSavePayload(q, 'draft'));
+        const savedRes = await questionsAPI.bulkCreate(payloads);
+        if (Array.isArray(savedRes.data) && savedRes.data.length === allQuestions.length) {
+          finalQuestionsWithIds = allQuestions.map((q, i) => ({
+            ...q,
+            id: savedRes.data[i]?.id || q.id,
+            status: savedRes.data[i]?.status || 'draft',
+          }));
+        }
+      } catch (saveErr) {
+        console.warn('Auto-save questions as draft failed on initial generation:', saveErr);
+      }
+
+      setQuestions(finalQuestionsWithIds);
       setGenMeta({
         retrieved_chunk_count: 0,
         doc_ids_used: [],
@@ -215,89 +277,88 @@ export default function AIGeneratePage() {
     }
   };
 
-  const resolveExplanation = (q) => {
-    if (q.explanation && typeof q.explanation === 'string' && q.explanation.trim()) return q.explanation.trim();
-    if (q.rationale && typeof q.rationale === 'string' && q.rationale.trim()) return q.rationale.trim();
-    if (q.options?.explanation && typeof q.options.explanation === 'string' && q.options.explanation.trim()) return q.options.explanation.trim();
-    if (q.options?.rationale && typeof q.options.rationale === 'string' && q.options.rationale.trim()) return q.options.rationale.trim();
-
-    // If options.rationales array/dict exists, compile bullets
-    if (Array.isArray(q.options?.rationales) && q.options.rationales.length > 0) {
-      const bullets = q.options.rationales
-        .map((r, i) => (typeof r === 'string' && r.trim()) ? `• Option ${String.fromCharCode(65 + i)}: ${r.trim()}` : null)
-        .filter(Boolean);
-      if (bullets.length > 0) return bullets.join('\n');
-    } else if (q.options?.rationales && typeof q.options.rationales === 'object') {
-      const bullets = Object.entries(q.options.rationales)
-        .map(([k, r]) => (typeof r === 'string' && r.trim()) ? `• ${k}: ${r.trim()}` : null)
-        .filter(Boolean);
-      if (bullets.length > 0) return bullets.join('\n');
-    }
-    return null;
-  };
-
-  const buildSavePayload = (q) => {
-    let payloadOptions = q.options;
-    const visualSvg = q.visual || (typeof q.options === 'object' && q.options !== null ? q.options.visual : null);
-    if (visualSvg) {
-      if (typeof payloadOptions === 'object' && payloadOptions !== null && !Array.isArray(payloadOptions)) {
-        payloadOptions = { ...payloadOptions, visual: visualSvg };
-      } else if (Array.isArray(payloadOptions)) {
-        payloadOptions = { items: payloadOptions, visual: visualSvg };
-      } else if (!payloadOptions) {
-        payloadOptions = { visual: visualSvg };
-      }
-    }
-    return {
-      type: q.questionType,
-      text: q.text,
-      options: payloadOptions || null,
-      visual: visualSvg || undefined,
-      answer: q.answer,
-      difficulty: q.difficulty,
-      points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
-      explanation: resolveExplanation(q),
-    };
-  };
-
-  const saveQuestion = async (q, idx) => {
-    setSavingId(idx);
+  const handleAccept = async (q, idx) => {
     try {
-      const res = await questionsAPI.create(buildSavePayload(q));
-      const savedId = res.data?.id;
+      if (q.id) {
+        await questionsAPI.updateStatus(q.id, 'ready_for_review');
+      } else {
+        const res = await questionsAPI.create(buildSavePayload(q, 'ready_for_review'));
+        if (res.data?.id) q = { ...q, id: res.data.id };
+      }
       setQuestions(prev => {
         const next = [...prev];
-        next[idx] = { ...next[idx], id: savedId };
+        next[idx] = { ...next[idx], id: q.id, status: 'ready_for_review' };
         return next;
       });
-      setSavedIds(prev => new Set([...prev, idx]));
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save question.');
-    } finally {
-      setSavingId(null);
+      console.error('Accept question error:', err);
+      alert(err.response?.data?.message || 'Failed to accept question.');
     }
   };
 
-  const saveAll = async () => {
-    setSavingAll(true);
-    const unsaved = questions.filter((q, i) => !savedIds.has(i));
-    for (let i = 0; i < unsaved.length; i++) {
-      const q = unsaved[i];
-      const idx = questions.indexOf(q);
-      try {
-        const res = await questionsAPI.create(buildSavePayload(q));
-        const savedId = res.data?.id;
-        setQuestions(prev => {
-          const next = [...prev];
-          next[idx] = { ...next[idx], id: savedId };
-          return next;
-        });
-        setSavedIds(prev => new Set([...prev, idx]));
-      } catch {
-        // Continue with remaining
+  const handleReject = async (q, idx) => {
+    try {
+      if (q.id) {
+        await questionsAPI.updateStatus(q.id, 'rejected');
+      } else {
+        const res = await questionsAPI.create(buildSavePayload(q, 'rejected'));
+        if (res.data?.id) q = { ...q, id: res.data.id };
       }
+      setQuestions(prev => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], id: q.id, status: 'rejected' };
+        return next;
+      });
+    } catch (err) {
+      console.error('Reject question error:', err);
+      alert(err.response?.data?.message || 'Failed to reject question.');
     }
-    setSavingAll(false);
+  };
+
+  const handleUndoReject = async (q, idx) => {
+    try {
+      if (q.id) {
+        await questionsAPI.updateStatus(q.id, 'draft');
+      }
+      setQuestions(prev => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], status: 'draft' };
+        return next;
+      });
+    } catch (err) {
+      console.error('Undo reject error:', err);
+      alert(err.response?.data?.message || 'Failed to undo rejection.');
+    }
+  };
+
+  const handleAcceptAll = async () => {
+    const unaccepted = questions.map((q, idx) => ({ q, idx })).filter(({ q }) => q.status !== 'ready_for_review');
+    for (const { q, idx } of unaccepted) {
+      try {
+        if (q.id) {
+          await questionsAPI.updateStatus(q.id, 'ready_for_review');
+        } else {
+          const res = await questionsAPI.create(buildSavePayload(q, 'ready_for_review'));
+          if (res.data?.id) q.id = res.data.id;
+        }
+      } catch (_) {}
+    }
+    setQuestions(prev => prev.map(q => ({ ...q, status: 'ready_for_review' })));
+  };
+
+  const handleRejectAll = async () => {
+    const unrejected = questions.map((q, idx) => ({ q, idx })).filter(({ q }) => q.status !== 'rejected');
+    for (const { q, idx } of unrejected) {
+      try {
+        if (q.id) {
+          await questionsAPI.updateStatus(q.id, 'rejected');
+        } else {
+          const res = await questionsAPI.create(buildSavePayload(q, 'rejected'));
+          if (res.data?.id) q.id = res.data.id;
+        }
+      } catch (_) {}
+    }
+    setQuestions(prev => prev.map(q => ({ ...q, status: 'rejected' })));
   };
 
   const toggleSource = (idx) => {
@@ -351,18 +412,26 @@ export default function AIGeneratePage() {
       const newQuestion = {
         ...res.data.question,
         points: res.data.question.points || question.points || (question.difficulty === 'hard' ? 3 : question.difficulty === 'medium' ? 2 : 1),
-        _internetSource: question._internetSource
+        _internetSource: question._internetSource,
+        status: 'draft',
       };
+      // Auto-save the regenerated question to DB
+      try {
+        if (question.id) {
+          await questionsAPI.update(question.id, buildSavePayload(newQuestion, 'draft'));
+          newQuestion.id = question.id;
+        } else {
+          const saveRes = await questionsAPI.create(buildSavePayload(newQuestion, 'draft'));
+          if (saveRes.data?.id) newQuestion.id = saveRes.data.id;
+        }
+      } catch (saveErr) {
+        console.warn('Auto-saving regenerated question failed:', saveErr);
+      }
+
       setQuestions(prev => {
         const updated = [...prev];
         updated[idx] = newQuestion;
         return updated;
-      });
-      // Reset saved status for this index — it's a new question
-      setSavedIds(prev => {
-        const next = new Set(prev);
-        next.delete(idx);
-        return next;
       });
       closeRegenModal();
     } catch (err) {
@@ -427,12 +496,12 @@ export default function AIGeneratePage() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '390px minmax(0, 1fr)', gap: 24, alignItems: 'start', width: '100%' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '350px minmax(0, 1fr)', gap: 14, alignItems: 'start', width: '100%' }}>
 
         {/* ─── Left Panel: Form ─── */}
         <div style={{
           background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-          borderRadius: 12, padding: 24, boxShadow: 'var(--shadow)', position: 'sticky', top: 24,
+          borderRadius: 12, padding: '20px 18px', boxShadow: 'var(--shadow)', position: 'sticky', top: 24,
           maxHeight: 'calc(100vh - 100px)', overflowY: 'auto',
         }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 20, color: 'var(--color-text)' }}>
@@ -824,24 +893,40 @@ export default function AIGeneratePage() {
                   {collapsedIds.size === questions.length ? '🔽 Expand All' : '🔼 Minimize All'}
                 </button>
                 <button
-                  id="save-all-btn"
-                  className="btn-save-all"
-                  onClick={saveAll}
-                  disabled={savingAll || savedIds.size === questions.length}
+                  id="reject-all-btn"
+                  onClick={handleRejectAll}
                   style={{
-                    padding: '9px 20px',
-                    background: savedIds.size === questions.length ? '#f0fdf4' : 'var(--color-primary)',
-                    border: 'none',
+                    padding: '9px 18px',
+                    background: '#fef2f2',
+                    border: '1px solid #fca5a5',
                     borderRadius: 8,
-                    color: savedIds.size === questions.length ? 'var(--color-success)' : '#fff',
+                    color: '#dc2626',
                     fontSize: 13,
                     fontWeight: 600,
-                    cursor: savingAll || savedIds.size === questions.length ? 'default' : 'pointer',
-                    boxShadow: savedIds.size === questions.length ? 'none' : '0 4px 12px rgba(79,110,247,0.25)',
+                    cursor: 'pointer',
                     transition: 'all 0.15s',
                   }}
                 >
-                  {savingAll ? '💾 Saving...' : savedIds.size === questions.length ? '✅ All Saved' : '💾 Save All to Bank'}
+                  <strong style={{ fontWeight: 900, fontFamily: 'system-ui, sans-serif', marginRight: 4 }}>✕</strong> Reject All
+                </button>
+                <button
+                  id="accept-all-btn"
+                  className="btn-save-all"
+                  onClick={handleAcceptAll}
+                  style={{
+                    padding: '9px 20px',
+                    background: '#16a34a',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  ✓ Accept All
                 </button>
               </div>
             </div>
@@ -860,7 +945,7 @@ export default function AIGeneratePage() {
                 Generating questions...
               </div>
               <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>
-                AI is creating {totalCount} questions across selected types for {grade} {contentArea}
+                Synthesizing high-quality questions using curriculum grounding...
               </div>
             </div>
           )}
@@ -879,37 +964,31 @@ export default function AIGeneratePage() {
             </div>
           )}
 
-          {/* Scrollable Questions Container */}
-          {questions.length > 0 && (
-            <div style={{
-              maxHeight: 'calc(100vh - 160px)',
-              overflowY: 'auto',
-              paddingRight: 12,
-              paddingTop: 6,
-              paddingBottom: 20,
-              marginTop: 10
-            }}>
+          {/* Render question cards */}
+          {!generating && questions.length > 0 && (
+            <div>
               {questions.map((q, idx) => {
-                const isSaved = savedIds.has(idx);
-                const isSaving = savingId === idx;
+                const isAccepted = q.status === 'ready_for_review';
+                const isRejected = q.status === 'rejected';
                 const isCollapsed = collapsedIds.has(idx);
                 const qType = TYPE_META[q.questionType] || TYPE_META.MCQ;
                 const qDiff = DIFFICULTIES.find(d => d.value === q.difficulty) || DIFFICULTIES[1];
                 const src = showSource[idx];
 
                 return (
-                  <div
+                    <div
                     key={idx}
                     style={{
-                      background: 'var(--color-surface)',
-                      border: `1.5px solid ${isSaved
-                        ? '#bbf7d0'
-                        : q.grounded === false
+                      background: isRejected ? '#fafafa' : 'var(--color-surface)',
+                      opacity: isRejected ? 0.8 : 1,
+                      border: `1.5px solid ${isAccepted
+                        ? '#86efac'
+                        : isRejected
                           ? '#fca5a5'
                           : 'var(--color-border)'
                         }`,
                       borderRadius: 12,
-                      padding: isCollapsed ? '14px 20px' : 20,
+                      padding: isCollapsed ? '12px 16px' : '16px 18px',
                       marginBottom: 16,
                       boxShadow: 'var(--shadow)',
                       boxSizing: 'border-box',
@@ -917,15 +996,42 @@ export default function AIGeneratePage() {
                     }}
                   >
                     {/* Card Header */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#0c0101ff', flexShrink: 0 }}>Q{idx + 1}</span>
-                        <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: qType.bg, color: qType.color, flexShrink: 0 }}>
-                          {q.questionType?.replace('_', ' ')}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      width: '100%',
+                      minWidth: 0,
+                      flexWrap: 'nowrap',
+                      boxSizing: 'border-box',
+                      marginBottom: isCollapsed ? 0 : 14,
+                      paddingBottom: isCollapsed ? 0 : 12,
+                      borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'nowrap', minWidth: 0, flexShrink: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text, #0f172a)', flexShrink: 0 }}>Q{idx + 1}</span>
+                        <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 600, background: qType.bg, color: qType.color, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          {q.questionType?.replace(/_/g, ' ')}
                         </span>
-                        <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize', flexShrink: 0 }}>
+                        <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize', flexShrink: 0, whiteSpace: 'nowrap' }}>
                           {q.difficulty}
                         </span>
+
+                        {/* Status Badge */}
+                        {isAccepted ? (
+                          <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 700, background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            ✓ Ready for Review
+                          </span>
+                        ) : isRejected ? (
+                          <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 700, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            <strong style={{ fontWeight: 900, fontFamily: 'system-ui, sans-serif', marginRight: 4 }}>✕</strong> Rejected
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 700, background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            📝 Draft
+                          </span>
+                        )}
 
                         {/* Grounding Status badge — only for syllabus-sourced questions */}
                         {!q._internetSource && (() => {
@@ -942,8 +1048,8 @@ export default function AIGeneratePage() {
                           }
                           return (
                             <span style={{
-                              display: 'inline-flex', padding: '3px 10px', borderRadius: 5,
-                              fontSize: 11, fontWeight: 700, flexShrink: 0,
+                              display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5,
+                              fontSize: 11.5, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
                               background: bg, color, border: `1px solid ${border}`,
                             }}>
                               {label}
@@ -952,7 +1058,7 @@ export default function AIGeneratePage() {
                         })()}
                       </div>
 
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexShrink: 0, marginLeft: 'auto', flexWrap: 'nowrap' }}>
                         {/* Source toggle */}
                         {(q.sources?.length > 0 || q.sourceChunkIds?.length > 0) && (
                           <button
@@ -960,7 +1066,7 @@ export default function AIGeneratePage() {
                             onClick={() => toggleSource(idx)}
                             title="Show source references for this question"
                             style={{
-                              padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                              padding: '6px 12px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
                               border: '1px solid var(--color-border)', background: src ? 'var(--color-primary-light)' : 'transparent',
                               color: src ? 'var(--color-primary)' : 'var(--color-text-muted)', cursor: 'pointer',
                               transition: 'all 0.15s',
@@ -975,25 +1081,12 @@ export default function AIGeneratePage() {
                           onClick={() => openEditModal(idx, q)}
                           title="Edit this question stem, choices, or rationale"
                           style={{
-                            padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
                             border: '1px solid #fed7aa', background: '#fff7ed', color: '#c2410c',
                             cursor: 'pointer', transition: 'all 0.12s',
                           }}
                         >
                           ✏️ Edit
-                        </button>
-                        {/* Feedback button */}
-                        <button
-                          id={`feedback-q-${idx}`}
-                          onClick={() => openFeedbackModal(q)}
-                          title="Submit feedback to improve future question generation"
-                          style={{
-                            padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            border: '1px solid #e0f2fe', background: '#f0f9ff', color: '#0369a1',
-                            cursor: 'pointer', transition: 'all 0.12s',
-                          }}
-                        >
-                          💬 Feedback
                         </button>
                         {/* Regenerate button */}
                         <button
@@ -1002,7 +1095,7 @@ export default function AIGeneratePage() {
                           onClick={() => openRegenModal(idx, q)}
                           title="Regenerate this question with modifications"
                           style={{
-                            padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
                             border: '1px solid #e0d7ff',
                             background: '#f5f3ff',
                             color: '#7c3aed',
@@ -1011,22 +1104,77 @@ export default function AIGeneratePage() {
                         >
                           🔄 Regenerate
                         </button>
-                        {/* Save button */}
-                        <button
-                          id={`save-q-${idx}`}
-                          className="btn-save-card"
-                          onClick={() => !isSaved && saveQuestion(q, idx)}
-                          disabled={isSaved || isSaving}
-                          style={{
-                            padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            border: isSaved ? '1px solid #bbf7d0' : '1px solid #ccd6ff',
-                            background: isSaved ? '#f0fdf4' : 'var(--color-primary-light)',
-                            color: isSaved ? 'var(--color-success)' : 'var(--color-primary)',
-                            cursor: isSaved ? 'default' : 'pointer', transition: 'all 0.12s',
-                          }}
-                        >
-                          {isSaving ? '💾 Saving...' : isSaved ? '✅ Saved' : '💾 Save'}
-                        </button>
+
+                        {/* Accept / Reject Action Buttons */}
+                        {isRejected ? (
+                          <>
+                            <button
+                              id={`undo-reject-q-${idx}`}
+                              onClick={() => handleUndoReject(q, idx)}
+                              title="Undo rejection"
+                              style={{
+                                padding: '6px 12px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                                border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569',
+                                cursor: 'pointer', transition: 'all 0.12s',
+                              }}
+                            >
+                              ↩ Undo
+                            </button>
+                            <button
+                              id={`accept-q-${idx}`}
+                              onClick={() => handleAccept(q, idx)}
+                              title="Accept and move to Ready for Review"
+                              style={{
+                                padding: '6px 15px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                                border: 'none', background: '#16a34a', color: '#fff',
+                                cursor: 'pointer', transition: 'all 0.12s',
+                              }}
+                            >
+                              ✓ Accept
+                            </button>
+                          </>
+                        ) : isAccepted ? (
+                          <button
+                            id={`reject-q-${idx}`}
+                            onClick={() => handleReject(q, idx)}
+                            title="Reject this question"
+                            style={{
+                              padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                              border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626',
+                              cursor: 'pointer', transition: 'all 0.12s',
+                            }}
+                          >
+                            <strong style={{ fontWeight: 900, fontFamily: 'system-ui, sans-serif', marginRight: 4 }}>✕</strong> Reject
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              id={`reject-q-${idx}`}
+                              onClick={() => handleReject(q, idx)}
+                              title="Reject this question"
+                              style={{
+                                padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                                border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626',
+                                cursor: 'pointer', transition: 'all 0.12s',
+                              }}
+                            >
+                              <strong style={{ fontWeight: 900, fontFamily: 'system-ui, sans-serif', marginRight: 4 }}>✕</strong> Reject
+                            </button>
+                            <button
+                              id={`accept-q-${idx}`}
+                              onClick={() => handleAccept(q, idx)}
+                              title="Accept and move to Ready for Review"
+                              style={{
+                                padding: '6px 15px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                                border: 'none', background: '#16a34a', color: '#fff',
+                                cursor: 'pointer', transition: 'all 0.12s',
+                                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                              }}
+                            >
+                              ✓ Accept
+                            </button>
+                          </>
+                        )}
 
                         {/* Minimize / Expand Toggle (-) (+) Icon Button */}
                         <button

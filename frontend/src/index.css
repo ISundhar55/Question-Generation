@@ -46,22 +46,28 @@ a {
 button {
   font-family: var(--font);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s ease;
 }
 
-button:hover:not(:disabled) {
-  filter: brightness(0.92) contrast(1.05);
-  transform: translateY(-1px);
+button:hover:not(:disabled):not(.tab-btn) {
+  filter: brightness(0.95);
 }
 
-button:active:not(:disabled) {
-  filter: brightness(0.85);
-  transform: translateY(0);
+/* Tab button override: completely disable bouncing and background changes */
+.tab-btn,
+.tab-btn:hover,
+.tab-btn:active,
+.tab-btn:focus {
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 /* Primary Button Enhancements */
-button[style*="var(--color-primary)"]:hover:not(:disabled),
-button[style*="#4f6ef7"]:hover:not(:disabled) {
+button[style*="background: var(--color-primary)"]:hover:not(:disabled):not(.tab-btn),
+button[style*="background: 'var(--color-primary)'"]:hover:not(:disabled):not(.tab-btn),
+button[style*="background: #4f6ef7"]:hover:not(:disabled):not(.tab-btn) {
   filter: none;
   background: var(--color-primary-dark, #3a55d4) !important;
   box-shadow: 0 6px 18px rgba(79, 110, 247, 0.3) !important;
@@ -69,20 +75,19 @@ button[style*="#4f6ef7"]:hover:not(:disabled) {
 }
 
 /* Outline / Cancel Button Enhancements */
-button[style*="background: 'transparent'"]:hover:not(:disabled),
-button[style*="background: transparent"]:hover:not(:disabled),
-button[style*="border: '1"]:hover:not(:disabled),
-button[style*="border: 1"]:hover:not(:disabled) {
+button[style*="background: 'transparent'"]:hover:not(:disabled):not(.tab-btn),
+button[style*="background: transparent"]:hover:not(:disabled):not(.tab-btn),
+button[style*="border: '1"]:hover:not(:disabled):not(.tab-btn),
+button[style*="border: 1"]:hover:not(:disabled):not(.tab-btn) {
   filter: none;
   background: var(--color-border, #f1f5f9) !important;
   border-color: #94a3b8 !important;
   color: var(--color-text, #1e293b) !important;
-  transform: translateY(-1px);
 }
 
 /* Solid Danger Button Hover */
-button[style*="background: 'var(--color-danger)'"]:hover:not(:disabled),
-button[style*="background: var(--color-danger)"]:hover:not(:disabled) {
+button[style*="background: 'var(--color-danger)'"]:hover:not(:disabled):not(.tab-btn),
+button[style*="background: var(--color-danger)"]:hover:not(:disabled):not(.tab-btn) {
   filter: none;
   background: var(--color-danger-dark, #b91c1c) !important;
   color: #ffffff !important;
@@ -90,16 +95,15 @@ button[style*="background: var(--color-danger)"]:hover:not(:disabled) {
   box-shadow: 0 4px 12px rgba(185, 28, 28, 0.25) !important;
 }
 
-/* Transparent Trash/Delete Icon Hover (Keep icon/text red, apply soft pink/red background) */
-button[style*="color: 'var(--color-danger)'"]:hover:not(:disabled),
-button[style*="color: var(--color-danger)"]:hover:not(:disabled),
-button[title*="delete"]:hover:not(:disabled),
-button[title*="Delete"]:hover:not(:disabled) {
+/* Transparent Trash/Delete Icon Hover */
+button[style*="color: 'var(--color-danger)'"]:hover:not(:disabled):not(.tab-btn),
+button[style*="color: var(--color-danger)"]:hover:not(:disabled):not(.tab-btn),
+button[title*="delete"]:hover:not(:disabled):not(.tab-btn),
+button[title*="Delete"]:hover:not(:disabled):not(.tab-btn) {
   filter: none;
-  background: #fef2f2 !important; /* Soft light red fill */
-  color: var(--color-danger, #dc2626) !important; /* Keep original red text/icon */
-  border-color: #fca5a5 !important; /* Highlight border slightly */
-  transform: translateY(-1px);
+  background: #fef2f2 !important;
+  color: var(--color-danger, #dc2626) !important;
+  border-color: #fca5a5 !important;
 }
 
 

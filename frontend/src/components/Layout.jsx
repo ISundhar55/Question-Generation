@@ -20,11 +20,12 @@ export default function Layout({ children }) {
       {/* Sidebar */}
       <aside style={{
         width: 220, background: 'var(--color-sidebar)', display: 'flex',
-        flexDirection: 'column', padding: '28px 0', flexShrink: 0,
-        position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 10,
+        flexDirection: 'column', padding: '24px 0', flexShrink: 0,
+        position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 100,
+        boxShadow: 'var(--shadow-sm)',
       }}>
         {/* Brand */}
-        <div style={{ padding: '0 20px 28px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ padding: '0 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 36, height: 36, borderRadius: 10, background: 'var(--color-primary)',
@@ -45,18 +46,18 @@ export default function Layout({ children }) {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-                  borderRadius: 8, marginBottom: 4, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px',
+                  borderRadius: 8, marginBottom: 5, cursor: 'pointer',
                   background: active ? 'rgba(79,110,247,0.15)' : 'transparent',
                   color: active ? 'var(--color-primary)' : 'var(--color-sidebar-text)',
-                  fontWeight: active ? 600 : 400, fontSize: 14,
+                  fontWeight: active ? 600 : 500, fontSize: 15,
                   transition: 'all 0.12s',
                   borderLeft: active ? '3px solid var(--color-primary)' : '3px solid transparent',
                 }}
                 onMouseEnter={(e) => !active && (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
                 onMouseLeave={(e) => !active && (e.currentTarget.style.background = 'transparent')}
               >
-                <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{item.icon}</span>
+                <span style={{ fontSize: 18, width: 22, textAlign: 'center' }}>{item.icon}</span>
                 {item.label}
               </div>
             );
@@ -64,19 +65,19 @@ export default function Layout({ children }) {
         </nav>
 
         {/* User */}
-        <div style={{ padding: '20px 12px 0', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-          <div style={{ padding: '10px 12px', borderRadius: 8, marginBottom: 8 }}>
+        <div style={{ padding: '16px 12px 0', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ padding: '8px 12px', borderRadius: 8, marginBottom: 8 }}>
             <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.name}
             </div>
-            <div style={{ color: '#a9abafff', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ color: '#a9abaf', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.email}
             </div>
           </div>
           <button
             onClick={handleLogout}
             style={{
-              width: '100%', padding: '9px 12px', background: 'var(--color-primary)',
+              width: '100%', padding: '8px 12px', background: 'var(--color-primary)',
               border: '1.5px solid var(--color-primary)', borderRadius: 6,
               color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
               transition: 'all 0.12s',
@@ -98,7 +99,7 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main content */}
-      <main style={{ marginLeft: 220, flex: 1, padding: '20px 32px', minHeight: '100vh' }}>
+      <main style={{ marginLeft: 220, flex: 1, padding: '14px 10px', minHeight: '100vh', width: 'calc(100% - 220px)' }}>
         {children}
       </main>
     </div>

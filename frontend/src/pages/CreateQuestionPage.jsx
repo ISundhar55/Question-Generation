@@ -31,17 +31,24 @@ export default function CreateQuestionPage() {
       .finally(() => setLoadingEdit(false));
   }, [id, isEditing]);
 
-  const handleSave = async (payload) => {
+  const handleSave = async (payload, targetStatus = null) => {
     setErrorMsg('');
     try {
+      const finalStatus = targetStatus || payload.status || initialData?.status || 'ready_for_review';
+      const fullPayload = { ...payload, status: finalStatus };
+
       if (isEditing) {
-        await questionsAPI.update(id, payload);
-        setSuccessMsg('Question updated successfully!');
-        setInitialData(payload);
-        setPreviewData(payload);
+        const res = await questionsAPI.update(id, fullPayload);
+        const updatedQ = res.data || fullPayload;
+        setSuccessMsg(targetStatus === 'approved' ? 'Question approved and moved to Final Bank!' : 'Question updated successfully!');
+        setInitialData(updatedQ);
+        setPreviewData(updatedQ);
+        if (targetStatus === 'approved' || targetStatus === 'rejected') {
+          setTimeout(() => navigate('/dashboard'), 1000);
+        }
       } else {
-        const res = await questionsAPI.create(payload);
-        setSuccessMsg('Question saved successfully!');
+        const res = await questionsAPI.create(fullPayload);
+        setSuccessMsg('Question saved to Ready for Review!');
         const savedQ = res.data;
         setInitialData(savedQ);
         setPreviewData(savedQ);
@@ -51,6 +58,21 @@ export default function CreateQuestionPage() {
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'Failed to save question');
       throw err; // re-throw so QuestionCreator knows save failed
+    }
+  };
+
+  const handleApprove = async (payload) => {
+    await handleSave(payload, 'approved');
+  };
+
+  const handleReject = async () => {
+    if (!id) return;
+    try {
+      await questionsAPI.updateStatus(id, 'rejected');
+      setSuccessMsg('Question marked as rejected.');
+      setTimeout(() => navigate('/dashboard'), 1000);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'Failed to reject question');
     }
   };
 
@@ -100,6 +122,8 @@ export default function CreateQuestionPage() {
               key={initialData?.id || 'create'}
               initialData={initialData}
               onSave={handleSave}
+              onSaveAndAccept={isEditing && initialData?.status === 'ready_for_review' ? handleApprove : undefined}
+              onReject={isEditing ? handleReject : undefined}
               onClose={handleClose}
               onPreview={handlePreview}
             />

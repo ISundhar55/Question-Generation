@@ -64,9 +64,12 @@ const PAGE_SIZE = 10;
 export default function DashboardPage() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('ready_for_review'); // 'ready_for_review' | 'approved'
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [deleting, setDeleting] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
+  const [rejectingId, setRejectingId] = useState(null);
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
@@ -86,7 +89,6 @@ export default function DashboardPage() {
   useEffect(() => { fetchQuestions(); }, []);
 
   const handleDeleteClick = (id, text) => {
-    // Truncate text for prompt display if too long
     const cleanText = text.length > 60 ? text.substring(0, 57) + '...' : text;
     setDeleteConfirm({ id, title: `"${cleanText}"` });
   };
@@ -103,14 +105,59 @@ export default function DashboardPage() {
     }
   };
 
-  const filtered = questions.filter(q => {
+  const handleApprove = async (id) => {
+    setApprovingId(id);
+    try {
+      await questionsAPI.updateStatus(id, 'approved');
+      setQuestions(prev => prev.map(q => q.id === id ? { ...q, status: 'approved' } : q));
+    } catch (err) {
+      console.error('Failed to approve question:', err);
+      alert(err.response?.data?.message || 'Failed to approve question.');
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleReject = async (id) => {
+    setRejectingId(id);
+    try {
+      await questionsAPI.updateStatus(id, 'rejected');
+      setQuestions(prev => prev.map(q => q.id === id ? { ...q, status: 'rejected' } : q));
+    } catch (err) {
+      console.error('Failed to reject question:', err);
+      alert(err.response?.data?.message || 'Failed to reject question.');
+    } finally {
+      setRejectingId(null);
+    }
+  };
+
+  const handleApproveAllInView = async () => {
+    const toApprove = filtered.filter(q => q.status !== 'approved');
+    if (toApprove.length === 0) return;
+    for (const q of toApprove) {
+      try {
+        await questionsAPI.updateStatus(q.id, 'approved');
+      } catch (_) {}
+    }
+    setQuestions(prev => prev.map(q => toApprove.some(a => a.id === q.id) ? { ...q, status: 'approved' } : q));
+  };
+
+  // Separate questions by review vs approved (exclude rejected and draft from active lists)
+  const reviewQuestions = questions.filter(
+    q => q.status === 'ready_for_review' || (!q.status && q.status !== 'approved' && q.status !== 'rejected' && q.status !== 'draft')
+  );
+  const approvedQuestions = questions.filter(q => q.status === 'approved');
+
+  const currentTabQuestions = tab === 'ready_for_review' ? reviewQuestions : approvedQuestions;
+
+  const filtered = currentTabQuestions.filter(q => {
     const matchType = filter === 'ALL' || q.type === filter;
     const matchSearch = q.text.toLowerCase().includes(search.toLowerCase());
     return matchType && matchSearch;
   });
 
-  // Reset to page 1 whenever filter or search changes
-  useEffect(() => { setPage(1); }, [filter, search]);
+  // Reset to page 1 whenever tab, filter or search changes
+  useEffect(() => { setPage(1); }, [tab, filter, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -127,35 +174,122 @@ export default function DashboardPage() {
   return (
     <Layout>
       {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em' }}>
             Question Bank
           </h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginTop: 4 }}>
-            Total Question{questions.length !== 1 ? 's' : ''}: {questions.length}
+            Manage, review, and organize assessment questions.
           </p>
         </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => navigate('/ai-generate')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 18px', background: '#f5f3ff',
+              border: '1px solid #ddd6fe', borderRadius: 8, color: '#7c3aed',
+              fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#ede9fe'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#f5f3ff'; }}
+          >
+            ✨ Generate with AI
+          </button>
+          <button
+            onClick={() => navigate('/create')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 18px', background: 'var(--color-primary)',
+              border: 'none', borderRadius: 8, color: '#fff',
+              fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(79,110,247,0.3)',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary-dark)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.transform = 'none'; }}
+          >
+            + New Question
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Top 2 Tabs: Ready for Review & Approved Questions ─── */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 22, borderBottom: '2px solid var(--color-border)', paddingBottom: 0 }}>
         <button
-          onClick={() => navigate('/create')}
+          id="tab-ready-for-review"
+          className="tab-btn"
+          onClick={() => { setTab('ready_for_review'); setFilter('ALL'); setPage(1); }}
           style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '11px 20px', background: 'var(--color-primary)',
-            border: 'none', borderRadius: 8, color: '#fff',
-            fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(79,110,247,0.3)',
-            transition: 'all 0.15s',
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            borderBottom: tab === 'ready_for_review' ? '3px solid var(--color-primary)' : '3px solid transparent',
+            color: tab === 'ready_for_review' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+            fontSize: 15,
+            fontWeight: tab === 'ready_for_review' ? 700 : 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            transition: 'color 0.15s, border-bottom 0.15s',
+            marginBottom: -2,
+            outline: 'none',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary-dark)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.transform = 'none'; }}
         >
-          + New Question
+          <span>📋 Ready for Review Questions</span>
+          <span style={{
+            background: tab === 'ready_for_review' ? 'var(--color-primary-light)' : '#f1f5f9',
+            color: tab === 'ready_for_review' ? 'var(--color-primary)' : '#64748b',
+            padding: '2px 8px',
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: 700,
+          }}>
+            {reviewQuestions.length}
+          </span>
+        </button>
+
+        <button
+          id="tab-approved-questions"
+          className="tab-btn"
+          onClick={() => { setTab('approved'); setFilter('ALL'); setPage(1); }}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            borderBottom: tab === 'approved' ? '3px solid #16a34a' : '3px solid transparent',
+            color: tab === 'approved' ? '#16a34a' : 'var(--color-text-muted)',
+            fontSize: 15,
+            fontWeight: tab === 'approved' ? 700 : 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            transition: 'color 0.15s, border-bottom 0.15s',
+            marginBottom: -2,
+            outline: 'none',
+          }}
+        >
+          <span>🏆 Approved Questions</span>
+          <span style={{
+            background: tab === 'approved' ? '#dcfce7' : '#f1f5f9',
+            color: tab === 'approved' ? '#16a34a' : '#64748b',
+            padding: '2px 8px',
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: 700,
+          }}>
+            {approvedQuestions.length}
+          </span>
         </button>
       </div>
 
-      {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 12, marginBottom: 28 }}>
-        {/* All Questions Card */}
+      {/* Stats Row (Filtered by Active Tab) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 12, marginBottom: 24 }}>
+        {/* All in Tab Card */}
         <div
           onClick={() => setFilter('ALL')}
           style={{
@@ -183,17 +317,18 @@ export default function DashboardPage() {
           }}
         >
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>{questions.length}</span>
+            <span>{currentTabQuestions.length}</span>
             {filter === 'ALL' && <span style={{ fontSize: 12 }}>🎯</span>}
           </div>
           <div style={{ fontSize: 11, color: filter === 'ALL' ? 'var(--color-text)' : 'var(--color-text-muted)', marginTop: 4, fontWeight: filter === 'ALL' ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            All
+            All {tab === 'ready_for_review' ? 'Pending' : 'Approved'}
           </div>
         </div>
 
         {ACTIVE_TYPES.map(type => {
           const meta = TYPE_LABELS[type];
           const isActive = filter === type;
+          const count = currentTabQuestions.filter(q => q.type === type).length;
           return (
             <div
               key={type}
@@ -210,7 +345,7 @@ export default function DashboardPage() {
               onMouseEnter={(e) => {
                 if (!isActive) {
                   e.currentTarget.style.borderColor = meta.color;
-                  e.currentTarget.style.background = `${meta.bg}22`; // very faint light background
+                  e.currentTarget.style.background = `${meta.bg}22`;
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }
               }}
@@ -223,7 +358,7 @@ export default function DashboardPage() {
               }}
             >
               <div style={{ fontSize: 18, fontWeight: 700, color: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>{questions.filter(q => q.type === type).length}</span>
+                <span>{count}</span>
                 {isActive && <span style={{ fontSize: 12 }}>🎯</span>}
               </div>
               <div style={{ fontSize: 11, color: isActive ? 'var(--color-text)' : 'var(--color-text-muted)', marginTop: 4, fontWeight: isActive ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -234,176 +369,255 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input
-          placeholder="Search questions..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            flex: 1, minWidth: 220, padding: '9px 14px',
-            border: '1.5px solid var(--color-border)', borderRadius: 8,
-            fontSize: 14, outline: 'none', background: 'var(--color-surface)',
-          }}
-        />
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          style={{
-            padding: '9px 36px 9px 14px', borderRadius: 8, fontSize: 14, fontWeight: 500,
-            border: '1.5px solid var(--color-border)', background: 'var(--color-surface)',
-            color: 'var(--color-text)', outline: 'none', cursor: 'pointer',
-            appearance: 'none', minWidth: 200,
-            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\")",
-            backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
-          }}
-        >
-          <option value="ALL">All Question Types</option>
-          {ACTIVE_TYPES.map(value => {
-            const meta = TYPE_LABELS[value];
-            return (
-              <option key={value} value={value}>{meta.label}</option>
-            );
-          })}
-        </select>
+      {/* Search and Action Bar */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 280 }}>
+          <input
+            placeholder={`Search ${tab === 'ready_for_review' ? 'ready for review' : 'approved'} questions...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              flex: 1, minWidth: 220, padding: '9px 14px',
+              border: '1.5px solid var(--color-border)', borderRadius: 8,
+              fontSize: 14, outline: 'none', background: 'var(--color-surface)',
+            }}
+          />
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            style={{
+              padding: '9px 36px 9px 14px', borderRadius: 8, fontSize: 14, fontWeight: 500,
+              border: '1.5px solid var(--color-border)', background: 'var(--color-surface)',
+              color: 'var(--color-text)', outline: 'none', cursor: 'pointer',
+              appearance: 'none', minWidth: 200,
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\")",
+              backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
+            }}
+          >
+            <option value="ALL">All Question Types</option>
+            {ACTIVE_TYPES.map(value => {
+              const meta = TYPE_LABELS[value];
+              return (
+                <option key={value} value={value}>{meta.label}</option>
+              );
+            })}
+          </select>
+        </div>
+
+        {tab === 'ready_for_review' && filtered.length > 0 && (
+          <button
+            onClick={handleApproveAllInView}
+            style={{
+              padding: '9px 18px',
+              background: '#16a34a',
+              border: 'none',
+              borderRadius: 8,
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
+              transition: 'all 0.15s',
+            }}
+          >
+            ✓ Approve All Filtered ({filtered.length}) items
+          </button>
+        )}
       </div>
 
       {/* Table */}
-      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'clip', boxShadow: 'var(--shadow)', width: '100%', minWidth: 0 }}>
-        {/* Table Header — always visible, never scrolls */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '90px 1fr 140px 100px 60px 70px 80px',
-          padding: '12px 20px', background: '#f8f9fb',
-          borderBottom: '1px solid var(--color-border)',
-          fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-          color: 'var(--color-text-muted)',
-        }}>
-          <span>ID</span>
-          <span>Question</span>
-          <span>Type</span>
-          <span>Difficulty</span>
-          <span>Points</span>
-          <span>Preview</span>
-          <span>Actions</span>
-        </div>
+      <div style={{
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 12,
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow)',
+        width: '100%',
+        maxHeight: 'calc(100vh - 365px)',
+        minHeight: 140,
+        overflowY: 'auto',
+      }}>
+        {loading ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            Loading questions...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>
+              {tab === 'ready_for_review' ? '🎉' : '📭'}
+            </div>
+            <div style={{ fontWeight: 600, fontSize: 16 }}>
+              {tab === 'ready_for_review' ? 'No pending questions for review' : 'No approved questions found'}
+            </div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>
+              {tab === 'ready_for_review'
+                ? 'All questions have been approved or rejected.'
+                : 'Approve questions from Ready for Review to add them to your final bank.'}
+            </div>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', textAlign: 'left' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f8f9fb' }}>
+              <tr style={{
+                borderBottom: '1px solid var(--color-border)',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--color-text-muted)',
+              }}>
+                <th style={{ padding: '12px 16px', width: 65, textAlign: 'left' }}>ID</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Question</th>
+                <th style={{ padding: '12px 16px', width: 180, textAlign: 'left' }}>Type</th>
+                <th style={{ padding: '12px 16px', width: 105, textAlign: 'left' }}>Difficulty</th>
+                <th style={{ padding: '12px 16px', width: 85, textAlign: 'center' }}>Points</th>
+                <th style={{ padding: '12px 16px', width: 85, textAlign: 'center' }}>Preview</th>
+                <th style={{ padding: '12px 16px', width: 95, textAlign: 'center' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((q, i) => {
+                const typeMeta = TYPE_LABELS[q.type] || {};
+                const diffMeta = DIFFICULTY_COLORS[q.difficulty] || DIFFICULTY_COLORS.medium;
 
-        {/* Scrollable body */}
-        <div style={{ maxHeight: 'calc(100vh - 335px)', minHeight: 140, overflowY: 'auto' }}>
-          {loading ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              Loading questions...
-            </div>
-          ) : filtered.length === 0 ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
-              <div style={{ fontWeight: 600 }}>No questions found</div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>
-                {questions.length === 0 ? 'Create your first question to get started' : 'Try changing the filters'}
-              </div>
-            </div>
-          ) : (
-            paged.map((q, i) => {
-              const typeMeta = TYPE_LABELS[q.type] || {};
-              const diffMeta = DIFFICULTY_COLORS[q.difficulty] || DIFFICULTY_COLORS.medium;
-              return (
-                <div
-                  key={q.id}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '90px 1fr 140px 100px 60px 70px 80px',
-                    padding: '14px 20px', alignItems: 'center',
-                    borderBottom: i < paged.length - 1 ? '1px solid var(--color-border)' : 'none',
-                    transition: 'background 0.1s',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8f9fb'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  {/* Question ID — first column */}
-                  <div style={{ paddingRight: 8 }}>
-                    <span style={{
-                      fontSize: 13, fontWeight: 600, color: 'var(--color-text)',
-                      display: 'inline-block',
-                      maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                return (
+                  <tr
+                    key={q.id}
+                    style={{
+                      borderBottom: i < paged.length - 1 ? '1px solid var(--color-border)' : 'none',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8f9fb'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {/* ID */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--color-text)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }} title={q.id}>
                       {q.id}
-                    </span>
-                  </div>
-                  <div style={{ paddingRight: 16, minWidth: 0, overflow: 'hidden' }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    </td>
+
+                    {/* Question */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: 'var(--color-text)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }} title={q.text}>
                       {q.text}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: typeMeta.color }}>
+                    </td>
+
+                    {/* Type */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: typeMeta.color,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
                       {typeMeta.label}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: diffMeta.color, textTransform: 'capitalize' }}>
+                    </td>
+
+                    {/* Difficulty */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: diffMeta.color,
+                      textTransform: 'capitalize',
+                      whiteSpace: 'nowrap',
+                    }}>
                       {q.difficulty}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 14, color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                    {q.points} pt{q.points !== 1 ? 's' : ''}
-                  </div>
-                  <div>
-                    <button
-                      onClick={() => navigate(`/edit/${q.id}`, { state: { startInPreview: true } })}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: 6,
-                        border: '1px solid var(--color-border)',
-                        background: 'transparent',
-                        fontSize: 14,
-                        cursor: 'pointer',
-                        color: 'var(--color-text-muted)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#eef2ff';
-                        e.currentTarget.style.borderColor = 'var(--color-primary-light)';
-                        e.currentTarget.style.color = 'var(--color-primary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.borderColor = 'var(--color-border)';
-                        e.currentTarget.style.color = 'var(--color-text-muted)';
-                      }}
-                      title="Preview question"
-                    >
-                      👁️
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      onClick={() => navigate(`/edit/${q.id}`)}
-                      style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)' }}
-                      title="Edit"
-                    >✏️</button>
-                    <button
-                      onClick={() => handleDeleteClick(q.id, q.text)}
-                      disabled={deleting === q.id}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      title="Delete"
-                    >
-                      {deleting === q.id ? '...' : (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 6h18" />
-                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                          <line x1="10" x2="10" y1="11" y2="17" />
-                          <line x1="14" x2="14" y1="11" y2="17" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                    </td>
+
+                    {/* Points */}
+                    <td style={{
+                      padding: '12px 16px',
+                      textAlign: 'center',
+                      fontSize: 13,
+                      color: 'var(--color-text-muted)',
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {q.points} pt{q.points !== 1 ? 's' : ''}
+                    </td>
+
+                    {/* Preview */}
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => navigate(`/edit/${q.id}`, { state: { startInPreview: true } })}
+                        style={{
+                          padding: '5px 9px',
+                          borderRadius: 6,
+                          border: '1px solid var(--color-border)',
+                          background: 'transparent',
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          color: 'var(--color-text-muted)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#eef2ff';
+                          e.currentTarget.style.borderColor = 'var(--color-primary-light)';
+                          e.currentTarget.style.color = 'var(--color-primary)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.borderColor = 'var(--color-border)';
+                          e.currentTarget.style.color = 'var(--color-text-muted)';
+                        }}
+                        title="Preview question"
+                      >
+                        👁️
+                      </button>
+                    </td>
+
+                    {/* Actions */}
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                        <button
+                          onClick={() => navigate(`/edit/${q.id}`)}
+                          style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)' }}
+                          title="Edit"
+                        >✏️</button>
+                        <button
+                          onClick={() => handleDeleteClick(q.id, q.text)}
+                          disabled={deleting === q.id}
+                          style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Delete"
+                        >
+                          {deleting === q.id ? '...' : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18" />
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                              <line x1="10" x2="10" y1="11" y2="17" />
+                              <line x1="14" x2="14" y1="11" y2="17" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Pagination */}
@@ -527,3 +741,4 @@ function pageBtnStyle(active, disabled) {
     opacity: disabled ? 0.5 : 1,
   };
 }
+
