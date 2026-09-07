@@ -312,8 +312,8 @@ def _call_gemini(prompt: str) -> str:
             response = client.generate_content(
                 prompt,
                 generation_config=genai.GenerationConfig(
-                    temperature=0.4,
-                    max_output_tokens=8192,
+                    temperature=0.3,
+                    max_output_tokens=3072,
                     response_mime_type="application/json",
                 ),
             )
@@ -420,10 +420,10 @@ def generate_questions(
         except Exception as primary_err:
             err_str = str(primary_err)
 
-            # ── Automatic Gemini → Groq failover ─────────────────────────────
-            if LLM_PROVIDER == "gemini" and _is_quota_error(err_str):
+            # ── Automatic Gemini → Groq failover on any Gemini error ────────
+            if LLM_PROVIDER == "gemini":
                 print(
-                    f"[llm] [WARNING] Gemini quota/rate-limit hit — "
+                    f"[llm] [WARNING] Gemini error ({err_str[:80]}) — "
                     f"automatically switching to Groq ({GROQ_MODEL})"
                 )
                 try:
@@ -432,7 +432,7 @@ def generate_questions(
                     print(f"[llm] [SUCCESS] Fallback to Groq succeeded")
                 except Exception as fallback_err:
                     return [], prompt, "", False, (
-                        f"Gemini quota exceeded AND Groq fallback failed: {str(fallback_err)}. "
+                        f"Gemini failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}. "
                         f"Check GROQ_API_KEY in python-llm/.env"
                     )
             else:
@@ -630,17 +630,17 @@ def generate_questions_from_internet(
         except Exception as primary_err:
             err_str = str(primary_err)
 
-            # Automatic Gemini → Groq failover on quota errors
-            if LLM_PROVIDER == "gemini" and _is_quota_error(err_str):
+            # Automatic Gemini → Groq failover on any Gemini error
+            if LLM_PROVIDER == "gemini":
                 print(
-                    f"[llm] [internet] Gemini quota hit — switching to Groq ({GROQ_MODEL})"
+                    f"[llm] [internet] Gemini error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})"
                 )
                 try:
                     raw = _call_groq(prompt)
                     provider_used = "groq (auto-fallback)"
                 except Exception as fallback_err:
                     return [], prompt, "", False, (
-                        f"Gemini quota exceeded AND Groq fallback failed: {str(fallback_err)}."
+                        f"Gemini failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
                     )
             else:
                 return [], prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"

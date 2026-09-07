@@ -207,39 +207,29 @@ export default function AIGeneratePage() {
     const combinedCustomPrompt = promptParts.length > 0 ? promptParts.join('\n\n') : undefined;
 
     try {
-      // Execute requests with a concurrency limit of 3 to avoid burst rate limits on LLMs
-      const runWithConcurrency = async (items, limit, fn) => {
-        const results = [];
-        const executing = [];
-        for (const item of items) {
-          const p = Promise.resolve().then(() => fn(item));
-          results.push(p);
-          if (limit <= items.length) {
-            const e = p.then(() => executing.splice(executing.indexOf(e), 1));
-            executing.push(e);
-            if (executing.length >= limit) {
-              await Promise.race(executing);
-            }
-          }
-        }
-        return Promise.all(results);
-      };
-
-      const responses = await runWithConcurrency(activeTypes, 3, ([type, count]) =>
-        aiAPI.generateFromInternet({
-          content_area: contentArea,
-          grade,
-          question_type: type,
-          difficulty,
-          count,
-          custom_prompt: combinedCustomPrompt,
-          include_visuals: includeVisuals,
-        })
+      // Fire all question type requests in parallel with resilient aggregation
+      const settled = await Promise.allSettled(
+        activeTypes.map(([type, count]) =>
+          aiAPI.generateFromInternet({
+            content_area: contentArea,
+            grade,
+            question_type: type,
+            difficulty,
+            count,
+            custom_prompt: combinedCustomPrompt,
+            include_visuals: includeVisuals,
+          })
+        )
       );
+
+      const successfulResponses = settled
+        .filter(s => s.status === 'fulfilled' && s.value?.data?.questions)
+        .map(s => s.value);
+
       const computeDefaultPoints = (diff) => (diff === 'hard' ? 3 : diff === 'medium' ? 2 : 1);
 
-      const allQuestions = responses.flatMap(res =>
-        (res.data.questions || []).map(q => ({
+      const allQuestions = successfulResponses.flatMap(res =>
+        (res.data?.questions || []).map(q => ({
           ...q,
           points: q.points || computeDefaultPoints(q.difficulty || difficulty),
           _internetSource: true,
@@ -247,29 +237,39 @@ export default function AIGeneratePage() {
         }))
       );
 
-      // Auto-save all generated questions as draft to DB immediately
-      let finalQuestionsWithIds = allQuestions;
-      try {
-        const payloads = allQuestions.map(q => buildSavePayload(q, 'draft'));
-        const savedRes = await questionsAPI.bulkCreate(payloads);
-        if (Array.isArray(savedRes.data) && savedRes.data.length === allQuestions.length) {
-          finalQuestionsWithIds = allQuestions.map((q, i) => ({
-            ...q,
-            id: savedRes.data[i]?.id || q.id,
-            status: savedRes.data[i]?.status || 'draft',
-          }));
-        }
-      } catch (saveErr) {
-        console.warn('Auto-save questions as draft failed on initial generation:', saveErr);
+      if (allQuestions.length === 0) {
+        const firstError = settled.find(s => s.status === 'rejected')?.reason?.response?.data?.message
+          || 'Generation failed. Please try again.';
+        throw new Error(firstError);
       }
 
-      setQuestions(finalQuestionsWithIds);
+      // Immediately render questions so the user sees results without delay
+      setQuestions(allQuestions);
       setGenMeta({
         retrieved_chunk_count: 0,
         doc_ids_used: [],
         ungrounded_dropped: 0,
         internetSource: true,
       });
+
+      // Auto-save questions as draft in background to assign persistent DB IDs
+      (async () => {
+        try {
+          const payloads = allQuestions.map(q => buildSavePayload(q, 'draft'));
+          const savedRes = await questionsAPI.bulkCreate(payloads);
+          if (Array.isArray(savedRes.data) && savedRes.data.length === allQuestions.length) {
+            setQuestions(prev =>
+              prev.map((q, i) => ({
+                ...q,
+                id: savedRes.data[i]?.id || q.id,
+                status: savedRes.data[i]?.status || 'draft',
+              }))
+            );
+          }
+        } catch (saveErr) {
+          console.warn('Auto-save questions as draft failed on initial generation:', saveErr);
+        }
+      })();
     } catch (err) {
       setError(err.response?.data?.message || 'Generation failed. Please try again.');
     } finally {
