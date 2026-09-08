@@ -25,14 +25,14 @@ export default function Layout({ children }) {
         boxShadow: 'var(--shadow-sm)',
       }}>
         {/* Brand */}
-        <div style={{ padding: '0 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ padding: '0 16px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10, background: 'var(--color-primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+              width: 32, height: 32, borderRadius: 8, background: 'var(--color-primary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0,
             }}>✏️</div>
             <div>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: 17 }}>Quizbot</div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap' }}>Question Creator</div>
             </div>
           </div>
         </div>

@@ -185,31 +185,16 @@ export default function DashboardPage() {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
-            onClick={() => navigate('/ai-generate')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '10px 18px', background: '#f5f3ff',
-              border: '1px solid #ddd6fe', borderRadius: 8, color: '#7c3aed',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#ede9fe'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#f5f3ff'; }}
-          >
-            ✨ Generate with AI
-          </button>
-          <button
-            onClick={() => navigate('/create')}
+            disabled
+            title="New Question creation is currently disabled"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '10px 18px', background: 'var(--color-primary)',
               border: 'none', borderRadius: 8, color: '#fff',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(79,110,247,0.3)',
+              fontSize: 14, fontWeight: 600, cursor: 'not-allowed',
+              opacity: 0.5,
               transition: 'all 0.15s',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary-dark)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.transform = 'none'; }}
           >
             + New Question
           </button>

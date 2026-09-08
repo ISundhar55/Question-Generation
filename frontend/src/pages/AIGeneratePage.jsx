@@ -489,7 +489,7 @@ export default function AIGeneratePage() {
       {/* Page Header */}
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em' }}>
-          ✨ AI Question Generator
+          ✨ AI Generator
         </h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginTop: 4 }}>
           Select parameters below — questions are generated using general curriculum knowledge and web sources.
@@ -870,23 +870,23 @@ export default function AIGeneratePage() {
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flexShrink: 0 }}>
                 <button
                   id="toggle-all-collapse-btn"
                   onClick={toggleAllCollapse}
                   title={collapsedIds.size === questions.length ? "Expand all questions" : "Minimize all questions to reduce scrolling"}
                   style={{
-                    padding: '8px 14px',
+                    padding: '7px 9px',
                     background: '#f8fafc',
                     border: '1px solid var(--color-border)',
-                    borderRadius: 8,
+                    borderRadius: 6,
                     color: 'var(--color-text)',
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
+                    gap: 5,
                     transition: 'all 0.15s',
                   }}
                 >
@@ -896,12 +896,12 @@ export default function AIGeneratePage() {
                   id="reject-all-btn"
                   onClick={handleRejectAll}
                   style={{
-                    padding: '8px 14px',
+                    padding: '7px 9px',
                     background: '#fef2f2',
                     border: '1px solid #fca5a5',
-                    borderRadius: 8,
+                    borderRadius: 6,
                     color: '#dc2626',
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.15s',
@@ -914,12 +914,12 @@ export default function AIGeneratePage() {
                   className="btn-save-all"
                   onClick={handleAcceptAll}
                   style={{
-                    padding: '8px 16px',
+                    padding: '7px 10px',
                     background: '#16a34a',
                     border: 'none',
-                    borderRadius: 8,
+                    borderRadius: 6,
                     color: '#fff',
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
                     boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
@@ -989,7 +989,7 @@ export default function AIGeneratePage() {
                           : 'var(--color-border)'
                         }`,
                       borderRadius: 12,
-                      padding: isCollapsed ? '12px 16px' : '16px 18px',
+                      padding: isCollapsed ? '10px 14px' : '15px 14px',
                       marginBottom: 16,
                       boxShadow: 'var(--shadow)',
                       boxSizing: 'border-box',
@@ -1013,56 +1013,61 @@ export default function AIGeneratePage() {
                       paddingBottom: isCollapsed ? 0 : 12,
                       borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'nowrap', minWidth: 0, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'nowrap', minWidth: 0, flexShrink: 0 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text, #0f172a)', flexShrink: 0 }}>Q{idx + 1}</span>
-                        <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 600, background: qType.bg, color: qType.color, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                          {q.questionType?.replace(/_/g, ' ')}
+                        <span style={{ color: '#cbd5e1', fontSize: 11, flexShrink: 0 }}>|</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: qType.color, textTransform: 'capitalize', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          {q.questionType?.replace(/_/g, ' ').toLowerCase()}
                         </span>
-                        <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 600, background: qDiff.bg, color: qDiff.color, textTransform: 'capitalize', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        <span style={{ color: '#cbd5e1', fontSize: 11, flexShrink: 0 }}>|</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: qDiff.color, textTransform: 'capitalize', flexShrink: 0, whiteSpace: 'nowrap' }}>
                           {q.difficulty}
                         </span>
+                        <span style={{ color: '#cbd5e1', fontSize: 11, flexShrink: 0 }}>|</span>
 
-                        {/* Status Badge */}
+                        {/* Status Text */}
                         {isAccepted ? (
-                          <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 700, background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                            ✓ Ready for Review
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#16a34a', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            Ready for Review
                           </span>
                         ) : isRejected ? (
-                          <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 700, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                            <strong style={{ fontWeight: 900, fontFamily: 'system-ui, sans-serif', marginRight: 4 }}>✕</strong> Rejected
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            Rejected
                           </span>
                         ) : (
-                          <span style={{ display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5, fontSize: 11.5, fontWeight: 700, background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                            📝 Draft
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            Draft
                           </span>
                         )}
 
-                        {/* Grounding Status badge — only for syllabus-sourced questions */}
+                        {/* Grounding Status — only for syllabus-sourced questions */}
                         {!q._internetSource && (() => {
                           const score = typeof q.groundingScore === 'number'
                             ? q.groundingScore
                             : (q.grounded === false ? 0 : 1);
-                          let label, bg, color, border;
+                          let label, color;
                           if (score >= 0.6) {
-                            label = 'Passed'; bg = '#dcfce7'; color = '#15803d'; border = '#bbf7d0';
+                            label = 'Passed'; color = '#15803d';
                           } else if (score >= 0.4) {
-                            label = 'Fair'; bg = '#fef9c3'; color = '#854d0e'; border = '#fde68a';
+                            label = 'Fair'; color = '#854d0e';
                           } else {
-                            label = 'Failed'; bg = '#fee2e2'; color = '#b91c1c'; border = '#fecaca';
+                            label = 'Failed'; color = '#b91c1c';
                           }
                           return (
-                            <span style={{
-                              display: 'inline-flex', padding: '3.5px 10px', borderRadius: 5,
-                              fontSize: 11.5, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
-                              background: bg, color, border: `1px solid ${border}`,
-                            }}>
-                              {label}
-                            </span>
+                            <>
+                              <span style={{ color: '#cbd5e1', fontSize: 11, flexShrink: 0 }}>|</span>
+                              <span style={{
+                                fontSize: 12, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap',
+                                color,
+                              }}>
+                                {label}
+                              </span>
+                            </>
                           );
                         })()}
                       </div>
 
-                      <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexShrink: 0, marginLeft: 'auto', flexWrap: 'nowrap' }}>
+                      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0, marginLeft: 'auto', flexWrap: 'nowrap' }}>
                         {/* Source toggle */}
                         {(q.sources?.length > 0 || q.sourceChunkIds?.length > 0) && (
                           <button
@@ -1070,7 +1075,7 @@ export default function AIGeneratePage() {
                             onClick={() => toggleSource(idx)}
                             title="Show source references for this question"
                             style={{
-                              padding: '6px 12px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                              padding: '5px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                               border: '1px solid var(--color-border)', background: src ? 'var(--color-primary-light)' : 'transparent',
                               color: src ? 'var(--color-primary)' : 'var(--color-text-muted)', cursor: 'pointer',
                               transition: 'all 0.15s',
@@ -1085,7 +1090,7 @@ export default function AIGeneratePage() {
                           onClick={() => openEditModal(idx, q)}
                           title="Edit this question stem, choices, or rationale"
                           style={{
-                            padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                            padding: '5px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                             border: '1px solid #fed7aa', background: '#fff7ed', color: '#c2410c',
                             cursor: 'pointer', transition: 'all 0.12s',
                           }}
@@ -1099,7 +1104,7 @@ export default function AIGeneratePage() {
                           onClick={() => openRegenModal(idx, q)}
                           title="Regenerate this question with modifications"
                           style={{
-                            padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                            padding: '5px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                             border: '1px solid #e0d7ff',
                             background: '#f5f3ff',
                             color: '#7c3aed',
@@ -1117,7 +1122,7 @@ export default function AIGeneratePage() {
                               onClick={() => handleUndoReject(q, idx)}
                               title="Undo rejection"
                               style={{
-                                padding: '6px 12px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                                padding: '5px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                                 border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569',
                                 cursor: 'pointer', transition: 'all 0.12s',
                               }}
@@ -1129,7 +1134,7 @@ export default function AIGeneratePage() {
                               onClick={() => handleAccept(q, idx)}
                               title="Accept and move to Ready for Review"
                               style={{
-                                padding: '6px 15px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                                padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                                 border: 'none', background: '#16a34a', color: '#fff',
                                 cursor: 'pointer', transition: 'all 0.12s',
                               }}
@@ -1143,7 +1148,7 @@ export default function AIGeneratePage() {
                             onClick={() => handleReject(q, idx)}
                             title="Reject this question"
                             style={{
-                              padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                              padding: '5px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                               border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626',
                               cursor: 'pointer', transition: 'all 0.12s',
                             }}
@@ -1157,7 +1162,7 @@ export default function AIGeneratePage() {
                               onClick={() => handleReject(q, idx)}
                               title="Reject this question"
                               style={{
-                                padding: '6px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                                padding: '5px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                                 border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626',
                                 cursor: 'pointer', transition: 'all 0.12s',
                               }}
@@ -1169,7 +1174,7 @@ export default function AIGeneratePage() {
                               onClick={() => handleAccept(q, idx)}
                               title="Accept and move to Ready for Review"
                               style={{
-                                padding: '6px 15px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+                                padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                                 border: 'none', background: '#16a34a', color: '#fff',
                                 cursor: 'pointer', transition: 'all 0.12s',
                                 boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
@@ -1186,11 +1191,11 @@ export default function AIGeneratePage() {
                           onClick={() => toggleCollapse(idx)}
                           title={isCollapsed ? "Expand question" : "Minimize question"}
                           style={{
-                            width: 28,
-                            height: 28,
+                            width: 26,
+                            height: 26,
                             padding: 0,
                             borderRadius: 6,
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: 700,
                             border: '1px solid var(--color-border)',
                             background: isCollapsed ? '#eff6ff' : '#f8fafc',
