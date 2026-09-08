@@ -89,10 +89,10 @@ export default function CreateQuestionPage() {
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em' }}>
             {isEditing ? 'Edit Question' : 'Create Question'}
           </h1>
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
+          <p style={{ fontSize: 14, color: 'var(--color-text-muted)', marginTop: 4 }}>
             {isEditing ? 'Update the question details below' : 'Choose a type and fill in the details'}
           </p>
         </div>

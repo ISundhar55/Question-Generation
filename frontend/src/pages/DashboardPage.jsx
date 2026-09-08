@@ -217,23 +217,23 @@ export default function DashboardPage() {
       </div>
 
       {/* ─── Top 2 Tabs: Ready for Review & Approved Questions ─── */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 22, borderBottom: '2px solid var(--color-border)', paddingBottom: 0 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, borderBottom: '2px solid var(--color-border)', paddingBottom: 0 }}>
         <button
           id="tab-ready-for-review"
           className="tab-btn"
           onClick={() => { setTab('ready_for_review'); setFilter('ALL'); setPage(1); }}
           style={{
-            padding: '12px 20px',
+            padding: '9px 16px',
             border: 'none',
             background: 'transparent',
             borderBottom: tab === 'ready_for_review' ? '3px solid var(--color-primary)' : '3px solid transparent',
             color: tab === 'ready_for_review' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-            fontSize: 15,
+            fontSize: 13.5,
             fontWeight: tab === 'ready_for_review' ? 700 : 500,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 7,
             transition: 'color 0.15s, border-bottom 0.15s',
             marginBottom: -2,
             outline: 'none',
@@ -243,9 +243,9 @@ export default function DashboardPage() {
           <span style={{
             background: tab === 'ready_for_review' ? 'var(--color-primary-light)' : '#f1f5f9',
             color: tab === 'ready_for_review' ? 'var(--color-primary)' : '#64748b',
-            padding: '2px 8px',
-            borderRadius: 12,
-            fontSize: 12,
+            padding: '2px 7px',
+            borderRadius: 10,
+            fontSize: 11,
             fontWeight: 700,
           }}>
             {reviewQuestions.length}
@@ -257,17 +257,17 @@ export default function DashboardPage() {
           className="tab-btn"
           onClick={() => { setTab('approved'); setFilter('ALL'); setPage(1); }}
           style={{
-            padding: '12px 20px',
+            padding: '9px 16px',
             border: 'none',
             background: 'transparent',
             borderBottom: tab === 'approved' ? '3px solid #16a34a' : '3px solid transparent',
             color: tab === 'approved' ? '#16a34a' : 'var(--color-text-muted)',
-            fontSize: 15,
+            fontSize: 13.5,
             fontWeight: tab === 'approved' ? 700 : 500,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 7,
             transition: 'color 0.15s, border-bottom 0.15s',
             marginBottom: -2,
             outline: 'none',
@@ -277,9 +277,9 @@ export default function DashboardPage() {
           <span style={{
             background: tab === 'approved' ? '#dcfce7' : '#f1f5f9',
             color: tab === 'approved' ? '#16a34a' : '#64748b',
-            padding: '2px 8px',
-            borderRadius: 12,
-            fontSize: 12,
+            padding: '2px 7px',
+            borderRadius: 10,
+            fontSize: 11,
             fontWeight: 700,
           }}>
             {approvedQuestions.length}
@@ -288,7 +288,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Row (Filtered by Active Tab) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(115px, 1fr))', gap: 12, marginBottom: 24 }}>
         {/* All in Tab Card */}
         <div
           onClick={() => setFilter('ALL')}

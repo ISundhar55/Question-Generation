@@ -854,8 +854,8 @@ export default function AIGeneratePage() {
 
           {/* Generation meta */}
           {genMeta && questions.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18, minWidth: 0 }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text-muted)', minWidth: 200, flex: '1 1 auto' }}>
                 Generated <strong style={{ color: 'var(--color-text)' }}>{questions.length}</strong> questions
                 {genMeta.internetSource ? (
                   <span style={{ marginLeft: 6 }}>
@@ -870,18 +870,18 @@ export default function AIGeneratePage() {
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', flexShrink: 0 }}>
                 <button
                   id="toggle-all-collapse-btn"
                   onClick={toggleAllCollapse}
                   title={collapsedIds.size === questions.length ? "Expand all questions" : "Minimize all questions to reduce scrolling"}
                   style={{
-                    padding: '9px 16px',
+                    padding: '8px 14px',
                     background: '#f8fafc',
                     border: '1px solid var(--color-border)',
                     borderRadius: 8,
                     color: 'var(--color-text)',
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: 600,
                     cursor: 'pointer',
                     display: 'flex',
@@ -896,12 +896,12 @@ export default function AIGeneratePage() {
                   id="reject-all-btn"
                   onClick={handleRejectAll}
                   style={{
-                    padding: '9px 18px',
+                    padding: '8px 14px',
                     background: '#fef2f2',
                     border: '1px solid #fca5a5',
                     borderRadius: 8,
                     color: '#dc2626',
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.15s',
@@ -914,12 +914,12 @@ export default function AIGeneratePage() {
                   className="btn-save-all"
                   onClick={handleAcceptAll}
                   style={{
-                    padding: '9px 20px',
+                    padding: '8px 16px',
                     background: '#16a34a',
                     border: 'none',
                     borderRadius: 8,
                     color: '#fff',
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: 600,
                     cursor: 'pointer',
                     boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
@@ -978,6 +978,7 @@ export default function AIGeneratePage() {
                 return (
                     <div
                     key={idx}
+                    className="responsive-card"
                     style={{
                       background: isRejected ? '#fafafa' : 'var(--color-surface)',
                       opacity: isRejected ? 0.8 : 1,
@@ -992,6 +993,9 @@ export default function AIGeneratePage() {
                       marginBottom: 16,
                       boxShadow: 'var(--shadow)',
                       boxSizing: 'border-box',
+                      width: '100%',
+                      minWidth: 0,
+                      maxWidth: '100%',
                       transition: 'all 0.15s ease',
                     }}
                   >
@@ -1263,65 +1267,68 @@ export default function AIGeneratePage() {
                                 display: 'flex',
                                 flexDirection: isSvg ? 'column' : 'row',
                                 alignItems: isSvg ? 'stretch' : 'flex-start',
-                                gap: 8,
+                                gap: 10,
                                 padding: '10px 14px',
                                 borderRadius: q.questionType === 'MULTIPLE_SELECT' ? 6 : 8,
                                 border: `1.5px solid ${isCorrect(letter) ? '#86efac' : 'var(--color-border)'}`,
                                 background: isCorrect(letter) ? '#f0fdf4' : '#fafbfc',
                               }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{
-                                      fontWeight: 700, fontSize: 12, color: isCorrect(letter) ? 'var(--color-success)' : 'var(--color-text-muted)',
-                                      flexShrink: 0,
-                                    }}>{letter}.</span>
-                                    {isCorrect(letter) && (
-                                      <span style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>
-                                        Correct
-                                      </span>
-                                    )}
-                                  </div>
-                                  {isSvg && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const tempDiv = document.createElement('div');
-                                        tempDiv.innerHTML = text;
-                                        const svgEl = tempDiv.querySelector('svg');
-                                        if (svgEl) {
-                                          document.body.appendChild(tempDiv);
-                                          import('question-storybook-ui').then(({ downloadSvgAsPng }) => {
-                                            downloadSvgAsPng(svgEl, `option_${letter}.png`, 2.5);
-                                            document.body.removeChild(tempDiv);
-                                          });
-                                        }
-                                      }}
-                                      style={{
-                                        fontSize: 10,
-                                        fontWeight: 600,
-                                        color: '#0284c7',
-                                        background: '#f0f9ff',
-                                        border: '1px solid #bae6fd',
-                                        borderRadius: 4,
-                                        padding: '2px 6px',
-                                        cursor: 'pointer',
-                                      }}
-                                      title={`Download Option ${letter} image as PNG`}
-                                    >
-                                      ⬇ PNG
-                                    </button>
+                                {/* Letter & optional Correct badge */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginTop: 1 }}>
+                                  <span style={{
+                                    fontWeight: 700, fontSize: 12, color: isCorrect(letter) ? 'var(--color-success)' : 'var(--color-text-muted)',
+                                    flexShrink: 0,
+                                  }}>{letter}.</span>
+                                  {isCorrect(letter) && (
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>
+                                      Correct
+                                    </span>
                                   )}
                                 </div>
+
+                                {/* Option Content */}
                                 {isSvg ? (
-                                  <div
-                                    style={{ width: '100%', display: 'flex', justifyContent: 'center', padding: '6px 0', overflowX: 'auto' }}
-                                    dangerouslySetInnerHTML={{ __html: text }}
-                                  />
+                                  <div>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const tempDiv = document.createElement('div');
+                                          tempDiv.innerHTML = text;
+                                          const svgEl = tempDiv.querySelector('svg');
+                                          if (svgEl) {
+                                            document.body.appendChild(tempDiv);
+                                            import('question-storybook-ui').then(({ downloadSvgAsPng }) => {
+                                              downloadSvgAsPng(svgEl, `option_${letter}.png`, 2.5);
+                                              document.body.removeChild(tempDiv);
+                                            });
+                                          }
+                                        }}
+                                        style={{
+                                          fontSize: 10,
+                                          fontWeight: 600,
+                                          color: '#0284c7',
+                                          background: '#f0f9ff',
+                                          border: '1px solid #bae6fd',
+                                          borderRadius: 4,
+                                          padding: '2px 6px',
+                                          cursor: 'pointer',
+                                        }}
+                                        title={`Download Option ${letter} image as PNG`}
+                                      >
+                                        ⬇ PNG
+                                      </button>
+                                    </div>
+                                    <div
+                                      style={{ width: '100%', display: 'flex', justifyContent: 'center', padding: '6px 0', overflowX: 'auto' }}
+                                      dangerouslySetInnerHTML={{ __html: text }}
+                                    />
+                                  </div>
                                 ) : (
-                                  <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>
+                                  <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--color-text)', lineHeight: 1.45 }}>
                                     <MarkdownText text={String(text)} />
-                                  </span>
+                                  </div>
                                 )}
                               </div>
                             );
@@ -2189,6 +2196,9 @@ export default function AIGeneratePage() {
                     <div style={{
                       background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
                       borderLeft: '3px solid var(--color-primary)',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere',
+                      minWidth: 0,
                     }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                         Answer Key

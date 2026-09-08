@@ -112,3 +112,11 @@ select,
 textarea {
   font-family: var(--font);
 }
+
+/* Ensure no card overflows horizontally */
+.responsive-card {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden;
+}

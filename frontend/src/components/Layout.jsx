@@ -46,18 +46,18 @@ export default function Layout({ children }) {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px',
-                  borderRadius: 8, marginBottom: 5, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                  borderRadius: 8, marginBottom: 4, cursor: 'pointer',
                   background: active ? 'rgba(79,110,247,0.15)' : 'transparent',
                   color: active ? 'var(--color-primary)' : 'var(--color-sidebar-text)',
-                  fontWeight: active ? 600 : 500, fontSize: 15,
+                  fontWeight: active ? 600 : 500, fontSize: 13.5,
                   transition: 'all 0.12s',
                   borderLeft: active ? '3px solid var(--color-primary)' : '3px solid transparent',
                 }}
                 onMouseEnter={(e) => !active && (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
                 onMouseLeave={(e) => !active && (e.currentTarget.style.background = 'transparent')}
               >
-                <span style={{ fontSize: 18, width: 22, textAlign: 'center' }}>{item.icon}</span>
+                <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{item.icon}</span>
                 {item.label}
               </div>
             );
@@ -99,7 +99,16 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main content */}
-      <main style={{ marginLeft: 220, flex: 1, padding: '14px 10px', minHeight: '100vh', width: 'calc(100% - 220px)' }}>
+      <main style={{
+        marginLeft: 220,
+        flex: 1,
+        padding: '16px 20px',
+        minHeight: '100vh',
+        width: 'calc(100% - 220px)',
+        maxWidth: 'calc(100% - 220px)',
+        minWidth: 0,
+        boxSizing: 'border-box',
+      }}>
         {children}
       </main>
     </div>
