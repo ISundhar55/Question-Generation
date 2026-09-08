@@ -1127,7 +1127,7 @@ export default function AIGeneratePage() {
                                 cursor: 'pointer', transition: 'all 0.12s',
                               }}
                             >
-                              ↩ Undo
+                              Undo
                             </button>
                             <button
                               id={`accept-q-${idx}`}
@@ -1139,7 +1139,7 @@ export default function AIGeneratePage() {
                                 cursor: 'pointer', transition: 'all 0.12s',
                               }}
                             >
-                              ✓ Accept
+                              Accept
                             </button>
                           </>
                         ) : isAccepted ? (
@@ -1153,7 +1153,7 @@ export default function AIGeneratePage() {
                               cursor: 'pointer', transition: 'all 0.12s',
                             }}
                           >
-                            <strong style={{ fontWeight: 900, fontFamily: 'system-ui, sans-serif', marginRight: 4 }}>✕</strong> Reject
+                            Reject
                           </button>
                         ) : (
                           <>
@@ -1167,7 +1167,7 @@ export default function AIGeneratePage() {
                                 cursor: 'pointer', transition: 'all 0.12s',
                               }}
                             >
-                              <strong style={{ fontWeight: 900, fontFamily: 'system-ui, sans-serif', marginRight: 4 }}>✕</strong> Reject
+                              Reject
                             </button>
                             <button
                               id={`accept-q-${idx}`}
@@ -1180,7 +1180,7 @@ export default function AIGeneratePage() {
                                 boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
                               }}
                             >
-                              ✓ Accept
+                              Accept
                             </button>
                           </>
                         )}
