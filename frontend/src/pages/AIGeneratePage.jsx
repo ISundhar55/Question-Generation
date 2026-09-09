@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import EditQuestionModal from '../components/EditQuestionModal';
@@ -19,7 +19,26 @@ export default function AIGeneratePage() {
 
   // Form state
   const [contentArea, setContentArea] = useState(CONTENT_AREAS[0]);
+  const [contentAreaOpen, setContentAreaOpen] = useState(false);
+  const contentAreaDropdownRef = useRef(null);
+
   const [grade, setGrade] = useState(GRADES[0]);
+  const [gradeOpen, setGradeOpen] = useState(false);
+  const gradeDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (gradeDropdownRef.current && !gradeDropdownRef.current.contains(e.target)) {
+        setGradeOpen(false);
+      }
+      if (contentAreaDropdownRef.current && !contentAreaDropdownRef.current.contains(e.target)) {
+        setContentAreaOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [difficulty, setDifficulty] = useState('medium');
   const [customPrompt, setCustomPrompt] = useState('');
   const [includeVisuals, setIncludeVisuals] = useState(false);
@@ -509,19 +528,147 @@ export default function AIGeneratePage() {
           </h2>
 
           {/* Content Area */}
-          <div style={{ marginBottom: 18 }}>
+          <div style={{ marginBottom: 18, position: 'relative' }} ref={contentAreaDropdownRef}>
             <label style={labelStyle}>Content Area</label>
-            <select id="ai-content-area" value={contentArea} onChange={e => setContentArea(e.target.value)} style={selectStyle}>
+            <div
+              id="ai-content-area-select"
+              onClick={() => setContentAreaOpen(prev => !prev)}
+              style={{
+                ...selectStyle,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                userSelect: 'none',
+                borderColor: contentAreaOpen ? 'var(--color-primary, #4f6ef7)' : '#cbd5e1',
+                boxShadow: contentAreaOpen ? '0 0 0 3px rgba(79, 110, 247, 0.15)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <span style={{ fontWeight: 500 }}>{contentArea}</span>
+              <span style={{ fontSize: 10, color: '#64748b', transition: 'transform 0.15s', transform: contentAreaOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
+            </div>
+
+            {/* Hidden native select for accessibility/testing compatibility */}
+            <select id="ai-content-area" value={contentArea} onChange={e => setContentArea(e.target.value)} style={{ display: 'none' }}>
               {CONTENT_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
+
+            {contentAreaOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: 4,
+                background: 'var(--color-surface, #fff)',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 8,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                maxHeight: 200,
+                overflowY: 'auto',
+                zIndex: 60,
+              }}>
+                {CONTENT_AREAS.map(a => (
+                  <div
+                    key={a}
+                    id={`ai-content-area-option-${a.replace(/\s+/g, '-').toLowerCase()}`}
+                    onClick={() => {
+                      setContentArea(a);
+                      setContentAreaOpen(false);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: 13.5,
+                      fontWeight: contentArea === a ? 600 : 400,
+                      background: contentArea === a ? 'rgba(79, 110, 247, 0.08)' : 'transparent',
+                      color: contentArea === a ? 'var(--color-primary, #4f6ef7)' : 'var(--color-text)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => { if (contentArea !== a) e.currentTarget.style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { if (contentArea !== a) e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <span>{a}</span>
+                    {contentArea === a && <span style={{ fontSize: 12, color: 'var(--color-primary, #4f6ef7)' }}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Grade */}
-          <div style={{ marginBottom: 18 }}>
+          <div style={{ marginBottom: 18, position: 'relative' }} ref={gradeDropdownRef}>
             <label style={labelStyle}>Grade</label>
-            <select id="ai-grade" value={grade} onChange={e => setGrade(e.target.value)} style={selectStyle}>
+            <div
+              id="ai-grade-select"
+              onClick={() => setGradeOpen(prev => !prev)}
+              style={{
+                ...selectStyle,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                userSelect: 'none',
+                borderColor: gradeOpen ? 'var(--color-primary, #4f6ef7)' : '#cbd5e1',
+                boxShadow: gradeOpen ? '0 0 0 3px rgba(79, 110, 247, 0.15)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <span style={{ fontWeight: 500 }}>{grade}</span>
+              <span style={{ fontSize: 10, color: '#64748b', transition: 'transform 0.15s', transform: gradeOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
+            </div>
+
+            {/* Hidden native select for accessibility/testing compatibility */}
+            <select id="ai-grade" value={grade} onChange={e => setGrade(e.target.value)} style={{ display: 'none' }}>
               {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
+
+            {gradeOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: 4,
+                background: 'var(--color-surface, #fff)',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 8,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                maxHeight: 200,
+                overflowY: 'auto',
+                zIndex: 50,
+              }}>
+                {GRADES.map(g => (
+                  <div
+                    key={g}
+                    id={`ai-grade-option-${g.replace(/\s+/g, '-').toLowerCase()}`}
+                    onClick={() => {
+                      setGrade(g);
+                      setGradeOpen(false);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: 13.5,
+                      fontWeight: grade === g ? 600 : 400,
+                      background: grade === g ? 'rgba(79, 110, 247, 0.08)' : 'transparent',
+                      color: grade === g ? 'var(--color-primary, #4f6ef7)' : 'var(--color-text)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => { if (grade !== g) e.currentTarget.style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { if (grade !== g) e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <span>{g}</span>
+                    {grade === g && <span style={{ fontSize: 12, color: 'var(--color-primary, #4f6ef7)' }}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
 
