@@ -1573,87 +1573,85 @@ export default function AIGeneratePage() {
                       );
                     })()}
 
-                    {/* Constructed Response — inline text + answer chips */}
-                    {q.questionType === 'CONSTRUCTED_RESPONSE' && q.text && (() => {
-                      const parts = q.text.split(/_{2,}/);
-                      const answers = q.options?.answers || q.answer?.split('|') || [];
+                    {/* Constructed Response — Correct Answer Key card */}
+                    {q.questionType === 'CONSTRUCTED_RESPONSE' && (() => {
+                      const answers = q.options?.answers || (q.answer ? q.answer.split('|') : []);
+                      if (!answers.length) return null;
                       return (
-                        <div style={{ marginBottom: 14 }}>
-                          <div style={{ fontSize: 14, lineHeight: 2.2, color: 'var(--color-text)', fontWeight: 500, marginBottom: 8 }}>
-                            {parts.map((part, i) => {
-                              const rawVal = answers[i];
-                              const displayVal = Array.isArray(rawVal) ? (rawVal[0] || '') : rawVal;
+                        <div style={{ marginBottom: 14, padding: '12px 16px', background: '#f5f3ff', borderRadius: 8, border: '1.5px solid #d8b4fe' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                            Correct Answer Key
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {answers.map((ans, idx) => {
+                              const isArr = Array.isArray(ans);
+                              const primary = isArr ? (ans[0] || '') : ans;
+                              const alts = isArr ? ans.slice(1) : [];
                               return (
-                                <span key={i}>
-                                  {part}
-                                  {i < parts.length - 1 && (
-                                    <span style={{
-                                      display: 'inline-block', padding: '2px 10px', margin: '0 4px',
-                                      background: '#f5f3ff', border: '1.5px solid #c4b5fd',
-                                      borderRadius: 6, color: '#7c3aed', fontWeight: 700, fontSize: 13,
-                                    }}>
-                                      {displayVal || '___'}
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 13, color: 'var(--color-text)' }}>
+                                  <span style={{ fontWeight: 600, color: '#6b21a8' }}>Blank {idx + 1}:</span>
+                                  <span style={{
+                                    display: 'inline-block', padding: '3px 10px',
+                                    background: '#ffffff', border: '1.5px solid #c4b5fd',
+                                    borderRadius: 6, color: '#7c3aed', fontWeight: 700, fontSize: 13,
+                                  }}>
+                                    {primary}
+                                  </span>
+                                  {alts.length > 0 && (
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                                      (acceptable alternatives: <strong>{alts.join(', ')}</strong>)
                                     </span>
                                   )}
-                                </span>
+                                </div>
                               );
                             })}
                           </div>
-
-                          {/* Acceptable Alternatives list */}
-                          {(() => {
-                            const hasAlternatives = answers.some(ans => Array.isArray(ans) && ans.length > 1);
-                            if (!hasAlternatives) return null;
-                            return (
-                              <div style={{ marginTop: 10, padding: '10px 14px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #d8b4fe' }}>
-                                <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Acceptable Answers</div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                  {answers.map((ans, idx) => {
-                                    const isArr = Array.isArray(ans);
-                                    const primary = isArr ? (ans[0] || '') : ans;
-                                    const alts = isArr ? ans.slice(1) : [];
-                                    return (
-                                      <div key={idx} style={{ fontSize: 12, color: 'var(--color-text)' }}>
-                                        Blank {idx + 1}: <strong>{primary}</strong>
-                                        {alts.length > 0 && (
-                                          <span> (acceptable alternatives: <span style={{ color: 'var(--color-text-muted)' }}>{alts.join(', ')}</span>)</span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
                         </div>
                       );
                     })()}
 
-                    {/* Dropdown — inline faux-select for each blank */}
-                    {q.questionType === 'DROPDOWN' && q.text && q.options?.blanks && (() => {
-                      const parts = q.text.split(/_{2,}/);
+                    {/* Dropdown — Blank options with correct selection highlighted */}
+                    {q.questionType === 'DROPDOWN' && q.options?.blanks && (() => {
                       return (
-                        <div style={{ marginBottom: 14, fontSize: 14, lineHeight: 2.8, color: 'var(--color-text)', fontWeight: 500 }}>
-                          {parts.map((part, i) => (
-                            <span key={i}>
-                              {part}
-                              {i < parts.length - 1 && q.options.blanks[i] && (
-                                <span style={{ display: 'inline-flex', flexDirection: 'column', verticalAlign: 'middle', margin: '0 4px', gap: 2 }}>
-                                  {q.options.blanks[i].choices.map(choice => (
-                                    <span key={choice} style={{
-                                      display: 'inline-block', padding: '1px 8px', borderRadius: 4,
-                                      fontSize: 12, fontWeight: choice === q.options.blanks[i].correct ? 700 : 400,
-                                      background: choice === q.options.blanks[i].correct ? '#d1fae5' : '#f1f5f9',
-                                      color: choice === q.options.blanks[i].correct ? '#065f46' : '#64748b',
-                                      border: `1px solid ${choice === q.options.blanks[i].correct ? '#6ee7b7' : '#e2e8f0'}`,
-                                    }}>
-                                      {choice === q.options.blanks[i].correct ? '✓ ' : ''}{choice}
-                                    </span>
-                                  ))}
+                        <div style={{ marginBottom: 14, padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1.5px solid #cbd5e1' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                            Dropdown Selections & Options
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {q.options.blanks.map((b, idx) => (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text)', minWidth: 60 }}>
+                                  Blank {idx + 1}:
                                 </span>
-                              )}
-                            </span>
-                          ))}
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                  {b.choices.map(choice => {
+                                    const isCorrect = choice === b.correct;
+                                    return (
+                                      <span
+                                        key={choice}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 4,
+                                          padding: '3px 10px',
+                                          borderRadius: 6,
+                                          fontSize: 12,
+                                          fontWeight: isCorrect ? 700 : 500,
+                                          background: isCorrect ? '#dcfce7' : '#ffffff',
+                                          color: isCorrect ? '#15803d' : '#475569',
+                                          border: `1.5px solid ${isCorrect ? '#86efac' : '#e2e8f0'}`,
+                                          boxShadow: isCorrect ? '0 1px 2px rgba(22, 163, 74, 0.1)' : 'none',
+                                        }}
+                                      >
+                                        {isCorrect && <span>✓</span>}
+                                        {choice}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       );
                     })()}
