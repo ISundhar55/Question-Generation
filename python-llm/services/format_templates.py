@@ -43,8 +43,11 @@ IMPORTANT for MULTIPLE_SELECT:
 - STEM-ANSWER COUNT AGREEMENT: The number specified in the question text MUST EXACTLY MATCH the number of correct options in the 'answer' field.
   * If the question asks for TWO (e.g. 'Which TWO...', 'Select TWO...'), there MUST be EXACTLY 2 correct answers (e.g. 'A|C') and 3 incorrect distractors.
   * If the question asks for THREE (e.g. 'Which THREE...', 'Select THREE...'), there MUST be EXACTLY 3 correct answers (e.g. 'B|D|E') and 2 incorrect distractors.
-  * NEVER ask for 'TWO' when 3 options are correct, and NEVER ask for 'THREE' when 2 options are correct.
-- MANDATORY DISTRACTORS: Ensure there are ALWAYS 2 or 3 plausible incorrect distractors (e.g., 2 correct + 3 distractors, or 3 correct + 2 distractors). Distractors must be UNAMBIGUOUSLY FALSE and factually flawed; they must NEVER accidentally be true or justifiable facts, as this ruins question quality.
+- MANDATORY DISTRACTORS & ZERO ACCIDENTAL TRUE OPTIONS:
+  * Ensure there are ALWAYS 2 or 3 plausible incorrect distractors (e.g., 2 correct + 3 distractors, or 3 correct + 2 distractors).
+  * Distractors must be UNAMBIGUOUSLY FALSE and factually flawed; they must NEVER accidentally be true.
+  * COMPARATIVE DISTRACTORS (CRITICAL): When drafting comparative options (e.g. 'A has fewer than B'), verify the actual values. If the comparison is true, you MUST invert it (e.g. 'A has more than B') so it is definitively FALSE.
+  * In 'Which TWO...', there must be EXACTLY 2 true options (matching the answer field) and all other 3 options must be false.
 - The answer field must list all correct letters in alphabetical order, joined with | (pipe), e.g. "A|C" or "B|D|E".
 - MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options' (A, B, C, D, E), explaining why each correct choice is right and why each distractor is wrong.""",
 
@@ -443,6 +446,19 @@ IMPORTANT RULES for SELECT_TEXT:
 5. "answer": A JSON array containing EXACT, verbatim string copies of the target sentences or words directly from "options.passage". The array length MUST exactly equal "max_selections".
 6. "explanation": Must explain why each correct selected item answers the question and why the remaining passage elements do not."""
 }
+
+# Universal explanation rules applied across ALL question types and content areas
+UNIVERSAL_RATIONALE_RULES = """
+UNIVERSAL RATIONALE & EXPLANATION INTEGRITY (APPLIES TO ALL QUESTION TYPES & ALL SUBJECTS):
+- MANDATORY EDUCATIONAL RATIONALE: Provide a clear, thorough explanation justifying why the correct answer is right and why distractors or alternatives are incorrect.
+- STRICT ANSWER-TO-RATIONALE TAG SYNCHRONIZATION: The status tag (Correct) may ONLY appear on items included in the 'answer' field (e.g., if answer is 'A|C', ONLY Option A and Option C can be tagged (Correct)). All distractors MUST be tagged (Incorrect). NEVER label a distractor as (Correct).
+- ZERO ACCIDENTAL TRUE DISTRACTORS: Every distractor must evaluate to definitively FALSE. For comparative statements (e.g. 'A has fewer than B'), verify that the statement is false; if it is true, invert it so it is an incorrect distractor.
+- ZERO DUPLICATION: Each item key or bullet in the explanation (e.g. option letter, blank, step, pair, row, category) MUST appear EXACTLY ONCE. Never repeat or emit duplicate bullets for the same key.
+- NO SCRATCHPAD / NO INTERNAL DIALOGUE: Complete all problem-solving, factual verification, calculations, and option drafting BEFORE outputting JSON. The explanation is strictly student-facing educational content. NEVER output internal thinking, self-corrections, recalculations, or conversational drafting thoughts (e.g., 'Wait, recalculating...', 'Let me review...', 'Let's fix...', 'in my head', 'Let's adjust...'). Output final clean educational rationales only."""
+
+# Append universal rationale rules to every format so they apply uniformly across all types and subjects
+for _qtype in list(FORMAT_BY_TYPE.keys()):
+    FORMAT_BY_TYPE[_qtype] = FORMAT_BY_TYPE[_qtype] + "\n\n" + UNIVERSAL_RATIONALE_RULES.strip()
 
 # Backward compatibility alias
 _FORMAT_BY_TYPE = FORMAT_BY_TYPE

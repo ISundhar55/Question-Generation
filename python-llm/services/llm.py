@@ -727,6 +727,179 @@ def generate_questions_from_internet(
 # ---------------------------------------------------------------------------
 
 
+def _clean_explanation(explanation: str) -> str:
+    """
+    Generic explanation cleaner for ALL question types and ALL content areas:
+    1. Deduplicates bulleted rationale items (Options, Blanks, Steps, Pairs, Statements, Gaps, Rows, etc.),
+       preserving the model's latest/corrected breakdown.
+    2. Filters out leaked chain-of-thought sentences ('Wait, recalculating...', 'in my head', etc.),
+       truncating rambling internal monologues.
+    3. Normalizes clean bullet formatting.
+    """
+    if not isinstance(explanation, str) or not explanation.strip():
+        return explanation
+
+    # Truly generic bullet matcher for any question type and label format
+    pattern = re.compile(
+        r"(?:^|\n)\s*(?:•|-|\*|\d+[.)])\s*([^:\n\r]+?)\s*[:\-–]\s*([\s\S]*?)(?=(?:\n\s*(?:•|-|\*|\d+[.)])\s*[^:\n\r]+?\s*[:\-–])|$)",
+        re.IGNORECASE
+    )
+    matches = list(pattern.finditer(explanation))
+
+    cot_triggers = [
+        r"\bwait\b", r"\brecalculat\w*", r"\blet'?s\s+(?:fix|change|adjust|rewrite|check|make|ensure|re-?evaluate|review)\b",
+        r"\blet\s+me\s+(?:review|check|re-?read|see|think)\b", r"\bin\s+my\s+head\b", r"\bmentally\b",
+        r"\boption\s+correctness\b", r"\bwhich\s+is\s+incorrect\b", r"\btherefore\s+option\b",
+        r"\bscratchpad\b", r"\bthinking\s+aloud\b"
+    ]
+    cot_pattern = re.compile("|".join(cot_triggers), re.IGNORECASE)
+
+    def _strip_cot(text: str) -> str:
+        # Strip conversational preamble if present right after bullet key, e.g. "Wait, let's rewrite: ..."
+        text = re.sub(
+            r"^(?:•|-|\*|\d+[.)])?\s*([^:\n\r]+?)\s*[:\-–]\s*(?:Wait,?\s*[^:\n]+?[:\-–]\s*|Let'?s\s*[^:\n]+?[:\-–]\s*)",
+            lambda m: m.group(1).strip() + ": ",
+            text,
+            flags=re.IGNORECASE
+        )
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        cleaned = []
+        for s in sentences:
+            s_clean = s.strip()
+            if not s_clean:
+                continue
+            if cot_pattern.search(s_clean):
+                if len(cleaned) >= 1:
+                    break
+                else:
+                    continue
+            cleaned.append(s_clean)
+        res = " ".join(cleaned).strip()
+        return res if res else text
+
+    if matches:
+        latest_by_key = {}
+        key_order = []
+        for m in matches:
+            raw_key = m.group(1).strip()
+            clean_key = re.sub(r"\(.*?\)", "", raw_key).strip().upper()
+            body = m.group(0).strip()
+            if clean_key not in latest_by_key:
+                key_order.append(clean_key)
+            latest_by_key[clean_key] = body
+
+        cleaned_bullets = []
+        for k in key_order:
+            bullet = latest_by_key[k]
+            cleaned_bullet = _strip_cot(bullet)
+            cleaned_bullet = re.sub(r"^(?:•|-|\*|\d+[.)])?\s*", "• ", cleaned_bullet.strip())
+            cleaned_bullet = re.sub(r"\s{2,}", " ", cleaned_bullet)
+            cleaned_bullets.append(cleaned_bullet)
+
+        return "\n".join(cleaned_bullets)
+
+    return _strip_cot(explanation)
+
+
+
+def _sync_rationale_tags_and_distractors(q: dict) -> dict:
+    """
+    Synchronize explanation status tags ((Correct) / (Incorrect)) with the actual answer key,
+    and resolve accidental true comparative distractors.
+    """
+    if not isinstance(q, dict):
+        return q
+
+    raw_ans = q.get("answer")
+    options = q.get("options")
+    explanation = q.get("explanation")
+
+    if not isinstance(explanation, str) or not explanation.strip():
+        return q
+
+    # 1. Choice-based questions (SINGLE_SELECT, MULTIPLE_SELECT, MCQ)
+    if isinstance(options, dict):
+        all_option_keys = {k.upper() for k in options.keys() if k != "visual" and len(k) == 1 and k.isalpha()}
+        if all_option_keys:
+            correct_letters = set()
+            if isinstance(raw_ans, str):
+                correct_letters = set(re.findall(r"\b[A-Za-z]\b", raw_ans.upper()))
+            elif isinstance(raw_ans, list):
+                correct_letters = {str(a).strip().upper() for a in raw_ans if str(a).strip()}
+
+            comparative_inversions = [
+                (r"\bfewer\b", "more"),
+                (r"\bless\s+than\b", "more than"),
+                (r"\bmore\s+than\b", "fewer than"),
+                (r"\bgreater\s+than\b", "less than"),
+                (r"\bhigher\s+than\b", "lower than"),
+                (r"\blower\s+than\b", "higher than"),
+                (r"\bbefore\b", "after"),
+                (r"\bafter\b", "before"),
+            ]
+
+            lines = explanation.split("\n")
+            cleaned_lines = []
+
+            for line in lines:
+                m = re.match(
+                    r"^(\s*(?:•|-|\*|\d+[.)])?\s*Option\s+([A-Za-z]))(?:\s*\((Correct|Incorrect)\))?\s*([:\-–]\s*)([\s\S]*)$",
+                    line,
+                    re.IGNORECASE
+                )
+                if m:
+                    opt_letter = m.group(2).upper()
+                    status = m.group(3)
+                    sep = m.group(4)
+                    body = m.group(5)
+
+                    if opt_letter in all_option_keys:
+                        is_actually_correct = (opt_letter in correct_letters)
+
+                        if is_actually_correct:
+                            cleaned_line = f"• Option {opt_letter} (Correct){sep}{body}"
+                        else:
+                            if status and status.lower() == "correct":
+                                # Distractor mistakenly marked as Correct by LLM!
+                                opt_text = options.get(opt_letter, "")
+                                inverted = False
+                                if isinstance(opt_text, str):
+                                    for comp_pat, repl in comparative_inversions:
+                                        if re.search(comp_pat, opt_text, re.IGNORECASE):
+                                            options[opt_letter] = re.sub(comp_pat, repl, opt_text, count=1, flags=re.IGNORECASE)
+                                            inverted = True
+                                            body_clean = re.sub(r"\bdoes\s+indeed\s+have\b", "has", body, flags=re.IGNORECASE)
+                                            body_clean = re.sub(r"\bso\s+[A-Za-z]+\s+does\s+have\b", "not", body_clean, flags=re.IGNORECASE)
+                                            body = f"{body_clean.rstrip('. ')}, meaning stating that they have {repl} is incorrect."
+                                            break
+
+                                if not inverted:
+                                    body = re.sub(r"\b(?:thus|therefore|hence)\s+option\s+[A-Za-z]\s+is\s+correct\.?", "", body, flags=re.IGNORECASE).strip()
+                                    body = f"{body.rstrip('. ')}, making this option an incorrect statement."
+
+                            cleaned_line = f"• Option {opt_letter} (Incorrect){sep}{body}"
+                    else:
+                        cleaned_line = line
+                else:
+                    cleaned_line = line
+
+                cleaned_lines.append(cleaned_line)
+
+            q["explanation"] = "\n".join(cleaned_lines)
+
+    # 2. TRUE_FALSE questions
+    q_type = str(q.get("questionType", "")).upper()
+    if q_type == "TRUE_FALSE" and isinstance(raw_ans, (str, bool)):
+        ans_bool = str(raw_ans).strip().lower() == "true"
+        exp = q["explanation"]
+        exp = re.sub(r"(•\s*True)\s*\([^)]*\)", f"\\1 ({'Correct' if ans_bool else 'Incorrect'})", exp, flags=re.IGNORECASE)
+        exp = re.sub(r"(•\s*False)\s*\([^)]*\)", f"\\1 ({'Incorrect' if ans_bool else 'Correct'})", exp, flags=re.IGNORECASE)
+        q["explanation"] = exp
+
+    return q
+
+
+
 def normalize_question(q: dict, allow_visuals: bool = True) -> dict:
     """Normalize questionType and answer fields to match standard conventions."""
     if not isinstance(q, dict):
@@ -1028,6 +1201,11 @@ def normalize_question(q: dict, allow_visuals: bool = True) -> dict:
                         unused_labels = [t.strip() for t in txt_matches if t.strip().lower() not in existing_opts_vals and len(t.strip()) > 1 and not t.strip().isdigit()]
                         clean_opt = unused_labels[0] if unused_labels else "Option " + target_key
                     q["options"][target_key] = clean_opt
+
+    # 11. Normalize explanation: deduplicate repeated items and strip leaked scratchpad reasoning across all question types
+    if isinstance(q.get("explanation"), str) and q["explanation"].strip():
+        q["explanation"] = _clean_explanation(q["explanation"])
+        q = _sync_rationale_tags_and_distractors(q)
 
     return q
 

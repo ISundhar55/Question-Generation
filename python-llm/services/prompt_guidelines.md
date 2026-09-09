@@ -27,9 +27,11 @@ Apply all 15 core guardrails and formatting standards to every question generate
    - The correct answer must be explicitly and unambiguously supported by the source content.
    - Never rely on unsupported assumptions or outside facts not directly verifiable from the text.
 
-6. DISTRACTOR VALIDATION
+6. DISTRACTOR VALIDATION & ZERO ACCIDENTAL CORRECT OPTIONS
    - Incorrect options must be plausibly flawed, based on real student misconceptions or inverted logic, and definitively INCORRECT.
    - A distractor must NEVER accidentally be true, partially true, or justifiable as an alternative answer. Accidental correct options ruin question validity.
+   - COMPARATIVE STATEMENTS (CRITICAL): When drafting comparative distractors (e.g., "A has fewer than B", "X is greater than Y", "P occurred before Q"), calculate the actual values first. Ensure the comparison is factually FALSE. If the true condition is "Ben has fewer tokens than Amy", then to make a distractor you MUST write "Ben has more tokens than Amy" or "Ben and Amy have equal tokens". Never write the true comparison as a distractor!
+   - EXACT ANSWER COUNT AUDIT: In questions specifying a count (e.g., "Which TWO...", "Select TWO..."), count the true statements across all options. There must be EXACTLY the requested number of true options (and all other options must be false).
    - Distractors must be structurally parallel: same grammatical form and similar length as the correct choice.
 
 7. QUESTION QUALITY & ANTI-HALLUCINATION
@@ -50,17 +52,19 @@ Apply all 15 core guardrails and formatting standards to every question generate
     - Never copy questions, reading passages, or stems verbatim from existing test papers, textbooks, or copyrighted websites.
     - Generate 100% original question stems, realistic scenarios, and passages synthesized from educational concepts and factual knowledge.
 
-11. EXPLANATION / RATIONALE BREAKDOWN (MANDATORY PER-ITEM BREAKDOWN)
-    - Every question must provide a clear, comprehensive explanation justifying why the correct answer is right and why distractors are incorrect.
-    - Single & Multi-Select: Include a distinct bullet (`• Option <Letter> (<Correct/Incorrect>): ...`) for EVERY option letter.
-    - True/False: Provide explicit rationale for both True and False states.
-    - Constructed Response & Dropdown: Provide a distinct rationale for EVERY blank (`• Blank <N>: ...`), detailing acceptable synonyms or why dropdown distractors are incorrect.
-    - Matching Lines: Provide a distinct bullet for EVERY matched pair (`• Match <LeftKey>-<RightKey>: ...`), explaining the relationship.
-    - Ordering: Provide a distinct bullet for EVERY step/item in sequence (`• Step <N>: ...`), justifying its placement.
+11. EXPLANATION & RATIONALE INTEGRITY (UNIVERSAL STANDARD ACROSS ALL SUBJECTS & FORMATS)
+    - Every question must provide a clear, comprehensive explanation justifying why the correct answer is right and why distractors or alternatives are incorrect.
+    - Structured Breakdown: Provide a distinct bullet for each answer item, option, blank, pair, step, row, or statement present in the question.
+    - STRICT ZERO-DUPLICATION RULE: Every item key or bullet MUST appear EXACTLY ONCE in the explanation. Never repeat, reiterate, or emit duplicate rationale entries for the same item.
+    - STRICT ANSWER-TO-RATIONALE TAG SYNCHRONIZATION:
+      * The status tag `(Correct)` may ONLY appear on options/items that are explicitly included in the `answer` key (e.g., if `answer` is "A|C", ONLY Option A and Option C can be tagged `(Correct)`).
+      * EVERY distractor (any option not in `answer`) MUST be tagged `(Incorrect)` and MUST explain why it is false.
+      * NEVER label a distractor as `(Correct)` in the explanation. If you find yourself writing `(Correct)` for an option not in `answer`, STOP — that distractor is invalid because it is accidentally true. You must modify the distractor text so that it is factually false!
+    - STRICT NO-SCRATCHPAD / ZERO INTERNAL MONOLOGUE RULE: The explanation is strictly student-facing educational content. Complete all problem-solving, factual verification, calculations, and option drafting BEFORE outputting JSON. NEVER output internal reasoning, recalculations, self-corrections, or conversational drafting thoughts (e.g., NEVER include phrases like "Wait, recalculating...", "Let me review...", "Let's fix...", "in my head", "Wait, this is incorrect...", "Let's adjust...", or "Let's change..."). Output only final, clean, authoritative educational rationales.
 
 12. FINAL QUALITY GATE
     - Output must be clean, valid, un-truncated JSON array syntax starting with `[` and ending with `]`.
-    - No markdown formatting code blockss, and no conversational filler outside the JSON array.
+    - No markdown formatting code blocks, and no conversational filler outside the JSON array.
 
 13. VISUAL RELEVANCE & ACCURACY (When Visuals are Requested)
     - Diagrams and charts must be generated only when visual diagram is requested, directly illustrating the intended concept.
@@ -104,6 +108,8 @@ Apply all 15 core guardrails and formatting standards to every question generate
      | Value 1 | Value 2 |
    - Never output informal tables or plain dashes without markdown pipe separators.
 
-6. MATHEMATICAL EXPRESSIONS & NOTATION
+6. MATHEMATICAL EXPRESSIONS, ARITHMETIC RIGOR & MULTI-STEP INTEGRITY
+   - ARITHMETIC INTEGRITY (CRITICAL): When creating word problems with multi-step calculations (e.g., adding/subtracting points across levels or turns), calculate and verify every arithmetic step (e.g. 35 - 12 - 6 = 17) completely BEFORE writing the stem and options.
+   - OPTION–STEM MATH CONSISTENCY: Every numerical option must strictly agree with the arithmetic in the stem. A correct option must never state an incorrect calculation result (e.g., if the problem computes to 17, a correct option cannot state 23).
    - Write equations and single-letter variables cleanly in plain text (e.g., `3x + 2 = 38`) without wrapping every individual variable in raw LaTeX dollar signs (`$x$`).
    - Use standard Unicode mathematical symbols directly (`°`, `×`, `÷`, `²`, `³`, `√`, `π`, `≤`, `≥`, `±`) for clean legibility.
