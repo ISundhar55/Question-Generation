@@ -115,8 +115,7 @@ IMPORTANT for TRUE_FALSE:
 IMPORTANT for CONSTRUCTED_RESPONSE:
 - Create 1-3 blanks using ___ in the text. Use EXACTLY three underscores (___) for EVERY blank.
   Do NOT use ____ (4), _____ (5), or any other count — always exactly three underscores.
-- Each element in options.answers MUST be an array of strings representing acceptable correct answers (synonyms, alternate spellings, abbreviations, or alternative terminology) for that blank.
-- You MUST provide at least 2-3 acceptable alternatives inside the array for EACH blank.
+- Provide legitimate acceptable alternatives inside the array ONLY when true synonyms, spelling variations, or grammatical variants (singular/plural) exist (e.g. ["solid", "solids"] or ["mitochondria", "mitochondrion"]). Never force scientifically distinct terms or different concepts as interchangeable alternatives (e.g. never treat "boiling" and "evaporation" as interchangeable).
 - The first string in each array is the primary correct answer.
 - The answer field must list only the primary correct answers joined with | (pipe).
 - MANDATORY RATIONALE: The explanation field MUST provide a distinct bulleted rationale for EVERY blank present in the question (• Blank 1: ..., • Blank 2: ..., etc.), explaining the core concept and why the listed alternatives are valid.""",
