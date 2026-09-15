@@ -339,6 +339,10 @@ def _call_gemini(prompt: str) -> str:
     last_err: Exception | None = None
     for attempt in range(2):
         try:
+            print(f"\n{'=' * 40} [LLM INPUT PROMPT - GEMINI (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(prompt, flush=True)
+            print(f"{'=' * 115}\n", flush=True)
+
             response = client.generate_content(
                 prompt,
                 generation_config=genai.GenerationConfig(
@@ -348,6 +352,11 @@ def _call_gemini(prompt: str) -> str:
                 ),
             )
             raw_text = response.text
+
+            print(f"\n{'=' * 40} [LLM RAW OUTPUT - GEMINI (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(raw_text, flush=True)
+            print(f"{'=' * 115}\n", flush=True)
+
             usage = getattr(response, 'usage_metadata', None)
             if usage:
                 prompt_tok  = getattr(usage, 'prompt_token_count', '?')
@@ -373,6 +382,10 @@ def _call_groq(prompt: str) -> str:
     last_err: Exception | None = None
     for attempt in range(2):
         try:
+            print(f"\n{'=' * 40} [LLM INPUT PROMPT - GROQ (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(prompt, flush=True)
+            print(f"{'=' * 113}\n", flush=True)
+
             completion = client.chat.completions.create(
                 model=GROQ_MODEL,
                 messages=[
@@ -389,6 +402,11 @@ def _call_groq(prompt: str) -> str:
                 max_tokens=8192,
             )
             raw_text = completion.choices[0].message.content
+
+            print(f"\n{'=' * 40} [LLM RAW OUTPUT - GROQ (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(raw_text, flush=True)
+            print(f"{'=' * 113}\n", flush=True)
+
             usage = getattr(completion, 'usage', None)
             if usage:
                 prompt_tok  = getattr(usage, 'prompt_tokens', '?')
@@ -794,6 +812,16 @@ def _clean_explanation(explanation: str) -> str:
             text,
             flags=re.IGNORECASE
         )
+        # If a chain-of-thought trigger occurs mid-text (e.g. "...26, wait, recalculating..."), truncate cleanly at that trigger
+        m_cot = cot_pattern.search(text)
+        if m_cot:
+            prefix = text[:m_cot.start()].strip()
+            if len(prefix) > 15:
+                prefix = re.sub(r"[,;:\-–\s]+$", "", prefix)
+                if not prefix.endswith((".", "!", "?")):
+                    prefix += "."
+                return prefix
+
         sentences = re.split(r'(?<=[.!?])\s+', text)
         cleaned = []
         for s in sentences:

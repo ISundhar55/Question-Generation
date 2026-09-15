@@ -31,24 +31,22 @@ IMPORTANT for SINGLE_SELECT:
   "grade": "<grade>",
   "text": "<question text>",
   "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>", "E": "<option E>"},
-  "answer": "<pipe-separated list of EXACTLY 2 or 3 correct letters, e.g. A|C or B|D|E>",
+  "answer": "<pipe-separated list of more than one correct letters, e.g. B|D or A|C|E>",
   "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D, E...)",
   "sourceChunkIds": [<list of chunk_id integers used>]
 }
 IMPORTANT for MULTIPLE_SELECT:
 - MANDATORY 5 OPTIONS: Always provide exactly 5 options (A, B, C, D, E). Always use consecutive letters starting from A.
-- STRICT CORRECT ANSWER COUNT (EXACTLY 2 OR 3): The answer field MUST contain EXACTLY 2 OR 3 correct letters (e.g., 'A|C' or 'B|D|E').
-  * STRICTLY FORBIDDEN: Having 4 correct answers out of 5 is INVALID (because it leaves only 1 distractor).
-  * STRICTLY FORBIDDEN: Having 1 correct answer is INVALID.
+- STRICT CORRECT ANSWER COUNT: The answer field MUST contain more than one correct letter (e.g. 2 or 3 correct letters). Never create a multiple-select question with only 1 correct answer.
 - STEM-ANSWER COUNT AGREEMENT: The number specified in the question text MUST EXACTLY MATCH the number of correct options in the 'answer' field.
-  * If the question asks for TWO (e.g. 'Which TWO...', 'Select TWO...'), there MUST be EXACTLY 2 correct answers (e.g. 'A|C') and 3 incorrect distractors.
-  * If the question asks for THREE (e.g. 'Which THREE...', 'Select THREE...'), there MUST be EXACTLY 3 correct answers (e.g. 'B|D|E') and 2 incorrect distractors.
+  * If the question asks for TWO (e.g. 'Which TWO...', 'Select TWO...'), there MUST be EXACTLY 2 correct answers and 3 incorrect distractors.
+  * If the question asks for THREE (e.g. 'Which THREE...', 'Select THREE...'), there MUST be EXACTLY 3 correct answers and 2 incorrect distractors.
 - MANDATORY DISTRACTORS & ZERO ACCIDENTAL TRUE OPTIONS:
-  * Ensure there are ALWAYS 2 or 3 plausible incorrect distractors (e.g., 2 correct + 3 distractors, or 3 correct + 2 distractors).
+  * Ensure there are ALWAYS plausible incorrect distractors.
   * Distractors must be UNAMBIGUOUSLY FALSE and factually flawed; they must NEVER accidentally be true.
   * COMPARATIVE DISTRACTORS (CRITICAL): When drafting comparative options (e.g. 'A has fewer than B'), verify the actual values. If the comparison is true, you MUST invert it (e.g. 'A has more than B') so it is definitively FALSE.
-  * In 'Which TWO...', there must be EXACTLY 2 true options (matching the answer field) and all other 3 options must be false.
-- The answer field must list all correct letters in alphabetical order, joined with | (pipe), e.g. "A|C" or "B|D|E".
+  * In 'Which TWO...', there must be EXACTLY 2 true options (matching the answer field) and all other options must be false.
+- The answer field must list all correct letters in alphabetical order, joined with | (pipe). Distribute correct answers across all options (A through E) without favoring specific letters.
 - MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options' (A, B, C, D, E), explaining why each correct choice is right and why each distractor is wrong.""",
 
     "MCQ": """Each question object must follow this exact format:
@@ -446,18 +444,10 @@ IMPORTANT RULES for SELECT_TEXT:
 6. "explanation": Must explain why each correct selected item answers the question and why the remaining passage elements do not."""
 }
 
-# Universal explanation rules applied across ALL question types and content areas
-UNIVERSAL_RATIONALE_RULES = """
-UNIVERSAL RATIONALE & EXPLANATION INTEGRITY (APPLIES TO ALL QUESTION TYPES & ALL SUBJECTS):
-- MANDATORY EDUCATIONAL RATIONALE: Provide a clear, thorough explanation justifying why the correct answer is right and why distractors or alternatives are incorrect.
-- STRICT ANSWER-TO-RATIONALE TAG SYNCHRONIZATION: The status tag (Correct) may ONLY appear on items included in the 'answer' field (e.g., if answer is 'A|C', ONLY Option A and Option C can be tagged (Correct)). All distractors MUST be tagged (Incorrect). NEVER label a distractor as (Correct).
-- ZERO ACCIDENTAL TRUE DISTRACTORS: Every distractor must evaluate to definitively FALSE. For comparative statements (e.g. 'A has fewer than B'), verify that the statement is false; if it is true, invert it so it is an incorrect distractor.
-- ZERO DUPLICATION: Each item key or bullet in the explanation (e.g. option letter, blank, step, pair, row, category) MUST appear EXACTLY ONCE. Never repeat or emit duplicate bullets for the same key.
-- NO SCRATCHPAD / NO INTERNAL DIALOGUE: Complete all problem-solving, factual verification, calculations, and option drafting BEFORE outputting JSON. The explanation is strictly student-facing educational content. NEVER output internal thinking, self-corrections, recalculations, or conversational drafting thoughts (e.g., 'Wait, recalculating...', 'Let me review...', 'Let's fix...', 'in my head', 'Let's adjust...'). Output final clean educational rationales only."""
-
-# Append universal rationale rules to every format so they apply uniformly across all types and subjects
-for _qtype in list(FORMAT_BY_TYPE.keys()):
-    FORMAT_BY_TYPE[_qtype] = FORMAT_BY_TYPE[_qtype] + "\n\n" + UNIVERSAL_RATIONALE_RULES.strip()
+# Universal rationale rules are managed centrally in guardrails.md (Section 8: Explanation Integrity)
+# to avoid prompt duplication and maintain a single source of truth across all formats.
+UNIVERSAL_RATIONALE_RULES = ""
 
 # Backward compatibility alias
 _FORMAT_BY_TYPE = FORMAT_BY_TYPE
+
