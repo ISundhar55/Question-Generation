@@ -627,9 +627,8 @@ STRICT RULES — follow exactly:
 3. Calibrate difficulty strictly to {difficulty} level.
 4. Return ONLY a valid JSON array. No markdown, no code fences, no explanations,
    no preamble. The response must start with [ and end with ].
-5. In sourceChunkIds, always return an empty list: [].
-6. Set "contentArea" to "{content_area}" and "grade" to "{grade}" on every question.
-7. MANDATORY: Add a "webSources" field to each question object with 1 entry identifying the best reputable educational website for this question topic.{preferred_website_rule} Use the format: {{"name": "<Website Name>", "url": "<Homepage or section-level URL>"}}. Only use the root domain or a known stable section URL — do NOT guess deep article paths.
+5. Set "contentArea" to "{content_area}" and "grade" to "{grade}" on every question.
+6. MANDATORY: Add a "webSources" field to each question object with 1 entry identifying the best reputable educational website for this question topic.{preferred_website_rule} Use the format: {{"name": "<Website Name>", "url": "<Homepage or section-level URL>"}}. Only use the root domain or a known stable section URL — do NOT guess deep article paths.
 {custom_block}
 Generate {count} {question_type} question(s) at {difficulty} difficulty
 for {grade} {content_area}.
