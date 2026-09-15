@@ -360,7 +360,7 @@ export default function AIGeneratePage() {
           const res = await questionsAPI.create(buildSavePayload(q, 'ready_for_review'));
           if (res.data?.id) q.id = res.data.id;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     setQuestions(prev => prev.map(q => ({ ...q, status: 'ready_for_review' })));
   };
@@ -375,7 +375,7 @@ export default function AIGeneratePage() {
           const res = await questionsAPI.create(buildSavePayload(q, 'rejected'));
           if (res.data?.id) q.id = res.data.id;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     setQuestions(prev => prev.map(q => ({ ...q, status: 'rejected' })));
   };
@@ -1123,7 +1123,7 @@ export default function AIGeneratePage() {
                 const src = showSource[idx];
 
                 return (
-                    <div
+                  <div
                     key={idx}
                     className="responsive-card"
                     style={{
@@ -1405,1134 +1405,1134 @@ export default function AIGeneratePage() {
                           </div>
                         )}
 
-                    {/* Multiple Choice Options */}
-                    {(q.questionType === 'SINGLE_SELECT' || q.questionType === 'MULTIPLE_SELECT' || q.questionType === 'MULTI_SELECT' || q.questionType === 'MCQ') && q.options && (() => {
-                      const correctAnswers = (q.answer || '').replace(/,/g, '|').split('|').map(s => s.trim());
-                      const isCorrect = (letter) => correctAnswers.includes(letter);
-                      const validEntries = Object.entries(q.options).filter(([k]) => k !== 'visual' && k.length <= 3);
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                          {validEntries.map(([letter, text]) => {
-                            const isSvg = typeof text === 'string' && text.includes('<svg');
-                            return (
-                              <div key={letter} style={{
-                                display: 'flex',
-                                flexDirection: isSvg ? 'column' : 'row',
-                                alignItems: isSvg ? 'stretch' : 'flex-start',
-                                gap: 10,
-                                padding: '10px 14px',
-                                borderRadius: q.questionType === 'MULTIPLE_SELECT' ? 6 : 8,
-                                border: `1.5px solid ${isCorrect(letter) ? '#86efac' : 'var(--color-border)'}`,
-                                background: isCorrect(letter) ? '#f0fdf4' : '#fafbfc',
-                              }}>
-                                {/* Letter & optional Correct badge */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginTop: 1 }}>
-                                  <span style={{
-                                    fontWeight: 700, fontSize: 12, color: isCorrect(letter) ? 'var(--color-success)' : 'var(--color-text-muted)',
-                                    flexShrink: 0,
-                                  }}>{letter}.</span>
-                                  {isCorrect(letter) && (
-                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>
-                                      Correct
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Option Content */}
-                                {isSvg ? (
-                                  <div>
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          const tempDiv = document.createElement('div');
-                                          tempDiv.innerHTML = text;
-                                          const svgEl = tempDiv.querySelector('svg');
-                                          if (svgEl) {
-                                            document.body.appendChild(tempDiv);
-                                            import('question-storybook-ui').then(({ downloadSvgAsPng }) => {
-                                              downloadSvgAsPng(svgEl, `option_${letter}.png`, 2.5);
-                                              document.body.removeChild(tempDiv);
-                                            });
-                                          }
-                                        }}
-                                        style={{
-                                          fontSize: 10,
-                                          fontWeight: 600,
-                                          color: '#0284c7',
-                                          background: '#f0f9ff',
-                                          border: '1px solid #bae6fd',
-                                          borderRadius: 4,
-                                          padding: '2px 6px',
-                                          cursor: 'pointer',
-                                        }}
-                                        title={`Download Option ${letter} image as PNG`}
-                                      >
-                                        ⬇ PNG
-                                      </button>
-                                    </div>
-                                    <div
-                                      style={{ width: '100%', display: 'flex', justifyContent: 'center', padding: '6px 0', overflowX: 'auto' }}
-                                      dangerouslySetInnerHTML={{ __html: text }}
-                                    />
-                                  </div>
-                                ) : (
-                                  <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--color-text)', lineHeight: 1.45 }}>
-                                    <MarkdownText text={String(text)} />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Matching Lines columns */}
-                    {q.questionType === 'MATCHING_LINES' && (() => {
-                      let opts = q.options;
-                      if (typeof opts === 'string') {
-                        try { opts = JSON.parse(opts); } catch (_) {
-                          try { opts = JSON.parse(opts.replace(/'/g, '"')); } catch (_) {}
-                        }
-                      }
-                      if (!opts?.left || !opts?.right) return null;
-                      const correctPairs = parseMatchingAnswer(q.answer);
-                      const leftItems = Object.entries(opts.left);
-                      const rightItems = Object.entries(opts.right);
-                      return (
-                        <div style={{ marginBottom: 14 }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4 }}>Column A</div>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4 }}>Column B</div>
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {leftItems.map(([key, label]) => (
-                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#f8fafc' }}>
-                                  <span style={{ fontWeight: 700, fontSize: 12, color: '#0891b2', flexShrink: 0, minWidth: 18 }}>{key}.</span>
-                                  <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{label}</span>
-                                </div>
-                              ))}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {rightItems.map(([key, label]) => (
-                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#f8fafc' }}>
-                                  <span style={{ fontWeight: 700, fontSize: 12, color: '#6b7280', flexShrink: 0, minWidth: 18 }}>{key}.</span>
-                                  <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{label}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          {Object.keys(correctPairs).length > 0 && (
-                            <div style={{ marginTop: 12 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Answer Key</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                {Object.entries(correctPairs).map(([leftKey, rightKey]) => (
-                                  <div key={leftKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#ecfeff', border: '1px solid #a5f3fc', fontSize: 12, fontWeight: 600, color: '#0891b2' }}>
-                                    <span>{leftKey}</span><span style={{ color: '#94a3b8' }}>→</span><span>{rightKey}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Ordering preview */}
-                    {q.questionType === 'ORDERING' && Array.isArray(q.options) && (() => {
-                      const correct = q.answer ? q.answer.split('|').map(s => s.trim()) : [];
-                      return (
-                        <div style={{ marginBottom: 14 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 400, marginBottom: 12 }}>
-                            {q.options.map((opt, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#fff' }}>
-                                <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>{i + 1}</span>
-                                <span style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500 }}>{opt}</span>
-                              </div>
-                            ))}
-                          </div>
-                          {correct.length > 0 && (
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Correct Order Key</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                {correct.map((item, i) => (
-                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{ fontSize: 12, padding: '4px 10px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 20, color: '#db2777', fontWeight: 600 }}>
-                                      {i + 1}. {item}
-                                    </span>
-                                    {i < correct.length - 1 && <span style={{ color: '#db2777', opacity: 0.5 }}>➔</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Constructed Response — Correct Answer Key card */}
-                    {q.questionType === 'CONSTRUCTED_RESPONSE' && (() => {
-                      const answers = q.options?.answers || (q.answer ? q.answer.split('|') : []);
-                      if (!answers.length) return null;
-                      return (
-                        <div style={{ marginBottom: 14, padding: '12px 16px', background: '#f5f3ff', borderRadius: 8, border: '1.5px solid #d8b4fe' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                            Correct Answer Key
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {answers.map((ans, idx) => {
-                              const isArr = Array.isArray(ans);
-                              const primary = isArr ? (ans[0] || '') : ans;
-                              const alts = isArr ? ans.slice(1) : [];
-                              return (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 13, color: 'var(--color-text)' }}>
-                                  <span style={{ fontWeight: 600, color: '#6b21a8' }}>Blank {idx + 1}:</span>
-                                  <span style={{
-                                    display: 'inline-block', padding: '3px 10px',
-                                    background: '#ffffff', border: '1.5px solid #c4b5fd',
-                                    borderRadius: 6, color: '#7c3aed', fontWeight: 700, fontSize: 13,
+                        {/* Multiple Choice Options */}
+                        {(q.questionType === 'SINGLE_SELECT' || q.questionType === 'MULTIPLE_SELECT' || q.questionType === 'MULTI_SELECT' || q.questionType === 'MCQ') && q.options && (() => {
+                          const correctAnswers = (q.answer || '').replace(/,/g, '|').split('|').map(s => s.trim());
+                          const isCorrect = (letter) => correctAnswers.includes(letter);
+                          const validEntries = Object.entries(q.options).filter(([k]) => k !== 'visual' && k.length <= 3);
+                          return (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                              {validEntries.map(([letter, text]) => {
+                                const isSvg = typeof text === 'string' && text.includes('<svg');
+                                return (
+                                  <div key={letter} style={{
+                                    display: 'flex',
+                                    flexDirection: isSvg ? 'column' : 'row',
+                                    alignItems: isSvg ? 'stretch' : 'flex-start',
+                                    gap: 10,
+                                    padding: '10px 14px',
+                                    borderRadius: q.questionType === 'MULTIPLE_SELECT' ? 6 : 8,
+                                    border: `1.5px solid ${isCorrect(letter) ? '#86efac' : 'var(--color-border)'}`,
+                                    background: isCorrect(letter) ? '#f0fdf4' : '#fafbfc',
                                   }}>
-                                    {primary}
-                                  </span>
-                                  {alts.length > 0 && (
-                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                                      (acceptable alternatives: <strong>{alts.join(', ')}</strong>)
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                                    {/* Letter & optional Correct badge */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginTop: 1 }}>
+                                      <span style={{
+                                        fontWeight: 700, fontSize: 12, color: isCorrect(letter) ? 'var(--color-success)' : 'var(--color-text-muted)',
+                                        flexShrink: 0,
+                                      }}>{letter}.</span>
+                                      {isCorrect(letter) && (
+                                        <span style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>
+                                          Correct
+                                        </span>
+                                      )}
+                                    </div>
 
-                    {/* Dropdown — Blank options with correct selection highlighted */}
-                    {q.questionType === 'DROPDOWN' && q.options?.blanks && (() => {
-                      return (
-                        <div style={{ marginBottom: 14, padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1.5px solid #cbd5e1' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                            Dropdown Selections & Options
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {q.options.blanks.map((b, idx) => (
-                              <div key={idx} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text)', minWidth: 60 }}>
-                                  Blank {idx + 1}:
-                                </span>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                  {b.choices.map(choice => {
-                                    const isCorrect = choice === b.correct;
-                                    return (
-                                      <span
-                                        key={choice}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: 4,
-                                          padding: '3px 10px',
-                                          borderRadius: 6,
-                                          fontSize: 12,
-                                          fontWeight: isCorrect ? 700 : 500,
-                                          background: isCorrect ? '#dcfce7' : '#ffffff',
-                                          color: isCorrect ? '#15803d' : '#475569',
-                                          border: `1.5px solid ${isCorrect ? '#86efac' : '#e2e8f0'}`,
-                                          boxShadow: isCorrect ? '0 1px 2px rgba(22, 163, 74, 0.1)' : 'none',
-                                        }}
-                                      >
-                                        {isCorrect && <span>✓</span>}
-                                        {choice}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Gap Match Passage & Response Options Display */}
-                    {q.questionType === 'GAP_MATCH' && q.options && (() => {
-                      const passageText = q.options.passage || '';
-                      const responseOptions = Array.isArray(q.options.response_options)
-                        ? q.options.response_options
-                        : Array.isArray(q.options.label_bank)
-                          ? q.options.label_bank
-                          : [];
-                      let answersObj = {};
-                      if (typeof q.answer === 'object' && q.answer !== null) {
-                        answersObj = q.answer;
-                      } else if (typeof q.answer === 'string') {
-                        try {
-                          answersObj = JSON.parse(q.answer);
-                        } catch (_) {
-                          try {
-                            const fixed = q.answer.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
-                            answersObj = JSON.parse(fixed);
-                          } catch (_) {}
-                        }
-                      }
-
-                      const renderPassageWithGaps = () => {
-                        if (!passageText) return <span style={{ color: 'var(--color-text-muted)' }}>No passage provided</span>;
-                        const parts = passageText.split(/(\[gap_[a-zA-Z0-9_-]+\]|\[gap\s*[0-9]+\])/gi);
-                        return parts.map((part, pIdx) => {
-                          const match = part.match(/\[(gap_[a-zA-Z0-9_-]+|gap\s*[0-9]+)\]/i);
-                          if (match) {
-                            const gapKey = match[1].toLowerCase().replace(/\s+/g, '_');
-                            return (
-                              <span
-                                key={pIdx}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  minWidth: 100,
-                                  height: 32,
-                                  margin: '0 4px',
-                                  padding: '2px 10px',
-                                  borderRadius: 6,
-                                  border: '2px dashed #2563eb',
-                                  background: '#eff6ff',
-                                  color: '#1d4ed8',
-                                  fontWeight: 600,
-                                  fontSize: 12,
-                                  verticalAlign: 'middle',
-                                }}
-                              >
-                                [ {match[1]} ]
-                              </span>
-                            );
-                          }
-                          return <span key={pIdx}>{part}</span>;
-                        });
-                      };
-
-                      return (
-                        <div style={{ marginBottom: 16 }}>
-                          {/* Response Options Bank */}
-                          {responseOptions.length > 0 && (
-                            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#eff6ff', border: '1.5px solid #bfdbfe', marginBottom: 14 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.04em' }}>
-                                📦 Response Options Bank
-                              </div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                {responseOptions.map((opt, i) => (
-                                  <span
-                                    key={i}
-                                    style={{
-                                      padding: '5px 12px',
-                                      borderRadius: 6,
-                                      background: '#ffffff',
-                                      border: '1px solid #93c5fd',
-                                      color: '#1e40af',
-                                      fontSize: 12,
-                                      fontWeight: 600,
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                    }}
-                                  >
-                                    {opt}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Passage Box with clean empty gaps */}
-                          <div style={{
-                            padding: '16px 20px',
-                            borderRadius: 10,
-                            background: '#f8fafc',
-                            border: '1.5px solid #e2e8f0',
-                            lineHeight: 2.0,
-                            fontSize: 14,
-                            color: 'var(--color-text)',
-                            marginBottom: 14,
-                          }}>
-                            {renderPassageWithGaps()}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Multiple Drop Bucket Display */}
-                    {q.questionType === 'MULTIPLE_DROP_BUCKET' && q.options && (() => {
-                      const optionBuckets = Array.isArray(q.options.option_buckets) ? q.options.option_buckets : [];
-                      const dropBuckets = Array.isArray(q.options.drop_buckets) ? q.options.drop_buckets : [];
-
-                      let answersObj = {};
-                      const rawAns = q.answer;
-                      if (typeof rawAns === 'object' && rawAns !== null && !Array.isArray(rawAns)) {
-                        answersObj = rawAns;
-                      } else if (typeof rawAns === 'string') {
-                        try {
-                          answersObj = JSON.parse(rawAns);
-                        } catch (_) {
-                          try {
-                            const fixed = rawAns
-                              .replace(/True/g, 'true').replace(/False/g, 'false').replace(/None/g, 'null')
-                              .replace(/(^|[{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
-                              .replace(/:\s*'([^']+?)'/g, ': "$1"')
-                              .replace(/\[\s*'([^']+?)'/g, '["$1"')
-                              .replace(/,\s*'([^']+?)'/g, ', "$1"');
-                            answersObj = JSON.parse(fixed);
-                          } catch (_) {
-                            const res = {};
-                            const regex = /['"]?([a-zA-Z0-9_\s-]+)['"]?\s*:\s*\[([\s\S]*?)\]/g;
-                            let match;
-                            while ((match = regex.exec(rawAns)) !== null) {
-                              const key = match[1].trim();
-                              const itemsRaw = match[2];
-                              const items = [];
-                              const itemRegex = /['"](.*?)['"](?=\s*,|\s*\]|\s*$)/g;
-                              let itemMatch;
-                              while ((itemMatch = itemRegex.exec(itemsRaw)) !== null) {
-                                items.push(itemMatch[1].trim());
-                              }
-                              if (items.length > 0) res[key] = items;
-                            }
-                            answersObj = res;
-                          }
-                        }
-                      }
-
-                      return (
-                        <div style={{ marginBottom: 16 }}>
-                          {/* Option Buckets */}
-                          {optionBuckets.length > 0 && (
-                            <div style={{ marginBottom: 14 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.04em' }}>
-                                📦 Option Buckets
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {optionBuckets.map((oBucket, bIdx) => (
-                                  <div key={oBucket.id || bIdx} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1.5px solid #e2e8f0' }}>
-                                    {oBucket.title && (
-                                      <div style={{ fontSize: 12, fontWeight: 700, color: '#0d6efd', marginBottom: 6 }}>
-                                        {oBucket.title}
+                                    {/* Option Content */}
+                                    {isSvg ? (
+                                      <div>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const tempDiv = document.createElement('div');
+                                              tempDiv.innerHTML = text;
+                                              const svgEl = tempDiv.querySelector('svg');
+                                              if (svgEl) {
+                                                document.body.appendChild(tempDiv);
+                                                import('question-storybook-ui').then(({ downloadSvgAsPng }) => {
+                                                  downloadSvgAsPng(svgEl, `option_${letter}.png`, 2.5);
+                                                  document.body.removeChild(tempDiv);
+                                                });
+                                              }
+                                            }}
+                                            style={{
+                                              fontSize: 10,
+                                              fontWeight: 600,
+                                              color: '#0284c7',
+                                              background: '#f0f9ff',
+                                              border: '1px solid #bae6fd',
+                                              borderRadius: 4,
+                                              padding: '2px 6px',
+                                              cursor: 'pointer',
+                                            }}
+                                            title={`Download Option ${letter} image as PNG`}
+                                          >
+                                            ⬇ PNG
+                                          </button>
+                                        </div>
+                                        <div
+                                          style={{ width: '100%', display: 'flex', justifyContent: 'center', padding: '6px 0', overflowX: 'auto' }}
+                                          dangerouslySetInnerHTML={{ __html: text }}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--color-text)', lineHeight: 1.45 }}>
+                                        <MarkdownText text={String(text)} />
                                       </div>
                                     )}
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                      {(oBucket.options || []).map((opt, oIdx) => (
-                                        <span
-                                          key={oIdx}
-                                          style={{
-                                            padding: '4px 10px',
-                                            borderRadius: 6,
-                                            background: '#ffffff',
-                                            border: '1px solid #cbd5e1',
-                                            color: 'var(--color-text)',
-                                            fontSize: 12,
-                                            fontWeight: 600,
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                          }}
-                                        >
-                                          {opt}
-                                        </span>
-                                      ))}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Matching Lines columns */}
+                        {q.questionType === 'MATCHING_LINES' && (() => {
+                          let opts = q.options;
+                          if (typeof opts === 'string') {
+                            try { opts = JSON.parse(opts); } catch (_) {
+                              try { opts = JSON.parse(opts.replace(/'/g, '"')); } catch (_) { }
+                            }
+                          }
+                          if (!opts?.left || !opts?.right) return null;
+                          const correctPairs = parseMatchingAnswer(q.answer);
+                          const leftItems = Object.entries(opts.left);
+                          const rightItems = Object.entries(opts.right);
+                          return (
+                            <div style={{ marginBottom: 14 }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4 }}>Column A</div>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4 }}>Column B</div>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  {leftItems.map(([key, label]) => (
+                                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#f8fafc' }}>
+                                      <span style={{ fontWeight: 700, fontSize: 12, color: '#0891b2', flexShrink: 0, minWidth: 18 }}>{key}.</span>
+                                      <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{label}</span>
                                     </div>
+                                  ))}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  {rightItems.map(([key, label]) => (
+                                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#f8fafc' }}>
+                                      <span style={{ fontWeight: 700, fontSize: 12, color: '#6b7280', flexShrink: 0, minWidth: 18 }}>{key}.</span>
+                                      <span style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.4 }}>{label}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              {Object.keys(correctPairs).length > 0 && (
+                                <div style={{ marginTop: 12 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Answer Key</div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                    {Object.entries(correctPairs).map(([leftKey, rightKey]) => (
+                                      <div key={leftKey} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#ecfeff', border: '1px solid #a5f3fc', fontSize: 12, fontWeight: 600, color: '#0891b2' }}>
+                                        <span>{leftKey}</span><span style={{ color: '#94a3b8' }}>→</span><span>{rightKey}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Ordering preview */}
+                        {q.questionType === 'ORDERING' && Array.isArray(q.options) && (() => {
+                          const correct = q.answer ? q.answer.split('|').map(s => s.trim()) : [];
+                          return (
+                            <div style={{ marginBottom: 14 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 400, marginBottom: 12 }}>
+                                {q.options.map((opt, i) => (
+                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: '#fff' }}>
+                                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>{i + 1}</span>
+                                    <span style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500 }}>{opt}</span>
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          )}
-
-                          {/* Target Drop Buckets */}
-                          {dropBuckets.length > 0 && (
-                            <div style={{ marginBottom: 14 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.04em' }}>
-                                📥 Target Drop Buckets
-                              </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(dropBuckets.length, 3)}, 1fr)`, gap: 10 }}>
-                                {dropBuckets.map((dBucket, dIdx) => {
-                                  const getAssigned = () => {
-                                    if (dBucket.id && Array.isArray(answersObj[dBucket.id])) return answersObj[dBucket.id];
-                                    if (dBucket.name && Array.isArray(answersObj[dBucket.name])) return answersObj[dBucket.name];
-                                    if (Array.isArray(answersObj[`drop_bucket_${dIdx + 1}`])) return answersObj[`drop_bucket_${dIdx + 1}`];
-                                    if (Array.isArray(answersObj[String(dIdx)])) return answersObj[String(dIdx)];
-                                    if (dBucket.name) {
-                                      const tName = dBucket.name.trim().toLowerCase();
-                                      const fKey = Object.keys(answersObj).find(k => k.trim().toLowerCase() === tName);
-                                      if (fKey && Array.isArray(answersObj[fKey])) return answersObj[fKey];
-                                    }
-                                    const fallback = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
-                                    return Array.isArray(fallback) ? fallback : [fallback].filter(Boolean);
-                                  };
-                                  const assignedList = getAssigned();
-
-                                  return (
-                                    <div
-                                      key={dBucket.id || dIdx}
-                                      style={{
-                                        padding: '12px 14px',
-                                        background: '#f0f9ff',
-                                        borderRadius: 8,
-                                        border: '2px dashed #0284c7',
-                                        minHeight: 100,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 6,
-                                      }}
-                                    >
-                                      <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <span>📥</span>
-                                        <span>{dBucket.name || `Category ${dIdx + 1}`}</span>
+                              {correct.length > 0 && (
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Correct Order Key</div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                    {correct.map((item, i) => (
+                                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ fontSize: 12, padding: '4px 10px', background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 20, color: '#db2777', fontWeight: 600 }}>
+                                          {i + 1}. {item}
+                                        </span>
+                                        {i < correct.length - 1 && <span style={{ color: '#db2777', opacity: 0.5 }}>➔</span>}
                                       </div>
-                                      {assignedList.length === 0 ? (
-                                        <div style={{ fontSize: 11, color: '#0284c7', fontStyle: 'italic', opacity: 0.7, marginTop: 6 }}>
-                                          [ Drop items here ]
-                                        </div>
-                                      ) : (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                                          {assignedList.map((item, i) => (
-                                            <span
-                                              key={i}
-                                              style={{
-                                                padding: '4px 10px',
-                                                borderRadius: 6,
-                                                background: '#ffffff',
-                                                border: '1px solid #7dd3fc',
-                                                color: '#0369a1',
-                                                fontSize: 12,
-                                                fontWeight: 600,
-                                              }}
-                                            >
-                                              {item}
-                                            </span>
-                                          ))}
-                                        </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Constructed Response — Correct Answer Key card */}
+                        {q.questionType === 'CONSTRUCTED_RESPONSE' && (() => {
+                          const answers = q.options?.answers || (q.answer ? q.answer.split('|') : []);
+                          if (!answers.length) return null;
+                          return (
+                            <div style={{ marginBottom: 14, padding: '12px 16px', background: '#f5f3ff', borderRadius: 8, border: '1.5px solid #d8b4fe' }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                                Correct Answer Key
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {answers.map((ans, idx) => {
+                                  const isArr = Array.isArray(ans);
+                                  const primary = isArr ? (ans[0] || '') : ans;
+                                  const alts = isArr ? ans.slice(1) : [];
+                                  return (
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 13, color: 'var(--color-text)' }}>
+                                      <span style={{ fontWeight: 600, color: '#6b21a8' }}>Blank {idx + 1}:</span>
+                                      <span style={{
+                                        display: 'inline-block', padding: '3px 10px',
+                                        background: '#ffffff', border: '1.5px solid #c4b5fd',
+                                        borderRadius: 6, color: '#7c3aed', fontWeight: 700, fontSize: 13,
+                                      }}>
+                                        {primary}
+                                      </span>
+                                      {alts.length > 0 && (
+                                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                                          (acceptable alternatives: <strong>{alts.join(', ')}</strong>)
+                                        </span>
                                       )}
                                     </div>
                                   );
                                 })}
                               </div>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                          );
+                        })()}
 
-                    {/* Matrix Interaction Display */}
-                    {q.questionType === 'MATRIX_INTERACTION' && q.options && (() => {
-                      const headerText = q.options?.header || 'Header';
-                      const rawCols = Array.isArray(q.options?.columns) ? q.options.columns : [];
-                      const columns = rawCols.map((c, i) => (typeof c === 'object' ? c : { id: `col_${i + 1}`, value: String(c) }));
-                      const rawRows = Array.isArray(q.options?.rows) ? q.options.rows : [];
-                      const rows = rawRows.map((r, i) => (typeof r === 'object' ? r : { id: `row_${i + 1}`, value: String(r) }));
+                        {/* Dropdown — Blank options with correct selection highlighted */}
+                        {q.questionType === 'DROPDOWN' && q.options?.blanks && (() => {
+                          return (
+                            <div style={{ marginBottom: 14, padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1.5px solid #cbd5e1' }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                                Dropdown Selections & Options
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {q.options.blanks.map((b, idx) => (
+                                  <div key={idx} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                                    <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text)', minWidth: 60 }}>
+                                      Blank {idx + 1}:
+                                    </span>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                      {b.choices.map(choice => {
+                                        const isCorrect = choice === b.correct;
+                                        return (
+                                          <span
+                                            key={choice}
+                                            style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: 4,
+                                              padding: '3px 10px',
+                                              borderRadius: 6,
+                                              fontSize: 12,
+                                              fontWeight: isCorrect ? 700 : 500,
+                                              background: isCorrect ? '#dcfce7' : '#ffffff',
+                                              color: isCorrect ? '#15803d' : '#475569',
+                                              border: `1.5px solid ${isCorrect ? '#86efac' : '#e2e8f0'}`,
+                                              boxShadow: isCorrect ? '0 1px 2px rgba(22, 163, 74, 0.1)' : 'none',
+                                            }}
+                                          >
+                                            {isCorrect && <span>✓</span>}
+                                            {choice}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
-                      let answersObj = {};
-                      const rawAns = q.answer;
-                      if (typeof rawAns === 'object' && rawAns !== null && !Array.isArray(rawAns)) {
-                        answersObj = rawAns;
-                      } else if (typeof rawAns === 'string') {
-                        const trimmed = rawAns.trim();
-                        try {
-                          answersObj = JSON.parse(trimmed);
-                        } catch (_) {
-                          try {
-                            const regex = /['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]/g;
-                            let match;
-                            while ((match = regex.exec(trimmed)) !== null) {
-                              answersObj[match[1].trim()] = match[2].trim();
+                        {/* Gap Match Passage & Response Options Display */}
+                        {q.questionType === 'GAP_MATCH' && q.options && (() => {
+                          const passageText = q.options.passage || '';
+                          const responseOptions = Array.isArray(q.options.response_options)
+                            ? q.options.response_options
+                            : Array.isArray(q.options.label_bank)
+                              ? q.options.label_bank
+                              : [];
+                          let answersObj = {};
+                          if (typeof q.answer === 'object' && q.answer !== null) {
+                            answersObj = q.answer;
+                          } else if (typeof q.answer === 'string') {
+                            try {
+                              answersObj = JSON.parse(q.answer);
+                            } catch (_) {
+                              try {
+                                const fixed = q.answer.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+                                answersObj = JSON.parse(fixed);
+                              } catch (_) { }
                             }
-                          } catch (_) {}
-                        }
-                      }
-
-                      const clean = (s) => (s || '').toString().trim().toLowerCase().replace(/[^\w\s]/g, '');
-
-                      const isMatch = (row, col, rIdx, cIdx) => {
-                        const cRowVal = clean(row.value);
-                        const cRowId = clean(row.id);
-                        const cColVal = clean(col.value);
-                        const cColId = clean(col.id);
-
-                        for (const [k, v] of Object.entries(answersObj)) {
-                          const cK = clean(k);
-                          const cV = clean(v);
-
-                          const rowMatches =
-                            k === row.value ||
-                            k === row.id ||
-                            cK === cRowVal ||
-                            cK === cRowId ||
-                            cK === `row${rIdx + 1}` ||
-                            cK === `${rIdx + 1}` ||
-                            (cRowVal.length > 8 && (cK.includes(cRowVal) || cRowVal.includes(cK)));
-
-                          if (rowMatches) {
-                            const colMatches =
-                              v === col.value ||
-                              v === col.id ||
-                              cV === cColVal ||
-                              cV === cColId ||
-                              cV === `col${cIdx + 1}` ||
-                              cV === `${cIdx + 1}`;
-
-                            if (colMatches) return true;
                           }
-                        }
-                        return false;
-                      };
 
-                      return (
-                        <div style={{ marginBottom: 16 }}>
-                          <div
-                            style={{
-                              background: '#ffffff',
-                              borderRadius: 10,
-                              border: '1.5px solid #cbd5e1',
-                              overflowX: 'auto',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                            }}
-                          >
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 450 }}>
-                              <thead>
-                                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
-                                  <th style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', borderRight: '1.5px solid #cbd5e1', width: '40%' }}>
-                                    {headerText}
-                                  </th>
-                                  {columns.map((col, cIdx) => (
-                                    <th
-                                      key={col.id || cIdx}
-                                      style={{
-                                        padding: '12px 14px',
-                                        fontWeight: 700,
-                                        fontSize: 13,
-                                        color: 'var(--color-text)',
-                                        textAlign: 'center',
-                                        borderRight: cIdx < columns.length - 1 ? '1.5px solid #cbd5e1' : 'none',
-                                      }}
-                                    >
-                                      {col.value || `col ${cIdx + 1}`}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {rows.map((row, rIdx) => (
-                                  <tr
-                                    key={row.id || rIdx}
+                          const renderPassageWithGaps = () => {
+                            if (!passageText) return <span style={{ color: 'var(--color-text-muted)' }}>No passage provided</span>;
+                            const parts = passageText.split(/(\[gap_[a-zA-Z0-9_-]+\]|\[gap\s*[0-9]+\])/gi);
+                            return parts.map((part, pIdx) => {
+                              const match = part.match(/\[(gap_[a-zA-Z0-9_-]+|gap\s*[0-9]+)\]/i);
+                              if (match) {
+                                const gapKey = match[1].toLowerCase().replace(/\s+/g, '_');
+                                return (
+                                  <span
+                                    key={pIdx}
                                     style={{
-                                      borderBottom: rIdx < rows.length - 1 ? '1.5px solid #e2e8f0' : 'none',
-                                      background: rIdx % 2 === 0 ? '#ffffff' : '#fcfcfd',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      minWidth: 100,
+                                      height: 32,
+                                      margin: '0 4px',
+                                      padding: '2px 10px',
+                                      borderRadius: 6,
+                                      border: '2px dashed #2563eb',
+                                      background: '#eff6ff',
+                                      color: '#1d4ed8',
+                                      fontWeight: 600,
+                                      fontSize: 12,
+                                      verticalAlign: 'middle',
                                     }}
                                   >
-                                    <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--color-text)', borderRight: '1.5px solid #cbd5e1', fontWeight: 500 }}>
-                                      {row.value || `Row ${rIdx + 1}`}
-                                    </td>
-                                    {columns.map((col, cIdx) => {
-                                      const selected = isMatch(row, col, rIdx, cIdx);
+                                    [ {match[1]} ]
+                                  </span>
+                                );
+                              }
+                              return <span key={pIdx}>{part}</span>;
+                            });
+                          };
+
+                          return (
+                            <div style={{ marginBottom: 16 }}>
+                              {/* Response Options Bank */}
+                              {responseOptions.length > 0 && (
+                                <div style={{ padding: '12px 16px', borderRadius: 8, background: '#eff6ff', border: '1.5px solid #bfdbfe', marginBottom: 14 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.04em' }}>
+                                    📦 Response Options Bank
+                                  </div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {responseOptions.map((opt, i) => (
+                                      <span
+                                        key={i}
+                                        style={{
+                                          padding: '5px 12px',
+                                          borderRadius: 6,
+                                          background: '#ffffff',
+                                          border: '1px solid #93c5fd',
+                                          color: '#1e40af',
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                        }}
+                                      >
+                                        {opt}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Passage Box with clean empty gaps */}
+                              <div style={{
+                                padding: '16px 20px',
+                                borderRadius: 10,
+                                background: '#f8fafc',
+                                border: '1.5px solid #e2e8f0',
+                                lineHeight: 2.0,
+                                fontSize: 14,
+                                color: 'var(--color-text)',
+                                marginBottom: 14,
+                              }}>
+                                {renderPassageWithGaps()}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Multiple Drop Bucket Display */}
+                        {q.questionType === 'MULTIPLE_DROP_BUCKET' && q.options && (() => {
+                          const optionBuckets = Array.isArray(q.options.option_buckets) ? q.options.option_buckets : [];
+                          const dropBuckets = Array.isArray(q.options.drop_buckets) ? q.options.drop_buckets : [];
+
+                          let answersObj = {};
+                          const rawAns = q.answer;
+                          if (typeof rawAns === 'object' && rawAns !== null && !Array.isArray(rawAns)) {
+                            answersObj = rawAns;
+                          } else if (typeof rawAns === 'string') {
+                            try {
+                              answersObj = JSON.parse(rawAns);
+                            } catch (_) {
+                              try {
+                                const fixed = rawAns
+                                  .replace(/True/g, 'true').replace(/False/g, 'false').replace(/None/g, 'null')
+                                  .replace(/(^|[{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+                                  .replace(/:\s*'([^']+?)'/g, ': "$1"')
+                                  .replace(/\[\s*'([^']+?)'/g, '["$1"')
+                                  .replace(/,\s*'([^']+?)'/g, ', "$1"');
+                                answersObj = JSON.parse(fixed);
+                              } catch (_) {
+                                const res = {};
+                                const regex = /['"]?([a-zA-Z0-9_\s-]+)['"]?\s*:\s*\[([\s\S]*?)\]/g;
+                                let match;
+                                while ((match = regex.exec(rawAns)) !== null) {
+                                  const key = match[1].trim();
+                                  const itemsRaw = match[2];
+                                  const items = [];
+                                  const itemRegex = /['"](.*?)['"](?=\s*,|\s*\]|\s*$)/g;
+                                  let itemMatch;
+                                  while ((itemMatch = itemRegex.exec(itemsRaw)) !== null) {
+                                    items.push(itemMatch[1].trim());
+                                  }
+                                  if (items.length > 0) res[key] = items;
+                                }
+                                answersObj = res;
+                              }
+                            }
+                          }
+
+                          return (
+                            <div style={{ marginBottom: 16 }}>
+                              {/* Option Buckets */}
+                              {optionBuckets.length > 0 && (
+                                <div style={{ marginBottom: 14 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.04em' }}>
+                                    📦 Option Buckets
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {optionBuckets.map((oBucket, bIdx) => (
+                                      <div key={oBucket.id || bIdx} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1.5px solid #e2e8f0' }}>
+                                        {oBucket.title && (
+                                          <div style={{ fontSize: 12, fontWeight: 700, color: '#0d6efd', marginBottom: 6 }}>
+                                            {oBucket.title}
+                                          </div>
+                                        )}
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                          {(oBucket.options || []).map((opt, oIdx) => (
+                                            <span
+                                              key={oIdx}
+                                              style={{
+                                                padding: '4px 10px',
+                                                borderRadius: 6,
+                                                background: '#ffffff',
+                                                border: '1px solid #cbd5e1',
+                                                color: 'var(--color-text)',
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                              }}
+                                            >
+                                              {opt}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Target Drop Buckets */}
+                              {dropBuckets.length > 0 && (
+                                <div style={{ marginBottom: 14 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.04em' }}>
+                                    📥 Target Drop Buckets
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(dropBuckets.length, 3)}, 1fr)`, gap: 10 }}>
+                                    {dropBuckets.map((dBucket, dIdx) => {
+                                      const getAssigned = () => {
+                                        if (dBucket.id && Array.isArray(answersObj[dBucket.id])) return answersObj[dBucket.id];
+                                        if (dBucket.name && Array.isArray(answersObj[dBucket.name])) return answersObj[dBucket.name];
+                                        if (Array.isArray(answersObj[`drop_bucket_${dIdx + 1}`])) return answersObj[`drop_bucket_${dIdx + 1}`];
+                                        if (Array.isArray(answersObj[String(dIdx)])) return answersObj[String(dIdx)];
+                                        if (dBucket.name) {
+                                          const tName = dBucket.name.trim().toLowerCase();
+                                          const fKey = Object.keys(answersObj).find(k => k.trim().toLowerCase() === tName);
+                                          if (fKey && Array.isArray(answersObj[fKey])) return answersObj[fKey];
+                                        }
+                                        const fallback = answersObj[dBucket.id] || answersObj[dBucket.name] || [];
+                                        return Array.isArray(fallback) ? fallback : [fallback].filter(Boolean);
+                                      };
+                                      const assignedList = getAssigned();
 
                                       return (
-                                        <td
+                                        <div
+                                          key={dBucket.id || dIdx}
+                                          style={{
+                                            padding: '12px 14px',
+                                            background: '#f0f9ff',
+                                            borderRadius: 8,
+                                            border: '2px dashed #0284c7',
+                                            minHeight: 100,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 6,
+                                          }}
+                                        >
+                                          <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span>📥</span>
+                                            <span>{dBucket.name || `Category ${dIdx + 1}`}</span>
+                                          </div>
+                                          {assignedList.length === 0 ? (
+                                            <div style={{ fontSize: 11, color: '#0284c7', fontStyle: 'italic', opacity: 0.7, marginTop: 6 }}>
+                                              [ Drop items here ]
+                                            </div>
+                                          ) : (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                                              {assignedList.map((item, i) => (
+                                                <span
+                                                  key={i}
+                                                  style={{
+                                                    padding: '4px 10px',
+                                                    borderRadius: 6,
+                                                    background: '#ffffff',
+                                                    border: '1px solid #7dd3fc',
+                                                    color: '#0369a1',
+                                                    fontSize: 12,
+                                                    fontWeight: 600,
+                                                  }}
+                                                >
+                                                  {item}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Matrix Interaction Display */}
+                        {q.questionType === 'MATRIX_INTERACTION' && q.options && (() => {
+                          const headerText = q.options?.header || 'Header';
+                          const rawCols = Array.isArray(q.options?.columns) ? q.options.columns : [];
+                          const columns = rawCols.map((c, i) => (typeof c === 'object' ? c : { id: `col_${i + 1}`, value: String(c) }));
+                          const rawRows = Array.isArray(q.options?.rows) ? q.options.rows : [];
+                          const rows = rawRows.map((r, i) => (typeof r === 'object' ? r : { id: `row_${i + 1}`, value: String(r) }));
+
+                          let answersObj = {};
+                          const rawAns = q.answer;
+                          if (typeof rawAns === 'object' && rawAns !== null && !Array.isArray(rawAns)) {
+                            answersObj = rawAns;
+                          } else if (typeof rawAns === 'string') {
+                            const trimmed = rawAns.trim();
+                            try {
+                              answersObj = JSON.parse(trimmed);
+                            } catch (_) {
+                              try {
+                                const regex = /['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]/g;
+                                let match;
+                                while ((match = regex.exec(trimmed)) !== null) {
+                                  answersObj[match[1].trim()] = match[2].trim();
+                                }
+                              } catch (_) { }
+                            }
+                          }
+
+                          const clean = (s) => (s || '').toString().trim().toLowerCase().replace(/[^\w\s]/g, '');
+
+                          const isMatch = (row, col, rIdx, cIdx) => {
+                            const cRowVal = clean(row.value);
+                            const cRowId = clean(row.id);
+                            const cColVal = clean(col.value);
+                            const cColId = clean(col.id);
+
+                            for (const [k, v] of Object.entries(answersObj)) {
+                              const cK = clean(k);
+                              const cV = clean(v);
+
+                              const rowMatches =
+                                k === row.value ||
+                                k === row.id ||
+                                cK === cRowVal ||
+                                cK === cRowId ||
+                                cK === `row${rIdx + 1}` ||
+                                cK === `${rIdx + 1}` ||
+                                (cRowVal.length > 8 && (cK.includes(cRowVal) || cRowVal.includes(cK)));
+
+                              if (rowMatches) {
+                                const colMatches =
+                                  v === col.value ||
+                                  v === col.id ||
+                                  cV === cColVal ||
+                                  cV === cColId ||
+                                  cV === `col${cIdx + 1}` ||
+                                  cV === `${cIdx + 1}`;
+
+                                if (colMatches) return true;
+                              }
+                            }
+                            return false;
+                          };
+
+                          return (
+                            <div style={{ marginBottom: 16 }}>
+                              <div
+                                style={{
+                                  background: '#ffffff',
+                                  borderRadius: 10,
+                                  border: '1.5px solid #cbd5e1',
+                                  overflowX: 'auto',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                }}
+                              >
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 450 }}>
+                                  <thead>
+                                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                                      <th style={{ padding: '12px 14px', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', borderRight: '1.5px solid #cbd5e1', width: '40%' }}>
+                                        {headerText}
+                                      </th>
+                                      {columns.map((col, cIdx) => (
+                                        <th
                                           key={col.id || cIdx}
                                           style={{
                                             padding: '12px 14px',
+                                            fontWeight: 700,
+                                            fontSize: 13,
+                                            color: 'var(--color-text)',
                                             textAlign: 'center',
                                             borderRight: cIdx < columns.length - 1 ? '1.5px solid #cbd5e1' : 'none',
-                                            background: selected ? '#f0fdf4' : 'transparent',
                                           }}
                                         >
-                                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            {selected ? (
-                                              <div
-                                                style={{
-                                                  width: 24,
-                                                  height: 24,
-                                                  borderRadius: '50%',
-                                                  background: '#22c55e',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  boxShadow: '0 2px 4px rgba(34, 197, 94, 0.3)',
-                                                }}
-                                              >
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                  <polyline points="20 6 9 17 4 12"></polyline>
-                                                </svg>
-                                              </div>
-                                            ) : (
-                                              <div
-                                                style={{
-                                                  width: 22,
-                                                  height: 22,
-                                                  borderRadius: '50%',
-                                                  border: '2px solid #3b82f6',
-                                                  background: '#ffffff',
-                                                }}
-                                              />
-                                            )}
-                                          </div>
+                                          {col.value || `col ${cIdx + 1}`}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {rows.map((row, rIdx) => (
+                                      <tr
+                                        key={row.id || rIdx}
+                                        style={{
+                                          borderBottom: rIdx < rows.length - 1 ? '1.5px solid #e2e8f0' : 'none',
+                                          background: rIdx % 2 === 0 ? '#ffffff' : '#fcfcfd',
+                                        }}
+                                      >
+                                        <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--color-text)', borderRight: '1.5px solid #cbd5e1', fontWeight: 500 }}>
+                                          {row.value || `Row ${rIdx + 1}`}
                                         </td>
-                                      );
-                                    })}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                                        {columns.map((col, cIdx) => {
+                                          const selected = isMatch(row, col, rIdx, cIdx);
 
-                    {/* Select Text Display */}
-                    {q.questionType === 'SELECT_TEXT' && q.options && (() => {
-                      const selectionType = q.options?.selection_type || 'Sentence';
-                      const maxSelections = q.options?.max_selections || 1;
-                      const passageText = q.options?.passage || '';
+                                          return (
+                                            <td
+                                              key={col.id || cIdx}
+                                              style={{
+                                                padding: '12px 14px',
+                                                textAlign: 'center',
+                                                borderRight: cIdx < columns.length - 1 ? '1.5px solid #cbd5e1' : 'none',
+                                                background: selected ? '#f0fdf4' : 'transparent',
+                                              }}
+                                            >
+                                              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                {selected ? (
+                                                  <div
+                                                    style={{
+                                                      width: 24,
+                                                      height: 24,
+                                                      borderRadius: '50%',
+                                                      background: '#22c55e',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      boxShadow: '0 2px 4px rgba(34, 197, 94, 0.3)',
+                                                    }}
+                                                  >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                      <polyline points="20 6 9 17 4 12"></polyline>
+                                                    </svg>
+                                                  </div>
+                                                ) : (
+                                                  <div
+                                                    style={{
+                                                      width: 22,
+                                                      height: 22,
+                                                      borderRadius: '50%',
+                                                      border: '2px solid #3b82f6',
+                                                      background: '#ffffff',
+                                                    }}
+                                                  />
+                                                )}
+                                              </div>
+                                            </td>
+                                          );
+                                        })}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
-                      let targetAnswers = [];
-                      const rawAns = q.answer;
-                      if (Array.isArray(rawAns)) {
-                        targetAnswers = rawAns.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
-                      } else if (typeof rawAns === 'string') {
-                        const trimmed = rawAns.trim();
-                        try {
-                          const p = JSON.parse(trimmed);
-                          if (Array.isArray(p)) targetAnswers = p.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
-                          else if (trimmed.includes('|')) targetAnswers = trimmed.split('|').map(s => s.trim());
-                          else targetAnswers = [trimmed];
-                        } catch (_) {
-                          try {
-                            const fixed = trimmed.replace(/'/g, '"');
-                            const p = JSON.parse(fixed);
-                            if (Array.isArray(p)) targetAnswers = p.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
-                            else if (trimmed.includes('|')) targetAnswers = trimmed.split('|').map(s => s.trim());
-                            else targetAnswers = [trimmed];
-                          } catch (_) {
-                            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-                              const inner = trimmed.slice(1, -1);
-                              targetAnswers = inner.split(',').flatMap(s => s.trim().replace(/^['"]|['"]$/g, '').split('|').map(x => x.trim())).filter(Boolean);
-                            } else if (trimmed.includes('|')) {
-                              targetAnswers = trimmed.split('|').map(s => s.trim()).filter(Boolean);
-                            } else {
-                              targetAnswers = [trimmed];
+                        {/* Select Text Display */}
+                        {q.questionType === 'SELECT_TEXT' && q.options && (() => {
+                          const selectionType = q.options?.selection_type || 'Sentence';
+                          const maxSelections = q.options?.max_selections || 1;
+                          const passageText = q.options?.passage || '';
+
+                          let targetAnswers = [];
+                          const rawAns = q.answer;
+                          if (Array.isArray(rawAns)) {
+                            targetAnswers = rawAns.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+                          } else if (typeof rawAns === 'string') {
+                            const trimmed = rawAns.trim();
+                            try {
+                              const p = JSON.parse(trimmed);
+                              if (Array.isArray(p)) targetAnswers = p.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+                              else if (trimmed.includes('|')) targetAnswers = trimmed.split('|').map(s => s.trim());
+                              else targetAnswers = [trimmed];
+                            } catch (_) {
+                              try {
+                                const fixed = trimmed.replace(/'/g, '"');
+                                const p = JSON.parse(fixed);
+                                if (Array.isArray(p)) targetAnswers = p.flatMap(item => typeof item === 'string' && item.includes('|') ? item.split('|').map(s => s.trim()) : [item]);
+                                else if (trimmed.includes('|')) targetAnswers = trimmed.split('|').map(s => s.trim());
+                                else targetAnswers = [trimmed];
+                              } catch (_) {
+                                if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                                  const inner = trimmed.slice(1, -1);
+                                  targetAnswers = inner.split(',').flatMap(s => s.trim().replace(/^['"]|['"]$/g, '').split('|').map(x => x.trim())).filter(Boolean);
+                                } else if (trimmed.includes('|')) {
+                                  targetAnswers = trimmed.split('|').map(s => s.trim()).filter(Boolean);
+                                } else {
+                                  targetAnswers = [trimmed];
+                                }
+                              }
                             }
                           }
-                        }
-                      }
 
-                      let tokens = [];
-                      if (selectionType === 'Paragraph') {
-                        tokens = passageText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
-                      } else if (selectionType === 'Words') {
-                        tokens = passageText.split(/\s+/).map(w => w.trim()).filter(Boolean);
-                      } else {
-                        tokens = passageText.match(/[^.!?\n]+[.!?]+(?:\s+|$)|[^.!?\n]+$/g) || [passageText];
-                        tokens = tokens.map(s => s.trim()).filter(Boolean);
-                      }
+                          let tokens = [];
+                          if (selectionType === 'Paragraph') {
+                            tokens = passageText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+                          } else if (selectionType === 'Words') {
+                            tokens = passageText.split(/\s+/).map(w => w.trim()).filter(Boolean);
+                          } else {
+                            tokens = passageText.match(/[^.!?\n]+[.!?]+(?:\s+|$)|[^.!?\n]+$/g) || [passageText];
+                            tokens = tokens.map(s => s.trim()).filter(Boolean);
+                          }
 
-                      // Build set of target words when in Words selection mode
-                      const cleanWord = (s) => (s || '').trim().replace(/^[“"'.,;:!?|/\\_-]+|[”"'.,;:!?|/\\_-]+$/g, '').toLowerCase();
-                      const targetWordSet = new Set();
-                      if (selectionType === 'Words') {
-                        targetAnswers.forEach(ans => {
-                          (ans || '').toLowerCase().replace(/[“"'.,;:!?|/\\_-]/g, ' ').split(/\s+/).forEach(w => {
-                            if (w.trim()) targetWordSet.add(w.trim());
-                          });
-                        });
-                      }
+                          // Build set of target words when in Words selection mode
+                          const cleanWord = (s) => (s || '').trim().replace(/^[“"'.,;:!?|/\\_-]+|[”"'.,;:!?|/\\_-]+$/g, '').toLowerCase();
+                          const targetWordSet = new Set();
+                          if (selectionType === 'Words') {
+                            targetAnswers.forEach(ans => {
+                              (ans || '').toLowerCase().replace(/[“"'.,;:!?|/\\_-]/g, ' ').split(/\s+/).forEach(w => {
+                                if (w.trim()) targetWordSet.add(w.trim());
+                              });
+                            });
+                          }
 
-                      return (
-                        <div style={{ marginBottom: 16 }}>
-                          {/* Selection Type & Max Selections Metadata Pill Bar */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: '#f5f3ff', border: '1px solid #ddd6fe', fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
-                              <span>Selection Type:</span>
-                              <strong style={{ color: '#6d28d9' }}>{selectionType}</strong>
-                            </div>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
-                              <span>Max Selections:</span>
-                              <strong style={{ color: '#1e40af' }}>{maxSelections}</strong>
-                            </div>
-                          </div>
+                          return (
+                            <div style={{ marginBottom: 16 }}>
+                              {/* Selection Type & Max Selections Metadata Pill Bar */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: '#f5f3ff', border: '1px solid #ddd6fe', fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+                                  <span>Selection Type:</span>
+                                  <strong style={{ color: '#6d28d9' }}>{selectionType}</strong>
+                                </div>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
+                                  <span>Max Selections:</span>
+                                  <strong style={{ color: '#1e40af' }}>{maxSelections}</strong>
+                                </div>
+                              </div>
 
-                          <div
-                            style={{
-                              padding: '16px 18px',
-                              borderRadius: 10,
-                              background: '#f8fafc',
-                              border: '1.5px solid #e2e8f0',
-                              lineHeight: 2.0,
-                              fontSize: 14,
-                              display: 'flex',
-                              flexWrap: 'wrap',
-                              gap: selectionType === 'Paragraph' ? 14 : selectionType === 'Words' ? 6 : 8,
-                            }}
-                          >
-                            {tokens.map((tokenText, idx) => {
-                              const cTok = cleanWord(tokenText);
-                              const isSelected = selectionType === 'Words'
-                                ? targetWordSet.has(cTok)
-                                : targetAnswers.some(ans => {
-                                    const cAns = cleanWord(ans);
-                                    if (!cAns || !cTok) return false;
-                                    return cAns === cTok || (cAns.length >= 6 && cTok.includes(cAns)) || (cTok.length >= 6 && cAns.includes(cTok));
-                                  });
+                              <div
+                                style={{
+                                  padding: '16px 18px',
+                                  borderRadius: 10,
+                                  background: '#f8fafc',
+                                  border: '1.5px solid #e2e8f0',
+                                  lineHeight: 2.0,
+                                  fontSize: 14,
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: selectionType === 'Paragraph' ? 14 : selectionType === 'Words' ? 6 : 8,
+                                }}
+                              >
+                                {tokens.map((tokenText, idx) => {
+                                  const cTok = cleanWord(tokenText);
+                                  const isSelected = selectionType === 'Words'
+                                    ? targetWordSet.has(cTok)
+                                    : targetAnswers.some(ans => {
+                                      const cAns = cleanWord(ans);
+                                      if (!cAns || !cTok) return false;
+                                      return cAns === cTok || (cAns.length >= 6 && cTok.includes(cAns)) || (cTok.length >= 6 && cAns.includes(cTok));
+                                    });
 
-                              return (
-                                <span
-                                  key={idx}
-                                  style={{
-                                    display: selectionType === 'Paragraph' ? 'block' : 'inline-flex',
-                                    width: selectionType === 'Paragraph' ? '100%' : 'auto',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    padding: selectionType === 'Paragraph' ? '10px 14px' : '4px 10px',
-                                    borderRadius: 6,
-                                    background: isSelected ? '#dcfce7' : '#ffffff',
-                                    border: `1.5px solid ${isSelected ? '#16a34a' : '#cbd5e1'}`,
-                                    color: isSelected ? '#15803d' : 'var(--color-text)',
-                                    fontWeight: isSelected ? 600 : 400,
-                                    boxShadow: isSelected ? '0 2px 4px rgba(22, 163, 74, 0.15)' : 'none',
-                                  }}
-                                >
-                                  {isSelected && (
+                                  return (
                                     <span
+                                      key={idx}
                                       style={{
-                                        display: 'inline-flex',
+                                        display: selectionType === 'Paragraph' ? 'block' : 'inline-flex',
+                                        width: selectionType === 'Paragraph' ? '100%' : 'auto',
                                         alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: 16,
-                                        height: 16,
-                                        borderRadius: '50%',
-                                        background: '#16a34a',
-                                        color: '#ffffff',
-                                        fontSize: 10,
-                                        fontWeight: 900,
-                                        marginRight: 2,
-                                        flexShrink: 0,
+                                        gap: 6,
+                                        padding: selectionType === 'Paragraph' ? '10px 14px' : '4px 10px',
+                                        borderRadius: 6,
+                                        background: isSelected ? '#dcfce7' : '#ffffff',
+                                        border: `1.5px solid ${isSelected ? '#16a34a' : '#cbd5e1'}`,
+                                        color: isSelected ? '#15803d' : 'var(--color-text)',
+                                        fontWeight: isSelected ? 600 : 400,
+                                        boxShadow: isSelected ? '0 2px 4px rgba(22, 163, 74, 0.15)' : 'none',
                                       }}
                                     >
-                                      ✓
+                                      {isSelected && (
+                                        <span
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: 16,
+                                            height: 16,
+                                            borderRadius: '50%',
+                                            background: '#16a34a',
+                                            color: '#ffffff',
+                                            fontSize: 10,
+                                            fontWeight: 900,
+                                            marginRight: 2,
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          ✓
+                                        </span>
+                                      )}
+                                      <span>{tokenText}</span>
                                     </span>
-                                  )}
-                                  <span>{tokenText}</span>
-                                </span>
-                              );
-                            })}
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Background Graphic Interactive SVG Display */}
+                        {q.questionType === 'BACKGROUND_GRAPHIC' && q.options && (() => {
+                          const dropZones = q.options.drop_zones || [];
+                          const labelBank = q.options.label_bank || [];
+                          const zoneWidth = q.options.drop_zone_width || 120;
+                          const zoneHeight = q.options.drop_zone_height || 36;
+                          const answersObj = typeof q.answer === 'object' && q.answer !== null ? q.answer : {};
+
+                          return (
+                            <div style={{ marginBottom: 16 }}>
+                              {/* SVG Diagram Canvas */}
+                              <div style={{
+                                position: 'relative',
+                                width: '100%',
+                                maxWidth: 620,
+                                borderRadius: 12,
+                                overflow: 'hidden',
+                                border: '1.5px solid #cbd5e1',
+                                background: '#f8fafc',
+                                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.04)',
+                                marginBottom: 14,
+                              }}>
+                                {/* Raw SVG rendering */}
+                                {q.options.svg_graphic ? (
+                                  <div
+                                    dangerouslySetInnerHTML={{ __html: q.options.svg_graphic }}
+                                    style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+                                  />
+                                ) : (
+                                  <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>
+                                    🖼️ Diagram Graphic
+                                  </div>
+                                )}
+
+                                {/* Drop Zone Pins Overlay (Empty Target Boxes) */}
+                                {dropZones.map((zone) => (
+                                  <div
+                                    key={zone.id}
+                                    title={zone.description ? `Pin ${zone.pin_label}: ${zone.description}` : `Drop Zone ${zone.pin_label}`}
+                                    style={{
+                                      position: 'absolute',
+                                      left: `${zone.x_percent || 50}%`,
+                                      top: `${zone.y_percent || 50}%`,
+                                      transform: 'translate(-50%, -50%)',
+                                      width: zoneWidth,
+                                      height: zoneHeight,
+                                      padding: '2px 8px',
+                                      borderRadius: 6,
+                                      border: '2px dashed #059669',
+                                      background: 'rgba(255, 255, 255, 0.88)',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: 6,
+                                      backdropFilter: 'blur(3px)',
+                                      zIndex: 2,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    <span style={{
+                                      background: '#059669',
+                                      color: '#fff',
+                                      borderRadius: '50%',
+                                      width: 22,
+                                      height: 22,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      flexShrink: 0,
+                                    }}>
+                                      {zone.pin_label || '•'}
+                                    </span>
+                                    <span style={{
+                                      fontSize: 11,
+                                      color: '#059669',
+                                      fontWeight: 500,
+                                      opacity: 0.7,
+                                      fontStyle: 'italic',
+                                      letterSpacing: '0.02em',
+                                    }}>
+                                      [ Drop Here ]
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Label Bank */}
+                              {labelBank.length > 0 && (
+                                <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ecfdf5', border: '1px solid #a7f3d0', marginBottom: 12 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                                    🏷️ Label Bank
+                                  </div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {labelBank.map((lbl, i) => (
+                                      <div
+                                        key={i}
+                                        style={{
+                                          padding: '5px 12px',
+                                          borderRadius: 6,
+                                          background: '#ffffff',
+                                          border: '1.5px solid #6ee7b7',
+                                          color: '#065f46',
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                        }}
+                                      >
+                                        {lbl}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Answer & Rationale */}
+                        <div style={{
+                          background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
+                          borderLeft: '3px solid var(--color-primary)',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'anywhere',
+                          minWidth: 0,
+                        }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                            Answer Key
                           </div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 10 : 0 }}>
+                            {(() => {
+                              let ansObj = null;
+                              let ansArray = null;
+
+                              if (Array.isArray(q.answer)) {
+                                ansArray = q.answer;
+                              } else if (typeof q.answer === 'string') {
+                                const trimmed = q.answer.trim();
+                                if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                                  try {
+                                    const parsed = JSON.parse(trimmed);
+                                    if (Array.isArray(parsed)) ansArray = parsed;
+                                  } catch (_) { }
+                                } else if (trimmed.startsWith('{') || trimmed.includes(':')) {
+                                  try {
+                                    ansObj = JSON.parse(trimmed);
+                                  } catch (_) {
+                                    try {
+                                      const fixed = trimmed.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
+                                      ansObj = JSON.parse(fixed);
+                                    } catch (_) { }
+                                  }
+                                }
+                              } else if (typeof q.answer === 'object' && q.answer !== null) {
+                                ansObj = q.answer;
+                              }
+
+                              if (ansArray && ansArray.length > 0) {
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    {ansArray.map((ansText, i) => (
+                                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#15803d', fontWeight: 600, fontSize: 13 }}>
+                                        <span>✓</span>
+                                        <span>"{ansText}"</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              }
+
+                              if (ansObj && typeof ansObj === 'object') {
+                                const normalized = [];
+                                const seen = new Set();
+                                Object.entries(ansObj).forEach(([k, v]) => {
+                                  let keyLabel = k;
+                                  const gapMatch = k.match(/gap_?([0-9]+)/i);
+                                  if (gapMatch) {
+                                    keyLabel = `Gap ${gapMatch[1]}`;
+                                  } else if (k.toLowerCase().startsWith('drop_bucket_') || k.toLowerCase().startsWith('bucket_')) {
+                                    const bucketName = q.options?.drop_buckets?.find(b => b.id === k)?.name;
+                                    keyLabel = bucketName || k;
+                                  } else if (k.toLowerCase().startsWith('zone_')) {
+                                    const pin = q.options?.drop_zones?.find(z => z.id === k)?.pin_label;
+                                    keyLabel = pin ? `Pin ${pin}` : k;
+                                  }
+                                  const valStr = Array.isArray(v) ? v.join(', ') : String(v);
+                                  if (!seen.has(keyLabel)) {
+                                    seen.add(keyLabel);
+                                    normalized.push([keyLabel, valStr]);
+                                  }
+                                });
+
+                                return (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {normalized.map(([k, v]) => (
+                                      <span key={k} style={{ padding: '4px 10px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
+                                        <strong>{k}:</strong> {v}
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              }
+
+                              return <span>{q.answer}</span>;
+                            })()}
+                          </div>
+                          {q.explanation && (
+                            <>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                                Rationale
+                              </div>
+                              <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.6 }}>
+                                <MarkdownText text={q.explanation} />
+                              </div>
+                            </>
+                          )}
                         </div>
-                      );
-                    })()}
 
-                    {/* Background Graphic Interactive SVG Display */}
-                    {q.questionType === 'BACKGROUND_GRAPHIC' && q.options && (() => {
-                      const dropZones = q.options.drop_zones || [];
-                      const labelBank = q.options.label_bank || [];
-                      const zoneWidth = q.options.drop_zone_width || 120;
-                      const zoneHeight = q.options.drop_zone_height || 36;
-                      const answersObj = typeof q.answer === 'object' && q.answer !== null ? q.answer : {};
-
-                      return (
-                        <div style={{ marginBottom: 16 }}>
-                          {/* SVG Diagram Canvas */}
+                        {/* Source detail (expandable): exact file + page + chapter for cross-verification */}
+                        {src && (q.sources?.length > 0 || q.sourceChunkIds?.length > 0) && (
                           <div style={{
-                            position: 'relative',
-                            width: '100%',
-                            maxWidth: 620,
-                            borderRadius: 12,
-                            overflow: 'hidden',
-                            border: '1.5px solid #cbd5e1',
-                            background: '#f8fafc',
-                            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.04)',
-                            marginBottom: 14,
+                            marginTop: 10, padding: '10px 14px',
+                            background: q._internetSource ? '#f0fdf4' : '#fffbeb',
+                            borderRadius: 8,
+                            border: q._internetSource ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                            fontSize: 12,
+                            color: q._internetSource ? '#166534' : '#92400e',
                           }}>
-                            {/* Raw SVG rendering */}
-                            {q.options.svg_graphic ? (
-                              <div
-                                dangerouslySetInnerHTML={{ __html: q.options.svg_graphic }}
-                                style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
-                              />
+                            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                              {q._internetSource
+                                ? `Reference Website${q.sources?.length > 1 ? 's' : ''}`
+                                : `Source${q.sources?.length > 1 ? 's' : ''} — for cross-verification against the syllabus`
+                              }
+                            </div>
+                            {q.sources?.length > 0 ? (
+                              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                                {q.sources.map((s, si) => {
+                                  const isHttp = s.filename?.startsWith('http://') || s.filename?.startsWith('https://');
+                                  // For internet sources: always link to root domain to avoid hallucinated 404 paths.
+                                  // e.g. https://www.mathsisfun.com/algebra/radical-expressions.html → https://www.mathsisfun.com
+                                  let safeHref = s.filename;
+                                  if (q._internetSource && isHttp) {
+                                    try { safeHref = new URL(s.filename).origin; } catch (_) { /* keep original */ }
+                                  }
+                                  return (
+                                    <li key={si} style={{ marginBottom: 2 }}>
+                                      {isHttp ? (
+                                        <a
+                                          href={safeHref}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          style={{
+                                            color: '#16a34a',
+                                            textDecoration: 'underline',
+                                            fontWeight: 600,
+                                            wordBreak: 'break-all',
+                                          }}
+                                        >
+                                          {q._internetSource ? (s.chapter || 'Web Link') : s.filename}
+                                        </a>
+                                      ) : (
+                                        <strong>{s.filename}</strong>
+                                      )}
+                                      {s.page ? `, page ${s.page}` : ''}
+                                      {s.chapter && !q._internetSource ? ` — ${s.chapter}` : ''}
+                                      {s.chunk_type === 'image' ? ' (image)' : ''}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
                             ) : (
-                              <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>
-                                🖼️ Diagram Graphic
+                              <span>Chunk ids: {q.sourceChunkIds.join(', ')}</span>
+                            )}
+
+                            {/* Grounding / fact-check status — only shown for syllabus-sourced questions */}
+                            {!q._internetSource && (
+                              <div style={{ marginTop: 8, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{
+                                  color: (() => {
+                                    const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
+                                    return s >= 0.6 ? '#15803d' : s >= 0.4 ? '#854d0e' : '#b91c1c';
+                                  })()
+                                }}>
+                                  {(() => {
+                                    const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
+                                    if (s >= 0.6) return '✅ Passed automated fact-check against the cited source.';
+                                    if (s >= 0.4) return `⚠️ Fair: ${q.groundingNote || 'partially supported by the cited source — review before use.'}`;
+                                    return `⚠️ Failed: ${q.groundingNote || 'not clearly supported by the cited source.'}`;
+                                  })()}
+                                </span>
                               </div>
                             )}
 
-                            {/* Drop Zone Pins Overlay (Empty Target Boxes) */}
-                            {dropZones.map((zone) => (
-                              <div
-                                key={zone.id}
-                                title={zone.description ? `Pin ${zone.pin_label}: ${zone.description}` : `Drop Zone ${zone.pin_label}`}
-                                style={{
-                                  position: 'absolute',
-                                  left: `${zone.x_percent || 50}%`,
-                                  top: `${zone.y_percent || 50}%`,
-                                  transform: 'translate(-50%, -50%)',
-                                  width: zoneWidth,
-                                  height: zoneHeight,
-                                  padding: '2px 8px',
-                                  borderRadius: 6,
-                                  border: '2px dashed #059669',
-                                  background: 'rgba(255, 255, 255, 0.88)',
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: 6,
-                                  backdropFilter: 'blur(3px)',
-                                  zIndex: 2,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <span style={{
-                                  background: '#059669',
-                                  color: '#fff',
-                                  borderRadius: '50%',
-                                  width: 22,
-                                  height: 22,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  flexShrink: 0,
-                                }}>
-                                  {zone.pin_label || '•'}
-                                </span>
-                                <span style={{
-                                  fontSize: 11,
-                                  color: '#059669',
-                                  fontWeight: 500,
-                                  opacity: 0.7,
-                                  fontStyle: 'italic',
-                                  letterSpacing: '0.02em',
-                                }}>
-                                  [ Drop Here ]
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Label Bank */}
-                          {labelBank.length > 0 && (
-                            <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ecfdf5', border: '1px solid #a7f3d0', marginBottom: 12 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-                                🏷️ Label Bank
-                              </div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                {labelBank.map((lbl, i) => (
-                                  <div
-                                    key={i}
-                                    style={{
-                                      padding: '5px 12px',
-                                      borderRadius: 6,
-                                      background: '#ffffff',
-                                      border: '1.5px solid #6ee7b7',
-                                      color: '#065f46',
-                                      fontSize: 12,
-                                      fontWeight: 600,
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                    }}
-                                  >
-                                    {lbl}
-                                  </div>
+                            {/* Source image thumbnails, if this question drew on a diagram/chart */}
+                            {q.imageRefs?.length > 0 && (
+                              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                                {q.imageRefs.map((url, ii) => (
+                                  <a key={ii} href={url} target="_blank" rel="noreferrer">
+                                    <img
+                                      src={url}
+                                      alt="Source diagram/chart"
+                                      style={{ height: 90, borderRadius: 6, border: '1px solid #fde68a', display: 'block' }}
+                                    />
+                                  </a>
                                 ))}
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Answer & Rationale */}
-                    <div style={{
-                      background: '#f8f9fb', borderRadius: 8, padding: '12px 14px',
-                      borderLeft: '3px solid var(--color-primary)',
-                      wordBreak: 'break-word',
-                      overflowWrap: 'anywhere',
-                      minWidth: 0,
-                    }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                        Answer Key
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: q.explanation ? 10 : 0 }}>
-                        {(() => {
-                          let ansObj = null;
-                          let ansArray = null;
-
-                          if (Array.isArray(q.answer)) {
-                            ansArray = q.answer;
-                          } else if (typeof q.answer === 'string') {
-                            const trimmed = q.answer.trim();
-                            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-                              try {
-                                const parsed = JSON.parse(trimmed);
-                                if (Array.isArray(parsed)) ansArray = parsed;
-                              } catch (_) {}
-                            } else if (trimmed.startsWith('{') || trimmed.includes(':')) {
-                              try {
-                                ansObj = JSON.parse(trimmed);
-                              } catch (_) {
-                                try {
-                                  const fixed = trimmed.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
-                                  ansObj = JSON.parse(fixed);
-                                } catch (_) {}
-                              }
-                            }
-                          } else if (typeof q.answer === 'object' && q.answer !== null) {
-                            ansObj = q.answer;
-                          }
-
-                          if (ansArray && ansArray.length > 0) {
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                {ansArray.map((ansText, i) => (
-                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#15803d', fontWeight: 600, fontSize: 13 }}>
-                                    <span>✓</span>
-                                    <span>"{ansText}"</span>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          }
-
-                          if (ansObj && typeof ansObj === 'object') {
-                            const normalized = [];
-                            const seen = new Set();
-                            Object.entries(ansObj).forEach(([k, v]) => {
-                              let keyLabel = k;
-                              const gapMatch = k.match(/gap_?([0-9]+)/i);
-                              if (gapMatch) {
-                                keyLabel = `Gap ${gapMatch[1]}`;
-                              } else if (k.toLowerCase().startsWith('drop_bucket_') || k.toLowerCase().startsWith('bucket_')) {
-                                const bucketName = q.options?.drop_buckets?.find(b => b.id === k)?.name;
-                                keyLabel = bucketName || k;
-                              } else if (k.toLowerCase().startsWith('zone_')) {
-                                const pin = q.options?.drop_zones?.find(z => z.id === k)?.pin_label;
-                                keyLabel = pin ? `Pin ${pin}` : k;
-                              }
-                              const valStr = Array.isArray(v) ? v.join(', ') : String(v);
-                              if (!seen.has(keyLabel)) {
-                                seen.add(keyLabel);
-                                normalized.push([keyLabel, valStr]);
-                              }
-                            });
-
-                            return (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                {normalized.map(([k, v]) => (
-                                  <span key={k} style={{ padding: '4px 10px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
-                                    <strong>{k}:</strong> {v}
-                                  </span>
-                                ))}
-                              </div>
-                            );
-                          }
-
-                          return <span>{q.answer}</span>;
-                        })()}
-                      </div>
-                      {q.explanation && (
-                        <>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-                            Rationale
-                          </div>
-                          <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.6 }}>
-                            <MarkdownText text={q.explanation} />
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Source detail (expandable): exact file + page + chapter for cross-verification */}
-                    {src && (q.sources?.length > 0 || q.sourceChunkIds?.length > 0) && (
-                      <div style={{
-                        marginTop: 10, padding: '10px 14px',
-                        background: q._internetSource ? '#f0fdf4' : '#fffbeb',
-                        borderRadius: 8,
-                        border: q._internetSource ? '1px solid #bbf7d0' : '1px solid #fde68a',
-                        fontSize: 12,
-                        color: q._internetSource ? '#166534' : '#92400e',
-                      }}>
-                        <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                          {q._internetSource
-                            ? `Reference Website${q.sources?.length > 1 ? 's' : ''}`
-                            : `Source${q.sources?.length > 1 ? 's' : ''} — for cross-verification against the syllabus`
-                          }
-                        </div>
-                        {q.sources?.length > 0 ? (
-                          <ul style={{ margin: 0, paddingLeft: 18 }}>
-                            {q.sources.map((s, si) => {
-                              const isHttp = s.filename?.startsWith('http://') || s.filename?.startsWith('https://');
-                              // For internet sources: always link to root domain to avoid hallucinated 404 paths.
-                              // e.g. https://www.mathsisfun.com/algebra/radical-expressions.html → https://www.mathsisfun.com
-                              let safeHref = s.filename;
-                              if (q._internetSource && isHttp) {
-                                try { safeHref = new URL(s.filename).origin; } catch (_) { /* keep original */ }
-                              }
-                              return (
-                                <li key={si} style={{ marginBottom: 2 }}>
-                                  {isHttp ? (
-                                    <a
-                                      href={safeHref}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      style={{
-                                        color: '#16a34a',
-                                        textDecoration: 'underline',
-                                        fontWeight: 600,
-                                        wordBreak: 'break-all',
-                                      }}
-                                    >
-                                      {q._internetSource ? (s.chapter || 'Web Link') : s.filename}
-                                    </a>
-                                  ) : (
-                                    <strong>{s.filename}</strong>
-                                  )}
-                                  {s.page ? `, page ${s.page}` : ''}
-                                  {s.chapter && !q._internetSource ? ` — ${s.chapter}` : ''}
-                                  {s.chunk_type === 'image' ? ' (image)' : ''}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        ) : (
-                          <span>Chunk ids: {q.sourceChunkIds.join(', ')}</span>
-                        )}
-
-                        {/* Grounding / fact-check status — only shown for syllabus-sourced questions */}
-                        {!q._internetSource && (
-                          <div style={{ marginTop: 8, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{
-                              color: (() => {
-                                const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
-                                return s >= 0.6 ? '#15803d' : s >= 0.4 ? '#854d0e' : '#b91c1c';
-                              })()
-                            }}>
-                              {(() => {
-                                const s = typeof q.groundingScore === 'number' ? q.groundingScore : (q.grounded === false ? 0 : 1);
-                                if (s >= 0.6) return '✅ Passed automated fact-check against the cited source.';
-                                if (s >= 0.4) return `⚠️ Fair: ${q.groundingNote || 'partially supported by the cited source — review before use.'}`;
-                                return `⚠️ Failed: ${q.groundingNote || 'not clearly supported by the cited source.'}`;
-                              })()}
-                            </span>
+                            )}
                           </div>
                         )}
-
-                        {/* Source image thumbnails, if this question drew on a diagram/chart */}
-                        {q.imageRefs?.length > 0 && (
-                          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                            {q.imageRefs.map((url, ii) => (
-                              <a key={ii} href={url} target="_blank" rel="noreferrer">
-                                <img
-                                  src={url}
-                                  alt="Source diagram/chart"
-                                  style={{ height: 90, borderRadius: 6, border: '1px solid #fde68a', display: 'block' }}
-                                />
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
                       </>
                     )}
                   </div>
@@ -2564,6 +2564,8 @@ export default function AIGeneratePage() {
             padding: 28,
             width: '100%',
             maxWidth: 560,
+            maxHeight: '95vh',
+            overflowY: 'auto',
             boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
             border: '1px solid var(--color-border)',
             animation: 'slideUp 0.18s ease',
@@ -2601,18 +2603,18 @@ export default function AIGeneratePage() {
             {/* Original Question Stem Preview */}
             <div style={{
               background: '#f8fafc', borderRadius: 10, padding: '12px 16px',
-              marginBottom: 18, border: '1px solid var(--color-border)',
+              marginBottom: 16, border: '1px solid var(--color-border)',
             }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
                 Original Question Stem
               </div>
-              <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.5, fontWeight: 600 }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.5, fontWeight: 600, maxHeight: 72, overflowY: 'auto' }}>
                 {regenModal.question.text}
               </div>
             </div>
 
             {/* What would you like to refine? (Target Checkboxes) */}
-            <div style={{ marginBottom: 18 }}>
+            <div style={{ marginBottom: 16 }}>
               <label style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>
                 What would you like to refine?
               </label>
@@ -2662,7 +2664,7 @@ export default function AIGeneratePage() {
             </div>
 
             {/* Refinement Instructions (Mandatory) */}
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 18 }}>
               <label style={{ ...labelStyle, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Refinement Instructions</span>
               </label>
