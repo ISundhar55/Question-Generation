@@ -11,7 +11,6 @@ Apply these guardrails to every generated assessment item.
 * Align every item with the specified content area, grade, standard, learning objective, assessment target, and boundaries.
 * Do not assess concepts or skills outside the defined scope.
 * Ensure the question measures the intended skill, not an unrelated skill (e.g. test reading comprehension, not science recall, on ELA standards).
-* Respect text genre discipline: standards coded `RI` (Reading Informational) require authentic informational/scientific text; standards coded `RL` (Reading Literature) require literary fiction, poetry, or drama.
 
 3. Question Structure & Schema
 * Follow the required question type, format, schema, and response structure exactly.

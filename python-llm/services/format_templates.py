@@ -16,7 +16,6 @@ FORMAT_BY_TYPE = {
   "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>"},
   "answer": "<correct letter, e.g. A, B, C, or D>",
   "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 IMPORTANT for SINGLE_SELECT:
 - Default: 4 options (A, B, C, D). If the teacher instructs a different count, add or remove letters accordingly. Always use consecutive letters starting from A.
@@ -33,7 +32,6 @@ IMPORTANT for SINGLE_SELECT:
   "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>", "E": "<option E>"},
   "answer": "<pipe-separated list of more than one correct letters, e.g. B|D or A|C|E>",
   "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D, E...)",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 IMPORTANT for MULTIPLE_SELECT:
 - MANDATORY 5 OPTIONS: Always provide exactly 5 options (A, B, C, D, E). Always use consecutive letters starting from A.
@@ -59,7 +57,6 @@ IMPORTANT for MULTIPLE_SELECT:
   "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>"},
   "answer": "<correct letter, e.g. A, B, C, or D>",
   "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 IMPORTANT for MCQ:
 - Default: 4 options (A, B, C, D). Always use consecutive letters starting from A.
@@ -75,7 +72,6 @@ IMPORTANT for MCQ:
   "text": "<statement that is clearly true or false>",
   "answer": "True" or "False",
   "explanation": "• True (<Correct or Incorrect>): <Clear explanation of why True is or is not the correct assessment of this statement>\\n• False (<Correct or Incorrect>): <Clear explanation of why False is or is not the correct assessment of this statement>",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 IMPORTANT for TRUE_FALSE:
 - MANDATORY RATIONALE: The explanation field MUST provide an explicit rationale for BOTH True and False, clearly identifying which is correct and which is incorrect.""",
@@ -89,7 +85,6 @@ IMPORTANT for TRUE_FALSE:
   "text": "<question>",
   "answer": "<model answer in 1-3 sentences>",
   "explanation": "<detailed rationale explaining the complete concept and key points expected in the answer>",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }""",
 
     "CONSTRUCTED_RESPONSE": """Each question object must follow this exact format:
@@ -107,7 +102,6 @@ IMPORTANT for TRUE_FALSE:
   },
   "answer": "<pipe-separated primary correct answers in blank order, e.g. answer1|answer2>",
   "explanation": "• Blank <N> (<primary answer>): <Clear explanation of the concept and why the primary answer and acceptable alternatives are correct>\\n• (Provide a bullet for EVERY blank present in the question: Blank 1, Blank 2, ...)",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for CONSTRUCTED_RESPONSE:
@@ -133,7 +127,6 @@ IMPORTANT for CONSTRUCTED_RESPONSE:
   },
   "answer": "<pipe-separated correct answers in blank order, e.g. answer1|answer2>",
   "explanation": "• Blank <N>: '<correct_choice>' is correct because <reason>. Other choices (<distractor1>, <distractor2>, <distractor3>) are incorrect because <reason>.\\n• (Provide a bullet for EVERY blank dropdown present in the question: Blank 1, Blank 2, ...)",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for DROPDOWN:
@@ -157,7 +150,6 @@ IMPORTANT for DROPDOWN:
   },
   "answer": "A-<number>, B-<number>, C-<number>, D-<number>",
   "explanation": "• Match <LeftKey>-<RightKey> (<Left item> -> <Right item>): <Clear explanation of why these two items pair together>\\n• (Provide a bullet for EVERY matched pair: Match A-..., Match B-..., etc.)",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for MATCHING_LINES:
@@ -177,7 +169,6 @@ IMPORTANT for MATCHING_LINES:
   "options": ["<shuffled/incorrect ordered option 1>", "<shuffled/incorrect ordered option 2>", "<shuffled/incorrect ordered option 3>", "<shuffled/incorrect ordered option 4>"],
   "answer": "<pipe-separated correct sequence of options, in correct order, e.g. Option 3|Option 2|Option 1>",
   "explanation": "• Step <N> (<Option Text>): <Clear explanation of why this step/item is placed at position N in the sequence>\\n• (Provide a bullet for EVERY step in the sequence: Step 1, Step 2, ...)",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for ORDERING:
@@ -233,7 +224,6 @@ IMPORTANT for ORDERING:
     "zone_3": "<correct_label_3>"
   },
   "explanation": "• Pin <Letter> / <ZoneId> (<Correct Label>): <Clear explanation of why this label is correct based on visual characteristics and biological/physical function>\\n• (Provide a bullet for EVERY drop zone: Pin A, Pin B, Pin C...)\\n• <Distractor Label> (Distractor): <Clear reason why this option is an incorrect choice that does not match any marked zone>",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for BACKGROUND_GRAPHIC:
@@ -275,7 +265,6 @@ IMPORTANT for BACKGROUND_GRAPHIC:
     "gap_2": "<correct_target_for_gap_2>"
   },
   "explanation": "• Gap 1 (<correct_target_1>): <Clear reason why this term accurately fills gap 1 based on the passage context and scientific/mathematical rules>\\n• (Provide a bullet for EVERY gap: Gap 1, Gap 2, and Gap 3/4 if present)\\n• <Distractor 1> (Distractor): <Clear reason why this term is an incorrect choice that does not properly fit any gap in this passage>\\n• <Distractor 2> (Distractor): <Clear reason why this term is incorrect>",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for GAP_MATCH:
@@ -346,7 +335,6 @@ IMPORTANT for GAP_MATCH:
     ]
   },
   "explanation": "• <Drop Category 1 Name>:\\n  - <item_1>: <Rationale>\\n  - <item_3>: <Rationale>\\n• <Drop Category 2 Name>:\\n  - <item_2>: <Rationale>\\n  - <item_4>: <Rationale>",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for MULTIPLE_DROP_BUCKET:
@@ -403,7 +391,6 @@ IMPORTANT for MULTIPLE_DROP_BUCKET:
     "<Statement or Item 4>": "<Column 1 or Column 2 Category Value>"
   },
   "explanation": "• <Statement 1>: <Correct Column Value> because <educational rationale>\\n• <Statement 2>: <Correct Column Value> because <educational rationale>\\n• <Statement 3>: <Correct Column Value> because <educational rationale>\\n• <Statement 4>: <Correct Column Value> because <educational rationale>",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT for MATRIX_INTERACTION:
@@ -432,7 +419,6 @@ IMPORTANT for MATRIX_INTERACTION:
     "<Verbatim target text element 2 directly from the passage (if max_selections > 1)>"
   ],
   "explanation": "• <For each target item, provide the educational rationale explaining why it correctly answers the prompt and why distractors do not>",
-  "sourceChunkIds": [<list of chunk_id integers used>]
 }
 
 IMPORTANT RULES for SELECT_TEXT:
