@@ -239,6 +239,7 @@ CRITICAL RULES FOR PASSAGE-BASED GENERATION:
 3. For question types that quote or select text (e.g. SELECT_TEXT, GAP_MATCH, CONSTRUCTED_RESPONSE), target phrases and evidence MUST be taken verbatim from this passage.
 4. For SELECT_TEXT or GAP_MATCH, set "options.passage" to the passage above (or relevant excerpt).
 5. Clean Option Choices: Do NOT append "(Correct)", "(Incorrect)", or any answer labels or status annotations to the option values in "options". The options dictionary must contain ONLY the raw choice text without suffixes or tags (e.g. never append suffixes like "(Correct)" or "[Incorrect]"). The correct option is designated strictly in the "answer" field, and only the "explanation" field should detail why an option is correct or incorrect.
+6. Direct & Natural Question Stems (NO META-REFERENCES): NEVER start or preface questions with meta-referential phrases like "Based on the passage...", "According to the passage...", "Based on the story...", "In the passage...", "As stated in the text...", or "Based on the starting numbers provided in the passage...". State the question DIRECTLY (e.g., write "Which pair of friends has a combined total of exactly 40 cards?" instead of "Based on the starting numbers provided in the passage, which pair of friends has a combined total of exactly 40 cards?").
 """
 
     visual_block = ""
@@ -744,6 +745,7 @@ CRITICAL RULES FOR PASSAGE-BASED GENERATION:
 3. For question types that quote or select text (e.g. SELECT_TEXT, GAP_MATCH, CONSTRUCTED_RESPONSE), target phrases and evidence MUST be taken verbatim from this passage.
 4. For SELECT_TEXT or GAP_MATCH, set "options.passage" to the passage above (or relevant excerpt).
 5. Clean Option Choices: Do NOT append "(Correct)", "(Incorrect)", or any answer labels or status annotations to the option values in "options". The options dictionary must contain ONLY the raw choice text without suffixes or tags (e.g. never append suffixes like "(Correct)" or "[Incorrect]"). The correct option is designated strictly in the "answer" field, and only the "explanation" field should detail why an option is correct or incorrect.
+6. Direct & Natural Question Stems (NO META-REFERENCES): NEVER start or preface questions with meta-referential phrases like "Based on the passage...", "According to the passage...", "Based on the story...", "In the passage...", "As stated in the text...", or "Based on the starting numbers provided in the passage...". State the question DIRECTLY (e.g., write "Which pair of friends has a combined total of exactly 40 cards?" instead of "Based on the starting numbers provided in the passage, which pair of friends has a combined total of exactly 40 cards?").
 """
 
     visual_block = ""
@@ -1251,6 +1253,26 @@ def normalize_question(q: dict, allow_visuals: bool = True, passage_id: int | No
             q["answer"] = ""
         else:
             q["answer"] = str(ans).strip()
+
+    # Clean meta-referential preambles from question stem (e.g. "Based on the passage, ...")
+    if "text" in q and isinstance(q["text"], str):
+        text_val = q["text"].strip()
+        # 1. Strip leading meta preambles:
+        pat_start = (
+            r'^(?:Based\s+on\s+[^,?:.]*?\b(?:passage|story|text)\b[^,?:.]*'
+            r'|According\s+to\s+[^,?:.]*?\b(?:passage|story|text)\b[^,?:.]*'
+            r'|In\s+the\s+(?:passage|story|text)'
+            r'|From\s+the\s+(?:passage|story|text)'
+            r'|As\s+(?:mentioned|stated|described)\s+in\s+the\s+(?:passage|story|text))[,:\s]*'
+        )
+        cleaned_text = re.sub(pat_start, '', text_val, flags=re.IGNORECASE).strip()
+        # 2. Strip trailing meta tags (e.g. ", based on the passage?"):
+        pat_end = r'[,;]?\s*(?:based\s+on|according\s+to|as\s+(?:mentioned|stated|described)\s+in)\s+(?:the\s+)?(?:passage|story|text)\s*(\??)$'
+        cleaned_text = re.sub(pat_end, r'\1', cleaned_text, flags=re.IGNORECASE).strip()
+        if cleaned_text and cleaned_text[0].islower():
+            cleaned_text = cleaned_text[0].upper() + cleaned_text[1:]
+        if cleaned_text:
+            q["text"] = cleaned_text
         
     # 1. Normalize questionType to standard enum strings
     q_type = str(q.get("questionType", "")).upper().replace(" ", "_").strip()

@@ -280,6 +280,7 @@ export default function AIGeneratePage() {
       const allQuestions = successfulResponses.flatMap(res =>
         (res.data?.questions || []).map(q => ({
           ...q,
+          text: q.text,
           options: sanitizeOptions(q.options),
           points: q.points || computeDefaultPoints(q.difficulty || difficulty),
           _internetSource: sourceMode === 'passage' ? false : true,
