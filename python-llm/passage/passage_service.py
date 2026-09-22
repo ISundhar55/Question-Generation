@@ -8,6 +8,7 @@ import json
 import re
 from typing import List, Tuple, Optional
 from services.llm import (
+    _call_clap,
     _call_gemini,
     _call_groq,
     _clean_response,
@@ -137,20 +138,22 @@ def generate_passages(req: GeneratePassageRequest) -> Tuple[List[PassageResult],
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            if LLM_PROVIDER == "groq":
+            if LLM_PROVIDER == "clap":
+                raw = _call_clap(prompt)
+            elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
             else:
                 raw = _call_gemini(prompt)
             print(f"[passage] Generated via {provider_used} (attempt {attempt})")
         except Exception as primary_err:
             err_str = str(primary_err)
-            if LLM_PROVIDER == "gemini":
-                print(f"[passage] Gemini error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})")
+            if LLM_PROVIDER in ("gemini", "clap"):
+                print(f"[passage] {provider_used} error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})")
                 try:
                     raw = _call_groq(prompt)
                     provider_used = "groq (auto-fallback)"
                 except Exception as fallback_err:
-                    return [], prompt, "", False, f"Gemini failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}"
+                    return [], prompt, "", False, f"{provider_used} failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}"
             else:
                 return [], prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"
 

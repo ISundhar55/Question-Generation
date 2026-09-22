@@ -80,8 +80,14 @@ load_dotenv()
 # Provider configuration — controlled entirely from .env
 # ---------------------------------------------------------------------------
 
-# Primary provider: "gemini" | "groq"  (default: gemini)
+# Primary provider: "clap" | "gemini" | "groq"  (default: gemini)
 LLM_PROVIDER   = os.getenv("LLM_PROVIDER", "gemini").lower()
+
+# CLAP settings (Changepond Large Language Model Platform)
+CLAP_API_KEY    = os.getenv("CLAP_API_KEY", "")
+CLAP_MODEL      = os.getenv("CLAP_MODEL", "google/gemma-4-31B-it")
+CLAP_BASE_URL   = os.getenv("CLAP_BASE_URL", "https://clap.changepond.com/api/chat/completions")
+CLAP_VERIFY_SSL = os.getenv("CLAP_VERIFY_SSL", "false").lower() in ("true", "1", "yes")
 
 # Gemini settings
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -439,6 +445,84 @@ def _call_groq(prompt: str) -> str:
     raise RuntimeError("Groq call failed with unknown error.")
 
 
+def _call_clap(prompt: str) -> str:
+    import time
+    import requests
+
+    if not CLAP_API_KEY:
+        raise RuntimeError(
+            "CLAP_API_KEY is not set. "
+            "Please set CLAP_API_KEY in python-llm/.env"
+        )
+
+    endpoint = CLAP_BASE_URL.strip()
+    # Normalize double slashes if any (e.g. https://clap.changepond.com//api/chat/completions)
+    endpoint = re.sub(r'(?<!:)//+', '/', endpoint)
+    if not endpoint.endswith("/chat/completions"):
+        endpoint = endpoint.rstrip("/") + "/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {CLAP_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": CLAP_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert assessment question generator. "
+                    "Follow all instructions exactly. Return only valid JSON."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.3,
+    }
+
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            print(f"\n{'=' * 40} [LLM INPUT PROMPT - CLAP ({CLAP_MODEL}) (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(prompt, flush=True)
+            print(f"{'=' * 115}\n", flush=True)
+
+            if not CLAP_VERIFY_SSL:
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+            resp = requests.post(endpoint, headers=headers, json=payload, verify=CLAP_VERIFY_SSL, timeout=180)
+            if resp.status_code != 200:
+                raise RuntimeError(f"CLAP API returned HTTP {resp.status_code}: {resp.text}")
+
+            res_json = resp.json()
+            raw_text = res_json["choices"][0]["message"]["content"]
+
+            print(f"\n{'=' * 40} [LLM RAW OUTPUT - CLAP (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(raw_text, flush=True)
+            print(f"{'=' * 115}\n", flush=True)
+
+            usage = res_json.get("usage")
+            if usage:
+                prompt_tok = usage.get("prompt_tokens", "?")
+                output_tok = usage.get("completion_tokens", "?")
+                total_tok = usage.get("total_tokens", "?")
+                print(f"[llm] Token usage (CLAP) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
+
+            return raw_text
+        except Exception as e:
+            last_err = e
+            print(f"[llm] CLAP attempt {attempt + 1} failed: {e}")
+            if attempt == 0:
+                time.sleep(2.0)
+                continue
+            raise e
+
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("CLAP call failed with unknown error.")
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -478,7 +562,9 @@ def generate_questions(
     for attempt in range(1, MAX_RETRIES + 1):
         # ── Primary call ─────────────────────────────────────────────────────
         try:
-            if LLM_PROVIDER == "groq":
+            if LLM_PROVIDER == "clap":
+                raw = _call_clap(prompt)
+            elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
             else:
                 raw = _call_gemini(prompt)
@@ -487,7 +573,7 @@ def generate_questions(
         except Exception as primary_err:
             err_str = str(primary_err)
 
-            # ── Automatic Gemini → Groq failover on any Gemini error ────────
+            # ── Automatic failover ──────────────────────────────────────────
             if LLM_PROVIDER == "gemini":
                 print(
                     f"[llm] [WARNING] Gemini error ({err_str[:80]}) — "
@@ -501,6 +587,19 @@ def generate_questions(
                     return [], prompt, "", False, (
                         f"Gemini failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}. "
                         f"Check GROQ_API_KEY in python-llm/.env"
+                    )
+            elif LLM_PROVIDER == "clap":
+                print(
+                    f"[llm] [WARNING] CLAP error ({err_str[:80]}) — "
+                    f"automatically switching to Groq ({GROQ_MODEL})"
+                )
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                    print(f"[llm] [SUCCESS] Fallback to Groq succeeded")
+                except Exception as fallback_err:
+                    return [], prompt, "", False, (
+                        f"CLAP failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
                     )
             else:
                 return [], prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"
@@ -701,7 +800,9 @@ def generate_questions_from_internet(
     for attempt in range(1, MAX_RETRIES + 1):
         # ── Primary call ──────────────────────────────────────────────────────
         try:
-            if LLM_PROVIDER == "groq":
+            if LLM_PROVIDER == "clap":
+                raw = _call_clap(prompt)
+            elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
             else:
                 raw = _call_gemini(prompt)
@@ -710,7 +811,7 @@ def generate_questions_from_internet(
         except Exception as primary_err:
             err_str = str(primary_err)
 
-            # Automatic Gemini → Groq failover on any Gemini error
+            # Automatic failover on error
             if LLM_PROVIDER == "gemini":
                 print(
                     f"[llm] [internet] Gemini error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})"
@@ -721,6 +822,17 @@ def generate_questions_from_internet(
                 except Exception as fallback_err:
                     return [], prompt, "", False, (
                         f"Gemini failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
+                    )
+            elif LLM_PROVIDER == "clap":
+                print(
+                    f"[llm] [internet] CLAP error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})"
+                )
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                except Exception as fallback_err:
+                    return [], prompt, "", False, (
+                        f"CLAP failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
                     )
             else:
                 return [], prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"
@@ -1760,7 +1872,9 @@ def regenerate_question(
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            if LLM_PROVIDER == "groq":
+            if LLM_PROVIDER == "clap":
+                raw = _call_clap(prompt)
+            elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
             else:
                 raw = _call_gemini(prompt)
@@ -1768,13 +1882,13 @@ def regenerate_question(
 
         except Exception as primary_err:
             err_str = str(primary_err)
-            if LLM_PROVIDER == "gemini" and _is_quota_error(err_str):
-                print(f"[llm] [WARNING] Gemini quota hit during regen — switching to Groq")
+            if (LLM_PROVIDER == "gemini" and _is_quota_error(err_str)) or LLM_PROVIDER == "clap":
+                print(f"[llm] [WARNING] {provider_used} error during regen — switching to Groq")
                 try:
                     raw = _call_groq(prompt)
                     provider_used = "groq (auto-fallback)"
                 except Exception as fallback_err:
-                    return None, prompt, "", False, f"Gemini quota + Groq fallback failed: {str(fallback_err)}"
+                    return None, prompt, "", False, f"{provider_used} error + Groq fallback failed: {str(fallback_err)}"
             else:
                 return None, prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"
 
@@ -1951,13 +2065,18 @@ Return ONLY a JSON array, one object per item in the same order and same
     raw = ""
     try:
         try:
-            if LLM_PROVIDER == "groq":
+            if LLM_PROVIDER == "clap":
+                raw = _call_clap(prompt)
+            elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
             else:
                 raw = _call_gemini(prompt)
         except Exception as primary_err:
             if LLM_PROVIDER == "gemini" and _is_quota_error(str(primary_err)):
                 print("[llm] [WARNING] Gemini quota hit during grounding check — switching to Groq")
+                raw = _call_groq(prompt)
+            elif LLM_PROVIDER == "clap":
+                print("[llm] [WARNING] CLAP error during grounding check — switching to Groq")
                 raw = _call_groq(prompt)
             else:
                 raise
