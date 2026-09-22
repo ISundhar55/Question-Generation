@@ -104,3 +104,36 @@ DO $$ BEGIN
     CHECK (status IN ('draft', 'ready_for_review', 'approved', 'rejected'));
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
+-- ============================================
+-- Passages / Test Stimulus Table
+-- ============================================
+CREATE TABLE IF NOT EXISTS passages (
+  id                    SERIAL PRIMARY KEY,
+  user_id               INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  title                 VARCHAR(255) NOT NULL,
+  text                  TEXT NOT NULL,
+  genre                 VARCHAR(50) DEFAULT 'informational',
+  grade                 VARCHAR(50) NOT NULL,
+  content_area          VARCHAR(100) NOT NULL,
+  word_count            INTEGER DEFAULT 0,
+  assessment_target     TEXT,
+  assessment_boundaries TEXT,
+  standard              TEXT,
+  learning_objective    TEXT,
+  status                VARCHAR(30) DEFAULT 'draft' CHECK (status IN ('draft', 'ready_for_review', 'approved', 'rejected')),
+  created_at            TIMESTAMP DEFAULT NOW(),
+  updated_at            TIMESTAMP DEFAULT NOW()
+);
+
+-- Link questions to an optional stimulus passage
+DO $$ BEGIN
+  ALTER TABLE questions ADD COLUMN IF NOT EXISTS passage_id INTEGER REFERENCES passages(id) ON DELETE SET NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+-- Optional vector diagram or illustration for reading passage stimulus
+DO $$ BEGIN
+  ALTER TABLE passages ADD COLUMN IF NOT EXISTS visual TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+
+

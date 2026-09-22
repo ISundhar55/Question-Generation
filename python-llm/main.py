@@ -43,6 +43,12 @@ from models import (
     FeedbackRequest,
     FeedbackResponse,
 )
+from passage import (
+    GeneratePassageRequest,
+    GeneratePassageResponse,
+    PassageResult,
+    generate_passages,
+)
 from services.pdf_parser import extract_text, chunk_text, extract_images_from_pdf, IMAGES_DIR
 from services.embedder import embed_texts, embed_query
 from services.vector_store import add_vectors, search_within_scored, rebuild_index_without
@@ -456,6 +462,8 @@ async def generate(req: GenerateRequest):
         chunks=chunks_for_prompt,
         custom_prompt=clean_custom_prompt or None,
         include_visuals=bool(req.include_visuals),
+        passage_text=req.passage_text or None,
+        passage_id=req.passage_id or None,
     )
 
     if not parse_success:
@@ -625,6 +633,8 @@ async def generate_internet(req: GenerateInternetRequest):
         custom_prompt=clean_custom_prompt or None,
         preferred_website=req.preferred_website or None,
         include_visuals=bool(req.include_visuals),
+        passage_text=req.passage_text or None,
+        passage_id=req.passage_id or None,
     )
 
     if not parse_success:
@@ -674,6 +684,50 @@ async def generate_internet(req: GenerateInternetRequest):
         doc_ids_used=[],
         ungrounded_dropped=0,
         duplicate_dropped=0,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /generate-passage
+# ---------------------------------------------------------------------------
+
+@app.post("/generate-passage", response_model=GeneratePassageResponse, dependencies=[Depends(verify_internal_key), Depends(rate_limit)])
+async def generate_passage_endpoint(req: GeneratePassageRequest):
+    """
+    Generate curriculum-aligned reading passages/stimuli based on standard,
+    learning objective, assessment target, assessment boundaries, and teacher instructions.
+    """
+    passages, prompt_sent, raw_response, success, error_msg = await asyncio.to_thread(
+        generate_passages, req
+    )
+
+    if not success:
+        log_generation(
+            request=req.model_dump(),
+            retrieved_chunk_ids=[],
+            prompt_sent=prompt_sent,
+            raw_response=raw_response,
+            parse_success=False,
+            error=error_msg,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=error_msg or "Failed to generate reading passage."
+        )
+
+    log_generation(
+        request=req.model_dump(),
+        retrieved_chunk_ids=[],
+        prompt_sent=prompt_sent,
+        raw_response=raw_response,
+        parse_success=True,
+        error=None,
+    )
+
+    return GeneratePassageResponse(
+        passages=passages,
+        count=len(passages),
+        prompt_sent=prompt_sent,
     )
 
 
@@ -729,6 +783,9 @@ async def regenerate(req: RegenerateRequest):
         modification_instructions=clean_mod_instructions,
         chunks=chunks_for_prompt,
         refinement_targets=req.refinement_targets,
+        passage_text=req.passage_text,
+        passage_id=req.passage_id,
+        passage_title=req.passage_title,
     )
 
     if parse_success and question_dict is not None and top_chunks:

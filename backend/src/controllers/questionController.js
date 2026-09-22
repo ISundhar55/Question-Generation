@@ -7,9 +7,10 @@ const getQuestions = async (req, res) => {
   const { status } = req.query;
   try {
     let query = `
-      SELECT q.*, qb.name AS bank_name
+      SELECT q.*, qb.name AS bank_name, p.title AS passage_title
       FROM questions q
       LEFT JOIN question_banks qb ON q.bank_id = qb.id
+      LEFT JOIN passages p ON q.passage_id = p.id
       WHERE q.user_id = $1
     `;
     const params = [req.user.id];
@@ -33,7 +34,10 @@ const getQuestions = async (req, res) => {
 const getQuestionById = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM questions WHERE id = $1 AND user_id = $2',
+      `SELECT q.*, p.title AS passage_title, p.text AS passage_text
+       FROM questions q
+       LEFT JOIN passages p ON q.passage_id = p.id
+       WHERE q.id = $1 AND q.user_id = $2`,
       [req.params.id, req.user.id]
     );
     if (result.rows.length === 0)
@@ -61,7 +65,7 @@ const formatOptionsWithVisual = (options, visual) => {
 
 // POST /api/questions
 const createQuestion = async (req, res) => {
-  const { bank_id, type, text, options, visual, answer, difficulty, points, explanation, status } = req.body;
+  const { bank_id, type, text, options, visual, answer, difficulty, points, explanation, status, passage_id } = req.body;
 
   if (!type || !text || answer === undefined || answer === null || answer === '')
     return res.status(400).json({ message: 'type, text, and answer are required' });
@@ -72,8 +76,8 @@ const createQuestion = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO questions (bank_id, user_id, type, text, options, answer, difficulty, points, explanation, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO questions (bank_id, user_id, type, text, options, answer, difficulty, points, explanation, status, passage_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         bank_id || null,
@@ -86,6 +90,7 @@ const createQuestion = async (req, res) => {
         points || 1,
         explanation || null,
         qStatus,
+        passage_id || null,
       ]
     );
     res.status(201).json(result.rows[0]);
@@ -108,7 +113,7 @@ const bulkCreateQuestions = async (req, res) => {
     const inserted = [];
 
     for (const item of items) {
-      const { bank_id, type, text, options, visual, answer, difficulty, points, explanation, status } = item;
+      const { bank_id, type, text, options, visual, answer, difficulty, points, explanation, status, passage_id } = item;
       if (!type || !text || answer === undefined || answer === null) continue;
 
       const answerVal = typeof answer === 'object' ? JSON.stringify(answer) : String(answer);
@@ -116,8 +121,8 @@ const bulkCreateQuestions = async (req, res) => {
       const qStatus = (status && VALID_STATUSES.includes(status)) ? status : 'draft';
 
       const resInsert = await client.query(
-        `INSERT INTO questions (bank_id, user_id, type, text, options, answer, difficulty, points, explanation, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO questions (bank_id, user_id, type, text, options, answer, difficulty, points, explanation, status, passage_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           bank_id || null,
@@ -130,6 +135,7 @@ const bulkCreateQuestions = async (req, res) => {
           points || 1,
           explanation || null,
           qStatus,
+          passage_id || null,
         ]
       );
       inserted.push(resInsert.rows[0]);
@@ -148,7 +154,7 @@ const bulkCreateQuestions = async (req, res) => {
 
 // PUT /api/questions/:id
 const updateQuestion = async (req, res) => {
-  const { type, text, options, visual, answer, difficulty, points, explanation, status } = req.body;
+  const { type, text, options, visual, answer, difficulty, points, explanation, status, passage_id } = req.body;
   const answerVal = typeof answer === 'object' ? JSON.stringify(answer) : String(answer);
   const finalOptions = formatOptionsWithVisual(options, visual);
 
@@ -157,9 +163,10 @@ const updateQuestion = async (req, res) => {
     let params;
 
     if (status && VALID_STATUSES.includes(status)) {
-      query = `UPDATE questions
-        SET type=$1, text=$2, options=$3, answer=$4, difficulty=$5, points=$6, explanation=$7, status=$8, updated_at=NOW()
-        WHERE id=$9 AND user_id=$10
+      query = `UPDATE questions 
+        SET type=$1, text=$2, options=$3, answer=$4, difficulty=$5, points=$6, explanation=$7, status=$8,
+            passage_id=COALESCE($9, passage_id), updated_at=NOW()
+        WHERE id=$10 AND user_id=$11
         RETURNING *`;
       params = [
         type,
@@ -170,13 +177,15 @@ const updateQuestion = async (req, res) => {
         points,
         explanation || null,
         status,
+        passage_id !== undefined ? passage_id : null,
         req.params.id,
         req.user.id,
       ];
     } else {
-      query = `UPDATE questions
-        SET type=$1, text=$2, options=$3, answer=$4, difficulty=$5, points=$6, explanation=$7, updated_at=NOW()
-        WHERE id=$8 AND user_id=$9
+      query = `UPDATE questions 
+        SET type=$1, text=$2, options=$3, answer=$4, difficulty=$5, points=$6, explanation=$7,
+            passage_id=COALESCE($8, passage_id), updated_at=NOW()
+        WHERE id=$9 AND user_id=$10
         RETURNING *`;
       params = [
         type,
@@ -186,6 +195,7 @@ const updateQuestion = async (req, res) => {
         difficulty,
         points,
         explanation || null,
+        passage_id !== undefined ? passage_id : null,
         req.params.id,
         req.user.id,
       ];

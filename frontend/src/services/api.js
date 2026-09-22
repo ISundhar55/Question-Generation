@@ -42,6 +42,16 @@ export const questionsAPI = {
   delete: (id) => api.delete(`/questions/${id}`),
 };
 
+export const passagesAPI = {
+  getAll: (params) => api.get('/passages', { params }),
+  getById: (id) => api.get(`/passages/${id}`),
+  create: (data) => api.post('/passages', data),
+  bulkCreate: (passages) => api.post('/passages/bulk', { passages }),
+  update: (id, data) => api.put(`/passages/${id}`, data),
+  updateStatus: (id, status) => api.patch(`/passages/${id}/status`, { status }),
+  delete: (id) => api.delete(`/passages/${id}`),
+};
+
 export const syllabusAPI = {
   list: () => api.get('/syllabus'),
   upload: (formData) =>
@@ -54,6 +64,7 @@ export const syllabusAPI = {
 export const aiAPI = {
   generate: (params) => api.post('/ai/generate', params),
   generateFromInternet: (params) => api.post('/ai/generate-internet', params),
+  generatePassage: (params) => api.post('/ai/generate-passage', params),
   regenerate: (params) => api.post('/ai/regenerate', params),
   feedback: (params) => api.post('/ai/feedback', params),
 };

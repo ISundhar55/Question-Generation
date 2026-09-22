@@ -36,16 +36,16 @@ IMPORTANT for SINGLE_SELECT:
 IMPORTANT for MULTIPLE_SELECT:
 - MANDATORY 5 OPTIONS: Always provide exactly 5 options (A, B, C, D, E). Always use consecutive letters starting from A.
 - STRICT CORRECT ANSWER COUNT: The answer field MUST contain more than one correct letter (e.g. 2 or 3 correct letters). Never create a multiple-select question with only 1 correct answer.
-- STEM-ANSWER COUNT AGREEMENT: The number specified in the question text MUST EXACTLY MATCH the number of correct options in the 'answer' field.
-  * If the question asks for TWO (e.g. 'Which TWO...', 'Select TWO...'), there MUST be EXACTLY 2 correct answers and 3 incorrect distractors.
-  * If the question asks for THREE (e.g. 'Which THREE...', 'Select THREE...'), there MUST be EXACTLY 3 correct answers and 2 incorrect distractors.
+- STEM-ANSWER COUNT AGREEMENT (ZERO-TOLERANCE): The number specified in the question text MUST EXACTLY MATCH the number of correct options in the 'answer' field.
+  * If the question asks for TWO (e.g. 'Which TWO...', 'Select TWO...'): There MUST be EXACTLY 2 correct letters in the 'answer' field (e.g. 'A|C'), and EXACTLY 3 incorrect distractors. NEVER output 3 correct answers or mark 3 options as Correct when asking for TWO.
+  * If the question asks for THREE (e.g. 'Which THREE...', 'Select THREE...'): There MUST be EXACTLY 3 correct letters in the 'answer' field (e.g. 'A|C|E'), and EXACTLY 2 incorrect distractors.
+  * In 'Which TWO...', there must be EXACTLY 2 true options (matching the answer field) and all other 3 options must be definitively FALSE.
+- PASSAGE GROUNDING & CHARACTER NAMES: In passage-based mode, every statement must be strictly verifiable from the provided passage. NEVER invent outside actions, card rules, or bonus mechanics, and spell character names exactly as they appear in the passage text.
 - MANDATORY DISTRACTORS & ZERO ACCIDENTAL TRUE OPTIONS:
-  * Ensure there are ALWAYS plausible incorrect distractors.
   * Distractors must be UNAMBIGUOUSLY FALSE and factually flawed; they must NEVER accidentally be true.
   * COMPARATIVE DISTRACTORS (CRITICAL): When drafting comparative options (e.g. 'A has fewer than B'), verify the actual values. If the comparison is true, you MUST invert it (e.g. 'A has more than B') so it is definitively FALSE.
-  * In 'Which TWO...', there must be EXACTLY 2 true options (matching the answer field) and all other options must be false.
 - The answer field must list all correct letters in alphabetical order, joined with | (pipe). Distribute correct answers across all options (A through E) without favoring specific letters.
-- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options' (A, B, C, D, E), explaining why each correct choice is right and why each distractor is wrong.""",
+- MANDATORY RATIONALE FOR ALL OPTIONS: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options' (A, B, C, D, E without omitting any letter), explaining why each correct choice is right and why each distractor is wrong.""",
 
     "MCQ": """Each question object must follow this exact format:
 {

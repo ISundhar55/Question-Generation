@@ -62,7 +62,7 @@ const cleanErrorMessage = (errorMsg) => {
 
 const generateQuestions = async (req, res) => {
   try {
-    const { content_area, grade, chapter, question_type, difficulty, count, custom_prompt, include_visuals } = req.body;
+    const { content_area, grade, chapter, question_type, difficulty, count, custom_prompt, include_visuals, passage_text, passage_id } = req.body;
 
     // Validate required fields
     if (!content_area || !grade || !question_type || !difficulty || !count) {
@@ -102,6 +102,8 @@ const generateQuestions = async (req, res) => {
           count: questionCount,
           custom_prompt: custom_prompt || null,
           include_visuals: Boolean(include_visuals),
+          passage_text: passage_text || null,
+          passage_id: passage_id || null,
         }),
       });
     } catch (err) {
@@ -137,6 +139,9 @@ const regenerateQuestion = async (req, res) => {
       modification_instructions,
       refinement_targets,
       source_chunk_ids,
+      passage_text,
+      passage_id,
+      passage_title,
     } = req.body;
 
     // Validate required fields
@@ -177,6 +182,9 @@ const regenerateQuestion = async (req, res) => {
           modification_instructions: modification_instructions || '',
           refinement_targets: refinement_targets || [],
           source_chunk_ids: source_chunk_ids || [],
+          passage_text: passage_text || null,
+          passage_id: passage_id || null,
+          passage_title: passage_title || null,
         }),
       });
     } catch (err) {
@@ -250,16 +258,13 @@ const submitFeedback = async (req, res) => {
 
 
 
-module.exports = { generateQuestions, regenerateQuestion, submitFeedback, generateFromInternet };
-
-
 // ---------------------------------------------------------------------------
 // POST /api/ai/generate-internet
 // ---------------------------------------------------------------------------
 
 async function generateFromInternet(req, res) {
   try {
-    const { content_area, grade, question_type, difficulty, count, custom_prompt, preferred_website, include_visuals } = req.body;
+    const { content_area, grade, question_type, difficulty, count, custom_prompt, preferred_website, include_visuals, passage_text, passage_id } = req.body;
 
     // Validate required fields
     if (!content_area || !grade || !question_type || !difficulty || !count) {
@@ -299,6 +304,8 @@ async function generateFromInternet(req, res) {
           custom_prompt: custom_prompt || null,
           preferred_website: preferred_website || null,
           include_visuals: Boolean(include_visuals),
+          passage_text: passage_text || null,
+          passage_id: passage_id || null,
         }),
       });
     } catch (err) {
@@ -317,4 +324,76 @@ async function generateFromInternet(req, res) {
     res.status(500).json({ message: 'Server error during internet generation.' });
   }
 }
+
+// ---------------------------------------------------------------------------
+// POST /api/ai/generate-passage
+// ---------------------------------------------------------------------------
+
+async function generatePassage(req, res) {
+  try {
+    const {
+      content_area,
+      grade,
+      standard,
+      learning_objective,
+      genre,
+      target_length,
+      count,
+      include_visuals,
+    } = req.body;
+
+    const assessment_target = req.body.assessment_target || req.body.assessmentTarget || null;
+    const assessment_boundaries = req.body.assessment_boundaries || req.body.assessmentBoundaries || null;
+    const cognitive_complexity = req.body.cognitive_complexity || req.body.cognitiveComplexity || null;
+    const instructions = req.body.instructions || req.body.custom_prompt || req.body.customPrompt || req.body.additionalInstructions || null;
+
+    if (!content_area || !grade) {
+      return res.status(400).json({ message: 'content_area and grade are required.' });
+    }
+
+    let pyRes;
+    try {
+      pyRes = await fetch(`${PYTHON_SERVICE}/generate-passage`, {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({
+          content_area,
+          grade,
+          standard: standard || null,
+          learning_objective: learning_objective || null,
+          assessment_target: assessment_target || null,
+          assessment_boundaries: assessment_boundaries || null,
+          cognitive_complexity: cognitive_complexity || null,
+          instructions: instructions || null,
+          custom_prompt: instructions || null,
+          genre: genre || 'informational',
+          target_length: target_length || 'medium',
+          count: count ? parseInt(count, 10) : 1,
+          include_visuals: Boolean(include_visuals),
+        }),
+      });
+    } catch (err) {
+      return res.status(503).json({ message: 'Python LLM service is unavailable.', detail: err.message });
+    }
+
+    const pyData = await pyRes.json();
+    if (!pyRes.ok) {
+      return res.status(pyRes.status).json({ message: cleanErrorMessage(pyData.detail) });
+    }
+
+    res.json(pyData);
+  } catch (err) {
+    console.error('[aiController] generatePassage error:', err);
+    res.status(500).json({ message: 'Server error during passage generation.' });
+  }
+}
+
+module.exports = {
+  generateQuestions,
+  regenerateQuestion,
+  submitFeedback,
+  generateFromInternet,
+  generatePassage,
+};
+
 

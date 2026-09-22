@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Union
 
 
@@ -53,6 +53,8 @@ class GenerateRequest(BaseModel):
     count: int = Field(..., ge=1, le=20, description="Number of questions (1-20)")
     custom_prompt: Optional[str] = Field(None, description="Optional additional instructions for the AI")
     include_visuals: Optional[bool] = Field(False, description="Whether to generate visual SVG diagrams for the questions")
+    passage_text: Optional[str] = Field(None, description="Optional reading passage stimulus text to ground question generation")
+    passage_id: Optional[int] = Field(None, description="Optional database ID of the linked passage")
 
 
 # ---------------------------------------------------------------------------
@@ -71,12 +73,19 @@ class GenerateInternetRequest(BaseModel):
     custom_prompt: Optional[str] = Field(None, description="Optional additional instructions for the AI")
     preferred_website: Optional[str] = Field(None, description="Optional user-preferred website URL for sourcing questions")
     include_visuals: Optional[bool] = Field(False, description="Whether to generate visual SVG diagrams for the questions")
+    passage_text: Optional[str] = Field(None, description="Optional reading passage stimulus text to ground question generation")
+    passage_id: Optional[int] = Field(None, description="Optional database ID of the linked passage")
 
+
+# ---------------------------------------------------------------------------
+# Question Result
+# ---------------------------------------------------------------------------
 
 class SourceRef(BaseModel):
     """Traces a generated question back to the exact file + page it came from."""
-    doc_id: str
     filename: str
+    doc_id: str
+    chunk_id: Optional[int] = 0
     chapter: Optional[str] = None
     page: Optional[int] = None
     chunk_type: str = "text"        # "text" | "image"
@@ -100,6 +109,19 @@ class QuestionResult(BaseModel):
     groundingNote: Optional[str] = None
     visual: Optional[str] = None     # Standalone SVG diagram markup
     webSources: Optional[list] = []  # Web sources citations for internet generation
+    passage_id: Optional[int] = None # Database ID of linked passage
+    passage_title: Optional[str] = None # Title of linked passage
+
+    @field_validator("webSources", mode="before")
+    @classmethod
+    def coerce_web_sources(cls, v):
+        if isinstance(v, dict):
+            return [v]
+        if isinstance(v, str) and v.strip():
+            return [{"name": "Web Reference", "url": v.strip()}]
+        if isinstance(v, list):
+            return v
+        return []
 
 
 class GenerateResponse(BaseModel):
@@ -141,6 +163,9 @@ class RegenerateRequest(BaseModel):
         default_factory=list,
         description="FAISS chunk_id integers from the original question's sourceChunkIds"
     )
+    passage_text: Optional[str] = Field(None, description="Optional stimulus reading passage text")
+    passage_id: Optional[int] = Field(None, description="Optional stimulus passage database ID")
+    passage_title: Optional[str] = Field(None, description="Optional stimulus passage title")
 
 
 class RegenerateResponse(BaseModel):

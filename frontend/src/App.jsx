@@ -25,6 +25,7 @@ export default function App() {
           <Route path="/edit/:id" element={<PrivateRoute><CreateQuestionPage /></PrivateRoute>} />
           <Route path="/syllabus" element={<PrivateRoute><SyllabusPage /></PrivateRoute>} />
           <Route path="/ai-generate" element={<PrivateRoute><AIGeneratePage /></PrivateRoute>} />
+          <Route path="/generate" element={<PrivateRoute><AIGeneratePage /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </UploadProvider>

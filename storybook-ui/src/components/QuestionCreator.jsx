@@ -1272,7 +1272,7 @@ export function QuestionCreator({
                   boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
                 }}
               >
-                {saving ? 'Saving...' : '✓ Save & Accept'}
+                {saving ? 'Saving...' : '✓ Save & Approve'}
               </button>
             </>
           ) : (

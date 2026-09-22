@@ -11,9 +11,33 @@ import { questionsAPI } from '../services/api';
 export default function EditQuestionModal({ question, idx, onSaveSuccess, onClose, onRejectSuccess }) {
   if (!question) return null;
 
+  const cleanOptionText = (text) => {
+    if (typeof text !== 'string') return text;
+    return text
+      .replace(/\s*[\(\[]\s*(?:Correct|Incorrect)\s*[\)\]]\s*$/i, '')
+      .replace(/^\s*[\(\[]\s*(?:Correct|Incorrect)\s*[\)\]]\s*[:-]?\s*/i, '')
+      .replace(/\s*[:\-–]\s*(?:Correct|Incorrect)\s*$/i, '')
+      .replace(/^\s*(?:Correct|Incorrect)\s*[:\-–]\s*/i, '')
+      .trim();
+  };
+
+  const sanitizeOptions = (opts) => {
+    if (!opts || typeof opts !== 'object' || Array.isArray(opts)) return opts;
+    const cleaned = {};
+    for (const [k, v] of Object.entries(opts)) {
+      if (k !== 'visual' && typeof v === 'string') {
+        cleaned[k] = cleanOptionText(v);
+      } else {
+        cleaned[k] = v;
+      }
+    }
+    return cleaned;
+  };
+
   // Prepare initialData for QuestionCreator with accurate points calculation
   const initialData = {
     ...question,
+    options: sanitizeOptions(question.options),
     type: question.questionType || question.type || 'SINGLE_SELECT',
     points: question.points || (question.difficulty === 'hard' ? 3 : question.difficulty === 'medium' ? 2 : 1),
     visual: question.visual || (typeof question.options === 'object' && question.options !== null ? question.options.visual : null) || null,
@@ -27,12 +51,13 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
     const apiPayload = {
       type: payload.type || question.questionType || question.type,
       text: payload.text,
-      options: payload.options || null,
+      options: sanitizeOptions(payload.options) || null,
       answer: payload.answer,
       difficulty: payload.difficulty || question.difficulty || 'medium',
       points: computedPoints,
       explanation: payload.explanation || question.explanation || null,
       status: newStatus,
+      passage_id: question.passage_id || undefined,
     };
 
     try {
@@ -53,6 +78,8 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
         id: savedId,
         status: newStatus,
         questionType: apiPayload.type,
+        passage_id: question.passage_id,
+        passage_title: question.passage_title,
         // Preserve AI grounding, sources, and visual diagram metadata
         explanation: payload.explanation || question.explanation,
         sources: question.sources || [],
@@ -216,7 +243,7 @@ export default function EditQuestionModal({ question, idx, onSaveSuccess, onClos
           <QuestionCreator
             initialData={initialData}
             onSave={(payload) => handleSaveEditedQuestion(payload, question.status || 'draft')}
-            onSaveAndAccept={(payload) => handleSaveEditedQuestion(payload, 'ready_for_review')}
+            onSaveAndAccept={(payload) => handleSaveEditedQuestion(payload, 'approved')}
             onReject={handleRejectQuestion}
             onClose={onClose}
             hideHeader={true}

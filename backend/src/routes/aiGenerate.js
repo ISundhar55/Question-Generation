@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { generateQuestions, regenerateQuestion, submitFeedback, generateFromInternet } = require('../controllers/aiController');
+const { generateQuestions, regenerateQuestion, submitFeedback, generateFromInternet, generatePassage } = require('../controllers/aiController');
 
 router.use(auth);
 
@@ -10,6 +10,9 @@ router.post('/generate', generateQuestions);
 
 // Generate questions from the internet (no syllabus required)
 router.post('/generate-internet', generateFromInternet);
+
+// Generate reading passage / test stimulus
+router.post('/generate-passage', generatePassage);
 
 // Regenerate a single question with modification instructions
 router.post('/regenerate', regenerateQuestion);

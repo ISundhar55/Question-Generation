@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const questionRoutes = require('./routes/questions');
+const passageRoutes = require('./passage/passageRoutes');
 const syllabusRoutes = require('./routes/syllabus');
 const aiRoutes = require('./routes/aiGenerate');
 const imageRoutes = require('./routes/images');
@@ -41,6 +42,7 @@ app.use('/api/ai', aiLimiter);
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/passages', passageRoutes);
 app.use('/api/syllabus', syllabusRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/images', imageRoutes);

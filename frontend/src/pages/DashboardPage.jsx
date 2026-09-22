@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { questionsAPI } from '../services/api';
+import { questionsAPI, passagesAPI } from '../services/api';
+import PassageCard from '../passage/PassageCard';
+import EditPassageModal from '../passage/EditPassageModal';
+import { DiagramViewer } from 'question-storybook-ui';
 
 const TYPE_LABELS = {
+  TEST_STIMULUS: { label: 'Test Stimulus', color: '#0d9488', bg: '#f0fdfa' },
   SINGLE_SELECT: { label: 'Multiple Choice (Single)', color: '#4f6ef7', bg: '#eef1fe' },
   MULTIPLE_SELECT: { label: 'Multiple Choice (Multiple)', color: '#3b82f6', bg: '#dbeafe' },
   MCQ: { label: 'MCQ (Legacy)', color: '#4f6ef7', bg: '#eef1fe' },
@@ -23,6 +27,7 @@ const TYPE_LABELS = {
 };
 
 const ACTIVE_TYPES = [
+  'TEST_STIMULUS',
   'SINGLE_SELECT',
   'MULTIPLE_SELECT',
   'TRUE_FALSE',
@@ -38,6 +43,7 @@ const ACTIVE_TYPES = [
 ];
 
 const SHORT_LABELS = {
+  TEST_STIMULUS: 'Test Stimulus',
   SINGLE_SELECT: 'MCQ (Single)',
   MULTIPLE_SELECT: 'MCQ (Multi)',
   MCQ: 'MCQ (Legacy)',
@@ -59,10 +65,13 @@ const DIFFICULTY_COLORS = {
   hard: { color: '#991b1b', bg: '#fef2f2' },
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 
 export default function DashboardPage() {
   const [questions, setQuestions] = useState([]);
+  const [passages, setPassages] = useState([]);
+  const [editingPassage, setEditingPassage] = useState(null);
+  const [previewPassage, setPreviewPassage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('ready_for_review'); // 'ready_for_review' | 'approved'
   const [filter, setFilter] = useState('ALL');
@@ -84,22 +93,40 @@ export default function DashboardPage() {
     }
   };
 
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, title }
-
-  useEffect(() => { fetchQuestions(); }, []);
-
-  const handleDeleteClick = (id, text) => {
-    const cleanText = text.length > 60 ? text.substring(0, 57) + '...' : text;
-    setDeleteConfirm({ id, title: `"${cleanText}"` });
+  const fetchPassages = async () => {
+    try {
+      const res = await passagesAPI.getAll();
+      setPassages(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch passages:', err);
+    }
   };
 
-  const confirmDeleteAction = async (id) => {
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, title, isPassage }
+
+  useEffect(() => {
+    fetchQuestions();
+    fetchPassages();
+  }, []);
+
+  const handleDeleteClick = (id, text, isPassage = false) => {
+    const cleanText = (text || '').length > 60 ? (text || '').substring(0, 57) + '...' : (text || '');
+    setDeleteConfirm({ id, title: `"${cleanText}"`, isPassage });
+  };
+
+  const confirmDeleteAction = async (id, isPassage = false) => {
     setDeleting(id);
     try {
-      await questionsAPI.delete(id);
-      setQuestions(prev => prev.filter(q => q.id !== id));
+      if (isPassage) {
+        await passagesAPI.delete(id);
+        setPassages(prev => prev.filter(p => p.id !== id));
+      } else {
+        await questionsAPI.delete(id);
+        setQuestions(prev => prev.filter(q => q.id !== id));
+      }
     } catch (err) {
-      console.error('Failed to delete question:', err);
+      console.error(`Failed to delete ${isPassage ? 'passage' : 'question'}:`, err);
+      alert(err.response?.data?.message || `Failed to delete ${isPassage ? 'passage' : 'question'}.`);
     } finally {
       setDeleting(null);
     }
@@ -131,6 +158,26 @@ export default function DashboardPage() {
     }
   };
 
+  const handlePassageStatus = async (id, status) => {
+    try {
+      await passagesAPI.updateStatus(id, status);
+      setPassages(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+    } catch (err) {
+      console.error('Failed to update passage status:', err);
+      alert(err.response?.data?.message || 'Failed to update passage status.');
+    }
+  };
+
+  const handlePassageDelete = async (id) => {
+    try {
+      await passagesAPI.delete(id);
+      setPassages(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('Failed to delete passage:', err);
+      alert(err.response?.data?.message || 'Failed to delete passage.');
+    }
+  };
+
   const handleApproveAllInView = async () => {
     const toApprove = filtered.filter(q => q.status !== 'approved');
     if (toApprove.length === 0) return;
@@ -150,18 +197,35 @@ export default function DashboardPage() {
 
   const currentTabQuestions = tab === 'ready_for_review' ? reviewQuestions : approvedQuestions;
 
+  // Separate passages by review vs approved
+  const reviewPassages = passages.filter(
+    p => p.status === 'ready_for_review' || p.status === 'draft' || (!p.status && p.status !== 'approved' && p.status !== 'rejected')
+  );
+  const approvedPassages = passages.filter(p => p.status === 'approved');
+  const currentTabPassages = tab === 'ready_for_review' ? reviewPassages : approvedPassages;
+
+  const isStimulus = filter === 'TEST_STIMULUS';
+
+  const filteredPassages = currentTabPassages.filter(p => {
+    const s = search.toLowerCase();
+    return (p.title || '').toLowerCase().includes(s) || (p.text || '').toLowerCase().includes(s);
+  });
+
   const filtered = currentTabQuestions.filter(q => {
     const matchType = filter === 'ALL' || q.type === filter;
-    const matchSearch = q.text.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = q.text.toLowerCase().includes(search.toLowerCase())
+      || (q.passage_title && q.passage_title.toLowerCase().includes(search.toLowerCase()));
     return matchType && matchSearch;
   });
 
   // Reset to page 1 whenever tab, filter or search changes
   useEffect(() => { setPage(1); }, [tab, filter, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const activeItems = isStimulus ? filteredPassages : filtered;
+  const totalPages = Math.max(1, Math.ceil(activeItems.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedQuestions = isStimulus ? [] : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedPassages = isStimulus ? filteredPassages.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) : [];
 
   // Page numbers to render (up to 5, centred around current page)
   const pageNumbers = (() => {
@@ -311,9 +375,11 @@ export default function DashboardPage() {
         </div>
 
         {ACTIVE_TYPES.map(type => {
-          const meta = TYPE_LABELS[type];
+          const meta = TYPE_LABELS[type] || {};
           const isActive = filter === type;
-          const count = currentTabQuestions.filter(q => q.type === type).length;
+          const count = type === 'TEST_STIMULUS'
+            ? currentTabPassages.length
+            : currentTabQuestions.filter(q => q.type === type).length;
           return (
             <div
               key={type}
@@ -358,7 +424,7 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 280 }}>
           <input
-            placeholder={`Search ${tab === 'ready_for_review' ? 'ready for review' : 'approved'} questions...`}
+            placeholder={filter === 'TEST_STIMULUS' ? "Search stimulus passages..." : `Search ${tab === 'ready_for_review' ? 'ready for review' : 'approved'} questions...`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
@@ -379,7 +445,7 @@ export default function DashboardPage() {
               backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
             }}
           >
-            <option value="ALL">All Question Types</option>
+            <option value="ALL">All Types</option>
             {ACTIVE_TYPES.map(value => {
               const meta = TYPE_LABELS[value];
               return (
@@ -389,60 +455,100 @@ export default function DashboardPage() {
           </select>
         </div>
 
-        {tab === 'ready_for_review' && filtered.length > 0 && (
-          <button
-            onClick={handleApproveAllInView}
-            style={{
-              padding: '9px 18px',
-              background: '#16a34a',
-              border: 'none',
-              borderRadius: 8,
-              color: '#fff',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
-              transition: 'all 0.15s',
-            }}
-          >
-            ✓ Approve All Filtered ({filtered.length}) items
-          </button>
+        {tab === 'ready_for_review' && (
+          filter === 'TEST_STIMULUS' ? (
+            filteredPassages.length > 0 && (
+              <button
+                onClick={async () => {
+                  const toApprove = filteredPassages.filter(p => p.status !== 'approved');
+                  for (const p of toApprove) {
+                    try { await passagesAPI.updateStatus(p.id, 'approved'); } catch (_) {}
+                  }
+                  setPassages(prev => prev.map(p => toApprove.some(a => a.id === p.id) ? { ...p, status: 'approved' } : p));
+                }}
+                style={{
+                  padding: '9px 18px',
+                  background: '#0d9488',
+                  border: 'none',
+                  borderRadius: 8,
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(13, 148, 136, 0.25)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                ✓ Approve All Filtered ({filteredPassages.length}) Stimulus
+              </button>
+            )
+          ) : (
+            filtered.length > 0 && (
+              <button
+                onClick={handleApproveAllInView}
+                style={{
+                  padding: '9px 18px',
+                  background: '#16a34a',
+                  border: 'none',
+                  borderRadius: 8,
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                ✓ Approve All Filtered ({filtered.length}) items
+              </button>
+            )
+          )
         )}
       </div>
 
-      {/* Table */}
-      <div style={{
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 12,
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow)',
-        width: '100%',
-        maxHeight: 'calc(100vh - 365px)',
-        minHeight: 140,
-        overflowY: 'auto',
-      }}>
+      {/* Table Grid for Questions and Stimulus Passages */}
+      <div
+        className="table-scroll-container"
+        style={{
+          background: 'var(--color-surface)',
+          border: '1.5px solid var(--color-border)',
+          borderRadius: 12,
+          boxShadow: 'var(--shadow)',
+          width: '100%',
+          maxHeight: 'calc(100vh - 280px)',
+          minHeight: 380,
+          overflowY: 'auto',
+          overflowX: 'auto',
+        }}
+      >
         {loading ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            Loading questions...
+            Loading {isStimulus ? 'stimulus passages' : 'questions'}...
           </div>
-        ) : filtered.length === 0 ? (
+        ) : activeItems.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>
-              {tab === 'ready_for_review' ? '🎉' : '📭'}
+              {isStimulus ? (tab === 'ready_for_review' ? '📖' : '📭') : (tab === 'ready_for_review' ? '🎉' : '📭')}
             </div>
             <div style={{ fontWeight: 600, fontSize: 16 }}>
-              {tab === 'ready_for_review' ? 'No pending questions for review' : 'No approved questions found'}
+              {isStimulus
+                ? (tab === 'ready_for_review' ? 'No pending stimulus passages for review' : 'No approved stimulus passages found')
+                : (tab === 'ready_for_review' ? 'No pending questions for review' : 'No approved questions found')}
             </div>
             <div style={{ fontSize: 13, marginTop: 4 }}>
-              {tab === 'ready_for_review'
-                ? 'All questions have been approved or rejected.'
-                : 'Approve questions from Ready for Review to add them to your final bank.'}
+              {isStimulus
+                ? (tab === 'ready_for_review'
+                  ? 'All stimulus passages have been approved or rejected.'
+                  : 'Approve stimulus passages from Ready for Review to make them available for grounded question generation.')
+                : (tab === 'ready_for_review'
+                  ? 'All questions have been approved or rejected.'
+                  : 'Approve questions from Ready for Review to add them to your final bank.')}
             </div>
           </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', textAlign: 'left' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f8f9fb' }}>
+        ) : isStimulus ? (
+          /* Test Stimulus Grid */
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 800, textAlign: 'left' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f8f9fb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <tr style={{
                 borderBottom: '1px solid var(--color-border)',
                 fontSize: 11,
@@ -452,16 +558,172 @@ export default function DashboardPage() {
                 color: 'var(--color-text-muted)',
               }}>
                 <th style={{ padding: '12px 16px', width: 65, textAlign: 'left' }}>ID</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Question</th>
-                <th style={{ padding: '12px 16px', width: 180, textAlign: 'left' }}>Type</th>
-                <th style={{ padding: '12px 16px', width: 105, textAlign: 'left' }}>Difficulty</th>
-                <th style={{ padding: '12px 16px', width: 85, textAlign: 'center' }}>Points</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Stimulus Name</th>
+                <th style={{ padding: '12px 16px', width: 160, textAlign: 'left' }}>Type</th>
+                <th style={{ padding: '12px 16px', width: 150, textAlign: 'left' }}>Grade / Subject</th>
                 <th style={{ padding: '12px 16px', width: 85, textAlign: 'center' }}>Preview</th>
                 <th style={{ padding: '12px 16px', width: 95, textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paged.map((q, i) => {
+              {pagedPassages.map((p, i) => {
+                return (
+                  <tr
+                    key={p.id}
+                    style={{
+                      borderBottom: i < pagedPassages.length - 1 ? '1px solid var(--color-border)' : 'none',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8f9fb'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {/* ID */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--color-text)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }} title={p.id}>
+                      {p.id}
+                    </td>
+
+                    {/* Stimulus Name */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: 'var(--color-text)',
+                      overflow: 'hidden',
+                    }} title={p.title}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, fontSize: 13.5, color: '#0f172a' }}>
+                            {p.title}
+                          </span>
+                          {p.visual_svg && (
+                            <span style={{ fontSize: 10.5, fontWeight: 600, color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 4, padding: '1px 5px' }}>
+                              🎨 Diagram
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+                          {p.text}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Type */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#0d9488',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      Test Stimulus
+                    </td>
+
+                    {/* Grade / Subject */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 12.5,
+                      color: 'var(--color-text)',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      <div><strong>{p.grade || 'Grade —'}</strong></div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{p.content_area || 'General'}</div>
+                    </td>
+
+                    {/* Preview */}
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => setPreviewPassage(p)}
+                        style={{
+                          padding: '5px 9px',
+                          borderRadius: 6,
+                          border: '1px solid var(--color-border)',
+                          background: 'transparent',
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          color: 'var(--color-text-muted)',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'var(--color-primary-light)';
+                          e.currentTarget.style.borderColor = 'var(--color-primary)';
+                          e.currentTarget.style.color = 'var(--color-primary)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.borderColor = 'var(--color-border)';
+                          e.currentTarget.style.color = 'var(--color-text-muted)';
+                        }}
+                        title="Preview stimulus passage"
+                      >
+                        👁️
+                      </button>
+                    </td>
+
+                    {/* Actions */}
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                        <button
+                          onClick={() => setEditingPassage(p)}
+                          style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)' }}
+                          title="Edit"
+                        >✏️</button>
+                        <button
+                          onClick={() => handleDeleteClick(p.id, p.title, true)}
+                          disabled={deleting === p.id}
+                          style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Delete"
+                        >
+                          {deleting === p.id ? '...' : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18" />
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                              <line x1="10" x2="10" y1="11" y2="17" />
+                              <line x1="14" x2="14" y1="11" y2="17" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          /* Regular Question Table */
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 920, textAlign: 'left' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f8f9fb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <tr style={{
+                borderBottom: '1px solid var(--color-border)',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--color-text-muted)',
+              }}>
+                <th style={{ padding: '12px 16px', width: 65, textAlign: 'left' }}>ID</th>
+                <th style={{ padding: '12px 16px', width: 170, textAlign: 'left' }}>Passage Name</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Question</th>
+                <th style={{ padding: '12px 16px', width: 170, textAlign: 'left' }}>Type</th>
+                <th style={{ padding: '12px 16px', width: 100, textAlign: 'left' }}>Difficulty</th>
+                <th style={{ padding: '12px 16px', width: 75, textAlign: 'center' }}>Points</th>
+                <th style={{ padding: '12px 16px', width: 85, textAlign: 'center' }}>Preview</th>
+                <th style={{ padding: '12px 16px', width: 95, textAlign: 'center' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedQuestions.map((q, i) => {
                 const typeMeta = TYPE_LABELS[q.type] || {};
                 const diffMeta = DIFFICULTY_COLORS[q.difficulty] || DIFFICULTY_COLORS.medium;
 
@@ -469,7 +731,7 @@ export default function DashboardPage() {
                   <tr
                     key={q.id}
                     style={{
-                      borderBottom: i < paged.length - 1 ? '1px solid var(--color-border)' : 'none',
+                      borderBottom: i < pagedQuestions.length - 1 ? '1px solid var(--color-border)' : 'none',
                       transition: 'background 0.1s',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.background = '#f8f9fb'}
@@ -486,6 +748,21 @@ export default function DashboardPage() {
                       whiteSpace: 'nowrap',
                     }} title={q.id}>
                       {q.id}
+                    </td>
+
+                    {/* Passage Name */}
+                    <td style={{
+                      padding: '12px 16px',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: 'var(--color-text)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }} title={q.passage_title || (q.passage_id ? `Passage #${q.passage_id}` : 'None')}>
+                      {q.passage_title || (q.passage_id ? `Passage #${q.passage_id}` : (
+                        <span style={{ color: 'var(--color-text-muted)' }}>—</span>
+                      ))}
                     </td>
 
                     {/* Question */}
@@ -515,27 +792,24 @@ export default function DashboardPage() {
                     </td>
 
                     {/* Difficulty */}
-                    <td style={{
-                      padding: '12px 16px',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: diffMeta.color,
-                      textTransform: 'capitalize',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {q.difficulty}
+                    <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: 12,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textTransform: 'capitalize',
+                        background: diffMeta.bg,
+                        color: diffMeta.color,
+                      }}>
+                        {q.difficulty || 'medium'}
+                      </span>
                     </td>
 
                     {/* Points */}
-                    <td style={{
-                      padding: '12px 16px',
-                      textAlign: 'center',
-                      fontSize: 13,
-                      color: 'var(--color-text-muted)',
-                      fontWeight: 600,
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {q.points} pt{q.points !== 1 ? 's' : ''}
+                    <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', textAlign: 'center' }}>
+                      {q.points ?? 1}
                     </td>
 
                     {/* Preview */}
@@ -550,14 +824,11 @@ export default function DashboardPage() {
                           fontSize: 13,
                           cursor: 'pointer',
                           color: 'var(--color-text-muted)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
                           transition: 'all 0.15s',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#eef2ff';
-                          e.currentTarget.style.borderColor = 'var(--color-primary-light)';
+                          e.currentTarget.style.background = 'var(--color-primary-light)';
+                          e.currentTarget.style.borderColor = 'var(--color-primary)';
                           e.currentTarget.style.color = 'var(--color-primary)';
                         }}
                         onMouseLeave={(e) => {
@@ -580,7 +851,7 @@ export default function DashboardPage() {
                           title="Edit"
                         >✏️</button>
                         <button
-                          onClick={() => handleDeleteClick(q.id, q.text)}
+                          onClick={() => handleDeleteClick(q.id, q.text, false)}
                           disabled={deleting === q.id}
                           style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-danger)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                           title="Delete"
@@ -606,14 +877,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Pagination */}
-      {!loading && filtered.length > 0 && (
+      {!loading && activeItems.length > 0 && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginTop: 16, flexWrap: 'wrap', gap: 12,
         }}>
           {/* Showing X–Y of Z */}
           <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-            Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
+            Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, activeItems.length)} of {activeItems.length}
           </span>
 
           {/* Page buttons */}
@@ -660,6 +931,165 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Custom Stimulus Preview Modal */}
+      {previewPassage && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: 20,
+        }}>
+          <div style={{
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+            borderRadius: 14, maxWidth: 840, width: '100%', maxHeight: '90vh',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 22px', borderBottom: '1px solid var(--color-border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: '#f8fafc',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{
+                  background: '#0d9488', color: '#fff', fontSize: 11, fontWeight: 700,
+                  padding: '3px 8px', borderRadius: 6,
+                }}>
+                  📖 Test Stimulus
+                </span>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>
+                  {previewPassage.title}
+                </h3>
+                {previewPassage.grade && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+                    background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1',
+                  }}>
+                    {String(previewPassage.grade).toLowerCase().startsWith('grade') ? previewPassage.grade : `Grade ${previewPassage.grade}`}
+                  </span>
+                )}
+                {previewPassage.content_area && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+                    background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe',
+                  }}>
+                    {previewPassage.content_area}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setPreviewPassage(null)}
+                style={{
+                  background: 'transparent', border: 'none', fontSize: 18,
+                  cursor: 'pointer', color: 'var(--color-text-muted)', padding: '4px 8px',
+                  lineHeight: 1, borderRadius: 4,
+                }}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+
+              {/* Visual Diagram if available */}
+              {(previewPassage.visual_svg || previewPassage.visual) && (
+                <div style={{ marginBottom: 18 }}>
+                  <DiagramViewer
+                    svgCode={previewPassage.visual_svg || previewPassage.visual}
+                    filename={`stimulus_${(previewPassage.title || 'diagram').replace(/[^a-zA-Z0-9_-]/g, '_')}`}
+                  />
+                </div>
+              )}
+
+              {/* Reading Text */}
+              <div style={{
+                fontSize: 14.5, lineHeight: 1.75, color: 'var(--color-text)',
+                background: '#ffffff', padding: '16px 20px', borderRadius: 8,
+                border: '1px solid #e2e8f0', whiteSpace: 'pre-line',
+                fontFamily: 'Georgia, serif',
+              }}>
+                {previewPassage.text}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '12px 24px', borderTop: '1px solid var(--color-border)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: '#f8fafc', flexWrap: 'wrap', gap: 10,
+            }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {tab === 'ready_for_review' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handlePassageStatus(previewPassage.id, 'approved');
+                      setPreviewPassage(null);
+                    }}
+                    style={{
+                      padding: '7px 18px', borderRadius: 6, border: 'none',
+                      background: '#16a34a', fontSize: 12.5, fontWeight: 600,
+                      color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    ✓ Approve Stimulus
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pass = previewPassage;
+                      setPreviewPassage(null);
+                      navigate('/ai-generate', { state: { passage: pass } });
+                    }}
+                    style={{
+                      padding: '7px 16px', borderRadius: 6, border: 'none',
+                      background: '#0d9488', fontSize: 12.5, fontWeight: 600,
+                      color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    📝 Generate Questions
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pass = previewPassage;
+                    setPreviewPassage(null);
+                    setEditingPassage(pass);
+                  }}
+                  style={{
+                    padding: '7px 14px', borderRadius: 6, border: '1px solid var(--color-border)',
+                    background: '#ffffff', fontSize: 12.5, fontWeight: 600,
+                    color: 'var(--color-text)', cursor: 'pointer',
+                  }}
+                >
+                  ✏️ Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewPassage(null)}
+                  style={{
+                    padding: '7px 16px', borderRadius: 6, border: '1px solid var(--color-border)',
+                    background: '#f1f5f9', fontSize: 12.5, fontWeight: 600,
+                    color: 'var(--color-text)', cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Custom Delete Confirmation Modal */}
       {deleteConfirm && (
         <div style={{
@@ -679,7 +1109,7 @@ export default function DashboardPage() {
               Confirm Deletion
             </h3>
             <p style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.5, marginBottom: 24 }}>
-              Are you sure you want to delete this question {deleteConfirm.title}? This action cannot be undone.
+              Are you sure you want to delete this {deleteConfirm.isPassage ? 'stimulus passage' : 'question'} {deleteConfirm.title}? This action cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button
@@ -695,8 +1125,9 @@ export default function DashboardPage() {
               <button
                 onClick={() => {
                   const targetId = deleteConfirm.id;
+                  const isPassage = deleteConfirm.isPassage;
                   setDeleteConfirm(null);
-                  confirmDeleteAction(targetId);
+                  confirmDeleteAction(targetId, isPassage);
                 }}
                 style={{
                   padding: '9px 18px', borderRadius: 8, border: 'none',
@@ -709,6 +1140,18 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Stimulus Passage Modal */}
+      {editingPassage && (
+        <EditPassageModal
+          passage={editingPassage}
+          onSaveSuccess={(updated) => {
+            setPassages(prev => prev.map(p => p.id === updated.id ? updated : p));
+            setEditingPassage(null);
+          }}
+          onClose={() => setEditingPassage(null)}
+        />
       )}
     </Layout>
   );
