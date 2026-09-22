@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { questionsAPI, passagesAPI } from '../services/api';
-import PassageCard from '../passage/PassageCard';
 import EditPassageModal from '../passage/EditPassageModal';
 import { DiagramViewer } from 'question-storybook-ui';
 
@@ -77,8 +76,6 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [deleting, setDeleting] = useState(null);
-  const [approvingId, setApprovingId] = useState(null);
-  const [rejectingId, setRejectingId] = useState(null);
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
@@ -132,32 +129,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleApprove = async (id) => {
-    setApprovingId(id);
-    try {
-      await questionsAPI.updateStatus(id, 'approved');
-      setQuestions(prev => prev.map(q => q.id === id ? { ...q, status: 'approved' } : q));
-    } catch (err) {
-      console.error('Failed to approve question:', err);
-      alert(err.response?.data?.message || 'Failed to approve question.');
-    } finally {
-      setApprovingId(null);
-    }
-  };
-
-  const handleReject = async (id) => {
-    setRejectingId(id);
-    try {
-      await questionsAPI.updateStatus(id, 'rejected');
-      setQuestions(prev => prev.map(q => q.id === id ? { ...q, status: 'rejected' } : q));
-    } catch (err) {
-      console.error('Failed to reject question:', err);
-      alert(err.response?.data?.message || 'Failed to reject question.');
-    } finally {
-      setRejectingId(null);
-    }
-  };
-
   const handlePassageStatus = async (id, status) => {
     try {
       await passagesAPI.updateStatus(id, status);
@@ -165,16 +136,6 @@ export default function DashboardPage() {
     } catch (err) {
       console.error('Failed to update passage status:', err);
       alert(err.response?.data?.message || 'Failed to update passage status.');
-    }
-  };
-
-  const handlePassageDelete = async (id) => {
-    try {
-      await passagesAPI.delete(id);
-      setPassages(prev => prev.filter(p => p.id !== id));
-    } catch (err) {
-      console.error('Failed to delete passage:', err);
-      alert(err.response?.data?.message || 'Failed to delete passage.');
     }
   };
 

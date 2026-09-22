@@ -1,6 +1,7 @@
 import React from 'react';
 import { QuestionCreator } from 'question-storybook-ui';
 import { questionsAPI } from '../services/api';
+import { sanitizeOptions } from '../utils/questionUtils';
 
 /**
  * EditQuestionModal
@@ -10,29 +11,6 @@ import { questionsAPI } from '../services/api';
  */
 export default function EditQuestionModal({ question, idx, onSaveSuccess, onClose, onRejectSuccess }) {
   if (!question) return null;
-
-  const cleanOptionText = (text) => {
-    if (typeof text !== 'string') return text;
-    return text
-      .replace(/\s*[\(\[]\s*(?:Correct|Incorrect)\s*[\)\]]\s*$/i, '')
-      .replace(/^\s*[\(\[]\s*(?:Correct|Incorrect)\s*[\)\]]\s*[:-]?\s*/i, '')
-      .replace(/\s*[:\-–]\s*(?:Correct|Incorrect)\s*$/i, '')
-      .replace(/^\s*(?:Correct|Incorrect)\s*[:\-–]\s*/i, '')
-      .trim();
-  };
-
-  const sanitizeOptions = (opts) => {
-    if (!opts || typeof opts !== 'object' || Array.isArray(opts)) return opts;
-    const cleaned = {};
-    for (const [k, v] of Object.entries(opts)) {
-      if (k !== 'visual' && typeof v === 'string') {
-        cleaned[k] = cleanOptionText(v);
-      } else {
-        cleaned[k] = v;
-      }
-    }
-    return cleaned;
-  };
 
   // Prepare initialData for QuestionCreator with accurate points calculation
   const initialData = {

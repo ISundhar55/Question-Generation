@@ -2,10 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import EditQuestionModal from '../components/EditQuestionModal';
-import { aiAPI, questionsAPI, passagesAPI } from '../services/api';
+import { aiAPI, questionsAPI } from '../services/api';
 import PassageDropdown from '../passage/PassageDropdown';
-import PassageCard from '../passage/PassageCard';
-import EditPassageModal from '../passage/EditPassageModal';
+import PassageGenerator from '../passage/PassageGenerator';
 import { MarkdownText, DiagramViewer } from 'question-storybook-ui';
 import {
   CONTENT_AREAS,
@@ -16,6 +15,7 @@ import {
   getRefinementTargetsForType,
   parseMatchingAnswer,
 } from './aiGenerateConstants';
+import { cleanOptionText, sanitizeOptions } from '../utils/questionUtils';
 
 export default function AIGeneratePage() {
   const navigate = useNavigate();
@@ -25,11 +25,6 @@ export default function AIGeneratePage() {
   const [genMode, setGenMode] = useState('item'); // 'item' | 'passage'
   const [sourceMode, setSourceMode] = useState('input'); // 'input' | 'passage'
   const [selectedPassage, setSelectedPassage] = useState(null);
-
-  // Passage generation results state
-  const [passages, setPassages] = useState([]);
-  const [passageCount, setPassageCount] = useState(1);
-  const [editingPassage, setEditingPassage] = useState(null);
 
   // Form state
   const [contentArea, setContentArea] = useState(CONTENT_AREAS[0]);
@@ -117,9 +112,6 @@ export default function AIGeneratePage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [questions, setQuestions] = useState([]);
-  const [savingAll, setSavingAll] = useState(false);
-  const [savedIds, setSavedIds] = useState(new Set());
-  const [savingId, setSavingId] = useState(null);
   const [showSource, setShowSource] = useState({});   // {idx: bool}
   const [collapsedIds, setCollapsedIds] = useState(new Set()); // Set of collapsed question indices
 
@@ -202,29 +194,6 @@ export default function AIGeneratePage() {
       if (bullets.length > 0) return bullets.join('\n');
     }
     return null;
-  };
-
-  const cleanOptionText = (text) => {
-    if (typeof text !== 'string') return text;
-    return text
-      .replace(/\s*[\(\[]\s*(?:Correct|Incorrect)\s*[\)\]]\s*$/i, '')
-      .replace(/^\s*[\(\[]\s*(?:Correct|Incorrect)\s*[\)\]]\s*[:-]?\s*/i, '')
-      .replace(/\s*[:\-–]\s*(?:Correct|Incorrect)\s*$/i, '')
-      .replace(/^\s*(?:Correct|Incorrect)\s*[:\-–]\s*/i, '')
-      .trim();
-  };
-
-  const sanitizeOptions = (opts) => {
-    if (!opts || typeof opts !== 'object' || Array.isArray(opts)) return opts;
-    const cleaned = {};
-    for (const [k, v] of Object.entries(opts)) {
-      if (k !== 'visual' && typeof v === 'string') {
-        cleaned[k] = cleanOptionText(v);
-      } else {
-        cleaned[k] = v;
-      }
-    }
-    return cleaned;
   };
 
   const buildSavePayload = (q, targetStatus = 'draft') => {
@@ -362,136 +331,8 @@ export default function AIGeneratePage() {
     }
   };
 
-  const handleGeneratePassages = async () => {
-    setGenerating(true);
-    setError(null);
-    setPassages([]);
-
-    const promptParts = [];
-    if (assessmentTarget.trim()) {
-      promptParts.push(`🎯 Assessment Target:\n${assessmentTarget.trim()}`);
-    }
-    if (assessmentBoundaries.trim()) {
-      promptParts.push(`🛑 Assessment Boundaries:\n${assessmentBoundaries.trim()}`);
-    }
-    if (cognitiveComplexity.trim()) {
-      promptParts.push(`🧠 Cognitive Complexity:\n${cognitiveComplexity.trim()}`);
-    }
-    if (customPrompt.trim()) {
-      promptParts.push(`Additional Instructions:\n${customPrompt.trim()}`);
-    }
-    const combinedCustomPrompt = promptParts.length > 0 ? promptParts.join('\n\n') : undefined;
-
-    try {
-      const res = await aiAPI.generatePassage({
-        content_area: contentArea,
-        grade,
-        count: 1,
-        difficulty,
-        include_visuals: includeVisuals,
-        assessment_target: assessmentTarget.trim() || undefined,
-        assessment_boundaries: assessmentBoundaries.trim() || undefined,
-        cognitive_complexity: cognitiveComplexity.trim() || undefined,
-        instructions: customPrompt.trim() || undefined,
-        custom_prompt: customPrompt.trim() || combinedCustomPrompt || undefined,
-      });
-
-      const genPassages = (res.data?.passages || []).map(p => ({
-        ...p,
-        content_area: contentArea,
-        grade,
-        assessment_target: assessmentTarget.trim() || p.assessment_target,
-        assessment_boundaries: assessmentBoundaries.trim() || p.assessment_boundaries,
-        cognitive_complexity: cognitiveComplexity.trim() || p.cognitive_complexity,
-        visual: p.visual || null,
-        status: 'draft',
-      }));
-
-      if (genPassages.length === 0) {
-        throw new Error('No passages generated. Please try again.');
-      }
-
-      setPassages(genPassages);
-
-      // Auto-save generated passages as draft in DB
-      (async () => {
-        try {
-          const savedResults = await Promise.all(
-            genPassages.map(p => passagesAPI.create({
-              title: p.title,
-              text: p.text,
-              visual: p.visual || null,
-              genre: p.genre || 'Informational',
-              grade: p.grade || grade,
-              content_area: p.content_area || contentArea,
-              word_count: p.word_count || (p.text ? p.text.trim().split(/\s+/).length : 0),
-              assessment_target: p.assessment_target,
-              assessment_boundaries: p.assessment_boundaries,
-              status: 'draft',
-            }))
-          );
-          setPassages(prev =>
-            prev.map((p, i) => ({
-              ...p,
-              id: savedResults[i]?.data?.id || p.id,
-              status: 'draft',
-            }))
-          );
-        } catch (saveErr) {
-          console.warn('Auto-save passages as draft failed:', saveErr);
-        }
-      })();
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Passage generation failed. Please try again.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handlePassageStatusUpdate = async (p, newStatus, idx) => {
-    try {
-      if (p.id) {
-        await passagesAPI.updateStatus(p.id, newStatus);
-      } else {
-        const res = await passagesAPI.create({
-          title: p.title,
-          text: p.text,
-          visual: p.visual || null,
-          genre: p.genre || 'Informational',
-          grade: p.grade || grade,
-          content_area: p.content_area || contentArea,
-          word_count: p.word_count || (p.text ? p.text.trim().split(/\s+/).length : 0),
-          assessment_target: p.assessment_target,
-          assessment_boundaries: p.assessment_boundaries,
-          status: newStatus,
-        });
-        if (res.data?.id) p = { ...p, id: res.data.id };
-      }
-      setPassages(prev => {
-        const next = [...prev];
-        next[idx] = { ...next[idx], id: p.id, status: newStatus };
-        return next;
-      });
-    } catch (err) {
-      console.error('Update passage status error:', err);
-      alert(err.response?.data?.message || 'Failed to update passage status');
-    }
-  };
-
-  const handlePassageDelete = async (p, idx) => {
-    if (p.id) {
-      try {
-        await passagesAPI.delete(p.id);
-      } catch (err) {
-        console.error('Delete passage error:', err);
-      }
-    }
-    setPassages(prev => prev.filter((_, i) => i !== idx));
-  };
-
   const resetFormAndResults = () => {
     setQuestions([]);
-    setPassages([]);
     setError(null);
     setSelectedPassage(null);
     setCustomPrompt('');
@@ -513,10 +354,7 @@ export default function AIGeneratePage() {
       MATRIX_INTERACTION: 0,
       SELECT_TEXT: 0,
     });
-    setPassageCount(1);
     setGenMeta(null);
-    setSavedIds(new Set());
-    setSavingId(null);
     setCollapsedIds(new Set());
     setShowSource({});
   };
@@ -555,24 +393,6 @@ export default function AIGeneratePage() {
     if (passage.content_area) setContentArea(passage.content_area);
     if (passage.grade) setGrade(passage.grade);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleAcceptAllPassages = async () => {
-    for (let i = 0; i < passages.length; i++) {
-      const p = passages[i];
-      if (p.status !== 'ready_for_review') {
-        await handlePassageStatusUpdate(p, 'ready_for_review', i);
-      }
-    }
-  };
-
-  const handleRejectAllPassages = async () => {
-    for (let i = 0; i < passages.length; i++) {
-      const p = passages[i];
-      if (p.status !== 'rejected') {
-        await handlePassageStatusUpdate(p, 'rejected', i);
-      }
-    }
   };
 
   const handleAccept = async (q, idx) => {
@@ -800,6 +620,58 @@ export default function AIGeneratePage() {
     }
   };
 
+  const renderModeToggle = () => (
+    <div style={{
+      display: 'flex',
+      background: '#f1f5f9',
+      padding: 3,
+      borderRadius: 8,
+      marginBottom: 16,
+      border: '1px solid var(--color-border)',
+    }}>
+      <button
+        type="button"
+        id="mode-item-gen"
+        onClick={handleSwitchToItemGen}
+        style={{
+          flex: 1,
+          padding: '7px 10px',
+          borderRadius: 6,
+          border: 'none',
+          background: genMode === 'item' ? '#ffffff' : 'transparent',
+          color: genMode === 'item' ? 'var(--color-primary, #4f6ef7)' : '#64748b',
+          fontWeight: genMode === 'item' ? 700 : 500,
+          fontSize: 12,
+          cursor: 'pointer',
+          boxShadow: genMode === 'item' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        📝 Item Generation
+      </button>
+      <button
+        type="button"
+        id="mode-passage-gen"
+        onClick={handleSwitchToPassageGen}
+        style={{
+          flex: 1,
+          padding: '7px 10px',
+          borderRadius: 6,
+          border: 'none',
+          background: genMode === 'passage' ? '#ffffff' : 'transparent',
+          color: genMode === 'passage' ? '#0d9488' : '#64748b',
+          fontWeight: genMode === 'passage' ? 700 : 500,
+          fontSize: 12,
+          cursor: 'pointer',
+          boxShadow: genMode === 'passage' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        📖 Passage Generation
+      </button>
+    </div>
+  );
+
   return (
     <Layout>
       {/* Page Header */}
@@ -812,71 +684,29 @@ export default function AIGeneratePage() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '350px minmax(0, 1fr)', gap: 14, alignItems: 'start', width: '100%' }}>
-
-        {/* ─── Left Panel: Form ─── */}
-        <div style={{
-          background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-          borderRadius: 12, padding: '20px 18px', boxShadow: 'var(--shadow)', position: 'sticky', top: 16,
-          minHeight: 'calc(100vh - 64px)', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto',
-        }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, color: 'var(--color-text)' }}>
-            Generation Parameters
-          </h2>
-
-          {/* Toggle 1: Generation Mode (Items vs Passages) */}
+      {genMode === 'passage' ? (
+        <PassageGenerator
+          initialContentArea={contentArea}
+          initialGrade={grade}
+          onGenerateQuestions={handleGenerateQuestionsFromPassage}
+          modeToggle={renderModeToggle()}
+        />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '350px minmax(0, 1fr)', gap: 14, alignItems: 'start', width: '100%' }}>
+          {/* ─── Left Panel: Form ─── */}
           <div style={{
-            display: 'flex',
-            background: '#f1f5f9',
-            padding: 3,
-            borderRadius: 8,
-            marginBottom: 16,
-            border: '1px solid var(--color-border)',
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+            borderRadius: 12, padding: '20px 18px', boxShadow: 'var(--shadow)', position: 'sticky', top: 16,
+            minHeight: 'calc(100vh - 64px)', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto',
           }}>
-            <button
-              type="button"
-              id="mode-item-gen"
-              onClick={handleSwitchToItemGen}
-              style={{
-                flex: 1,
-                padding: '7px 10px',
-                borderRadius: 6,
-                border: 'none',
-                background: genMode === 'item' ? '#ffffff' : 'transparent',
-                color: genMode === 'item' ? 'var(--color-primary, #4f6ef7)' : '#64748b',
-                fontWeight: genMode === 'item' ? 700 : 500,
-                fontSize: 12,
-                cursor: 'pointer',
-                boxShadow: genMode === 'item' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              📝 Item Generation
-            </button>
-            <button
-              type="button"
-              id="mode-passage-gen"
-              onClick={handleSwitchToPassageGen}
-              style={{
-                flex: 1,
-                padding: '7px 10px',
-                borderRadius: 6,
-                border: 'none',
-                background: genMode === 'passage' ? '#ffffff' : 'transparent',
-                color: genMode === 'passage' ? '#0d9488' : '#64748b',
-                fontWeight: genMode === 'passage' ? 700 : 500,
-                fontSize: 12,
-                cursor: 'pointer',
-                boxShadow: genMode === 'passage' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              📖 Passage Generation
-            </button>
-          </div>
+            <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, color: 'var(--color-text)' }}>
+              Generation Parameters
+            </h2>
 
-          {/* Toggle 2: Item Generation Source (Standard vs Passage Grounding) */}
-          {genMode === 'item' && (
+            {/* Toggle 1: Generation Mode (Items vs Passages) */}
+            {renderModeToggle()}
+
+            {/* Toggle 2: Item Generation Source (Standard vs Passage Grounding) */}
             <div style={{ marginBottom: 16 }}>
               <div style={{
                 display: 'flex',
@@ -926,9 +756,8 @@ export default function AIGeneratePage() {
                 </button>
               </div>
             </div>
-          )}
 
-          {/* Content Area */}
+            {/* Content Area */}
           <div style={{ marginBottom: 18, position: 'relative' }} ref={contentAreaDropdownRef}>
             <label style={labelStyle}>Content Area</label>
             <div
@@ -1234,8 +1063,8 @@ export default function AIGeneratePage() {
             </div>
           )}
 
-          {/* Assessment Boundaries, Target, and Complexity - Visible during Passage Generation or Standard Item Generation */}
-          {(genMode === 'passage' || sourceMode !== 'passage') && (
+          {/* Assessment Boundaries, Target, and Complexity - Visible during Standard Item Generation */}
+          {sourceMode !== 'passage' && (
             <>
               {/* Assessment Boundaries */}
               <div style={{ marginBottom: 18 }}>
@@ -1329,7 +1158,7 @@ export default function AIGeneratePage() {
                 cursor: 'text',
               }}
             />
-            {(((genMode === 'passage' || sourceMode !== 'passage') && (assessmentTarget.trim() || assessmentBoundaries.trim() || cognitiveComplexity.trim())) || customPrompt.trim()) && (
+            {((sourceMode !== 'passage' && (assessmentTarget.trim() || assessmentBoundaries.trim() || cognitiveComplexity.trim())) || customPrompt.trim()) && (
               <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span>💡</span> AI will strictly apply these assessment parameters and instructions
               </div>
@@ -1361,9 +1190,7 @@ export default function AIGeneratePage() {
                   Include Visual Diagrams
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
-                  {genMode === 'passage'
-                    ? 'Generate passage with an accompanying vector diagram, cycle, chart, or scientific illustration'
-                    : 'Generate items with vector geometry, circuits, cycles, or charts'}
+                  Generate items with vector geometry, circuits, cycles, or charts
                 </div>
               </div>
             </div>
@@ -1372,44 +1199,36 @@ export default function AIGeneratePage() {
               id="ai-include-visuals"
               checked={includeVisuals}
               onChange={e => setIncludeVisuals(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0d9488' }}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#4f6ef7' }}
             />
           </div>
 
           {/* Generate Button */}
           {(() => {
-            const isPassageMissing = genMode === 'item' && sourceMode === 'passage' && !selectedPassage;
-            const isItemDisabled = genMode === 'item' && (totalCount === 0 || totalCount > 50 || isPassageMissing);
+            const isPassageMissing = sourceMode === 'passage' && !selectedPassage;
+            const isItemDisabled = totalCount === 0 || totalCount > 50 || isPassageMissing;
             const isDisabled = generating || isItemDisabled;
 
             return (
               <button
                 id="generate-btn"
                 className="btn-generate"
-                onClick={genMode === 'passage' ? handleGeneratePassages : handleGenerate}
+                onClick={handleGenerate}
                 disabled={isDisabled}
                 style={{
                   width: '100%', padding: '13px',
-                  background: isDisabled
-                    ? (genMode === 'passage' ? '#99f6e4' : '#c7d2fe')
-                    : (genMode === 'passage' ? '#0d9488' : 'var(--color-primary)'),
+                  background: isDisabled ? '#c7d2fe' : 'var(--color-primary)',
                   border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 700,
                   cursor: isDisabled ? 'not-allowed' : 'pointer',
-                  boxShadow: isDisabled
-                    ? 'none'
-                    : (genMode === 'passage' ? '0 4px 14px rgba(13, 148, 136, 0.35)' : '0 4px 14px rgba(79,110,247,0.35)'),
+                  boxShadow: isDisabled ? 'none' : '0 4px 14px rgba(79,110,247,0.35)',
                   transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
               >
                 {generating ? (
                   <>
                     <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                    {genMode === 'passage'
-                      ? 'Generating Stimulus Passage...'
-                      : `Generating ${totalCount} Question${totalCount > 1 ? 's' : ''}...`}
+                    Generating {totalCount} Question{totalCount > 1 ? 's' : ''}...
                   </>
-                ) : genMode === 'passage' ? (
-                  '📖 Generate Stimulus Passage'
                 ) : isPassageMissing ? (
                   'Select a Stimulus Passage'
                 ) : totalCount === 0 ? (
@@ -1444,71 +1263,8 @@ export default function AIGeneratePage() {
             </div>
           )}
 
-          {/* Passage Generation View */}
-          {genMode === 'passage' && (
-            <>
-              {/* Empty state while generating */}
-              {generating && (
-                <div style={{
-                  background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-                  borderRadius: 12, padding: 60, textAlign: 'center', boxShadow: 'var(--shadow)',
-                }}>
-                  <div style={{ fontSize: 36, marginBottom: 16, animation: 'pulse 1.5s ease-in-out infinite' }}>
-                    📖
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
-                    Synthesizing Reading Stimulus...
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>
-                    Crafting curriculum-aligned passage grounded in assessment targets and boundaries...
-                  </div>
-                </div>
-              )}
-
-              {/* Empty state before generation */}
-              {!generating && passages.length === 0 && !error && (
-                <div style={{
-                  background: 'var(--color-surface)', border: '1px dashed var(--color-border)',
-                  borderRadius: 12, padding: 60, textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 36, marginBottom: 12 }}>📖</div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>Ready to Generate Stimulus Passages</div>
-                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>
-                    Configure parameters on the left and click Generate Stimulus Passage.
-                  </div>
-                </div>
-              )}
-
-              {/* Render generated passages */}
-              {!generating && passages.length > 0 && (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-                      Generated stimulus passage for <strong style={{ color: 'var(--color-text)' }}>{grade} {contentArea}</strong>
-                    </div>
-                  </div>
-
-                  {passages.map((p, idx) => (
-                    <PassageCard
-                      key={p.id || idx}
-                      passage={p}
-                      index={idx}
-                      onUpdateStatus={(pass, status) => handlePassageStatusUpdate(pass, status, idx)}
-                      onDelete={null}
-                      onEdit={() => setEditingPassage(p)}
-                      onGenerateQuestions={handleGenerateQuestionsFromPassage}
-                      showCopy={false}
-                      showTargetBoundaries={false}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Item Generation View */}
-          {genMode === 'item' && (
-            <>
+          {/* Item Generation Results */}
+          <>
               {/* Generation meta */}
               {genMeta && questions.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18, minWidth: 0 }}>
@@ -2224,27 +1980,12 @@ export default function AIGeneratePage() {
                                 : Array.isArray(q.options.label_bank)
                                   ? q.options.label_bank
                                   : [];
-                              let answersObj = {};
-                              if (typeof q.answer === 'object' && q.answer !== null) {
-                                answersObj = q.answer;
-                              } else if (typeof q.answer === 'string') {
-                                try {
-                                  answersObj = JSON.parse(q.answer);
-                                } catch (_) {
-                                  try {
-                                    const fixed = q.answer.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z0-9_-]+)\s*:/g, '$1"$2":');
-                                    answersObj = JSON.parse(fixed);
-                                  } catch (_) { }
-                                }
-                              }
-
                               const renderPassageWithGaps = () => {
                                 if (!passageText) return <span style={{ color: 'var(--color-text-muted)' }}>No passage provided</span>;
                                 const parts = passageText.split(/(\[gap_[a-zA-Z0-9_-]+\]|\[gap\s*[0-9]+\])/gi);
                                 return parts.map((part, pIdx) => {
                                   const match = part.match(/\[(gap_[a-zA-Z0-9_-]+|gap\s*[0-9]+)\]/i);
                                   if (match) {
-                                    const gapKey = match[1].toLowerCase().replace(/\s+/g, '_');
                                     return (
                                       <span
                                         key={pIdx}
@@ -2788,7 +2529,6 @@ export default function AIGeneratePage() {
                               const labelBank = q.options.label_bank || [];
                               const zoneWidth = q.options.drop_zone_width || 120;
                               const zoneHeight = q.options.drop_zone_height || 36;
-                              const answersObj = typeof q.answer === 'object' && q.answer !== null ? q.answer : {};
 
                               return (
                                 <div style={{ marginBottom: 16 }}>
@@ -3124,9 +2864,9 @@ export default function AIGeneratePage() {
                 </div>
               )}
             </>
-          )}
         </div>
       </div>
+    )}
 
 
 
@@ -3444,18 +3184,15 @@ export default function AIGeneratePage() {
               style={{
                 position: 'absolute', top: 14, right: 14,
                 width: 30, height: 30, borderRadius: '50%',
-                border: '1px solid var(--color-border)',
-                background: 'transparent',
-                color: 'var(--color-text-muted)',
-                fontSize: 16, fontWeight: 700, lineHeight: 1,
-                cursor: 'pointer', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', transition: 'all 0.15s',
+                border: 'none', background: 'var(--color-border)',
+                color: 'var(--color-text-muted)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 14, fontWeight: 700, lineHeight: 1,
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = 'var(--color-text)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
             >
               &#x2715;
             </button>
+
             {feedbackSuccess ? (
               /* ── Success state ── */
               <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
@@ -3626,6 +3363,7 @@ export default function AIGeneratePage() {
           </div>
         </div>
       )}
+
       {/* ─── Edit Question Modal (Encapsulates Save & Update Lifecycle) ─── */}
       {editModal && (
         <EditQuestionModal
@@ -3633,18 +3371,6 @@ export default function AIGeneratePage() {
           idx={editModal.idx}
           onSaveSuccess={handleEditSaveSuccess}
           onClose={closeEditModal}
-        />
-      )}
-
-      {/* ─── Edit Stimulus Passage Modal ─── */}
-      {editingPassage && (
-        <EditPassageModal
-          passage={editingPassage}
-          onSaveSuccess={(updated) => {
-            setPassages(prev => prev.map(p => (p.id === updated.id || (p.title === editingPassage.title && !p.id)) ? updated : p));
-            setEditingPassage(null);
-          }}
-          onClose={() => setEditingPassage(null)}
         />
       )}
     </Layout>
