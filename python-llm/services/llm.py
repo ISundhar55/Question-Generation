@@ -19,6 +19,7 @@ import os
 import re
 import random
 import sys
+import threading
 
 # Prevent UnicodeEncodeError on Windows systems with non-UTF-8 terminals (e.g. cp1252)
 try:
@@ -90,12 +91,14 @@ CLAP_BASE_URL   = os.getenv("CLAP_BASE_URL", "https://clap.changepond.com/api/ch
 CLAP_VERIFY_SSL = os.getenv("CLAP_VERIFY_SSL", "false").lower() in ("true", "1", "yes")
 
 # Gemini settings
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+_raw_gemini_keys = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEYS = [k.strip() for k in _raw_gemini_keys.replace(";", ",").split(",") if k.strip()]
+GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else ""
 GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Groq settings (used as automatic fallback when Gemini quota exhausted)
 GROQ_API_KEY   = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL     = os.getenv("GROQ_MODEL", "groq/compound-mini")
+GROQ_MODEL     = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 
 # Quota/rate-limit error patterns that trigger automatic failover
 _QUOTA_PATTERNS = (
@@ -105,28 +108,51 @@ _QUOTA_PATTERNS = (
     "resource_exhausted",
     "RESOURCE_EXHAUSTED",
     "exceeded",
+    "504",
+    "deadline",
+    "timeout",
+    "timed out",
 )
 
+_current_gemini_idx = 0
+_gemini_lock = threading.Lock()
 _gemini_client = None
 _groq_client   = None
 
 
 def _is_quota_error(error_str: str) -> bool:
-    """Return True if the error is a Gemini quota / rate-limit error."""
+    """Return True if the error is a Gemini quota / rate-limit / timeout error."""
     low = error_str.lower()
     return any(p.lower() in low for p in _QUOTA_PATTERNS)
 
 
 def _get_gemini():
-    global _gemini_client
-    if _gemini_client is None:
-        if not GEMINI_API_KEY:
-            raise RuntimeError("GEMINI_API_KEY is not set in environment.")
+    global _gemini_client, _current_gemini_idx
+    with _gemini_lock:
+        if _gemini_client is None:
+            if not GEMINI_API_KEYS:
+                raise RuntimeError("GEMINI_API_KEY is not set in environment.")
+            key = GEMINI_API_KEYS[_current_gemini_idx % len(GEMINI_API_KEYS)]
+            import google.generativeai as genai
+            genai.configure(api_key=key)
+            _gemini_client = genai.GenerativeModel(GEMINI_MODEL)
+            print(f"[llm] Gemini client ready (key {(_current_gemini_idx % len(GEMINI_API_KEYS)) + 1}/{len(GEMINI_API_KEYS)}): {GEMINI_MODEL}")
+        return _gemini_client
+
+
+def _rotate_gemini_key() -> bool:
+    """Switch to the next Gemini API key in the pool (thread-safe)."""
+    global _gemini_client, _current_gemini_idx
+    with _gemini_lock:
+        if len(GEMINI_API_KEYS) <= 1:
+            return False
+        _current_gemini_idx = (_current_gemini_idx + 1) % len(GEMINI_API_KEYS)
+        next_key = GEMINI_API_KEYS[_current_gemini_idx]
         import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
+        genai.configure(api_key=next_key)
         _gemini_client = genai.GenerativeModel(GEMINI_MODEL)
-        print(f"[llm] Gemini client ready: {GEMINI_MODEL}")
-    return _gemini_client
+        print(f"[llm] 🔄 Rotated to Gemini API key {_current_gemini_idx + 1}/{len(GEMINI_API_KEYS)}")
+        return True
 
 
 def _get_groq():
@@ -354,9 +380,10 @@ def _clean_response(raw: str) -> str:
 def _call_gemini(prompt: str) -> str:
     import google.generativeai as genai
     import time
-    client = _get_gemini()
+    max_attempts = min(len(GEMINI_API_KEYS), 4) if len(GEMINI_API_KEYS) > 1 else 2
     last_err: Exception | None = None
-    for attempt in range(2):
+    for attempt in range(max_attempts):
+        client = _get_gemini()
         try:
             print(f"\n{'=' * 40} [LLM INPUT PROMPT - GEMINI (Attempt {attempt + 1})] {'=' * 40}", flush=True)
             print(prompt, flush=True)
@@ -369,6 +396,7 @@ def _call_gemini(prompt: str) -> str:
                     max_output_tokens=3072,
                     response_mime_type="application/json",
                 ),
+                request_options={"timeout": 25.0},
             )
             raw_text = response.text
 
@@ -385,10 +413,16 @@ def _call_gemini(prompt: str) -> str:
             return raw_text
         except Exception as e:
             last_err = e
-            if _is_quota_error(str(e)) and attempt == 0:
-                print(f"[llm] Rate limit on Gemini — waiting 2s before retry...")
-                time.sleep(2.0)
-                continue
+            err_msg = str(e)
+            print(f"[llm] Gemini call failed on attempt {attempt + 1}: {err_msg[:80]}")
+            if _is_quota_error(err_msg):
+                if _rotate_gemini_key():
+                    time.sleep(0.3)
+                    continue
+                elif attempt == 0:
+                    print(f"[llm] Rate limit on Gemini — waiting 1.5s before retry...")
+                    time.sleep(1.5)
+                    continue
             raise e
     if last_err is not None:
         raise last_err
