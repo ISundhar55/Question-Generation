@@ -330,8 +330,11 @@ export default function DashboardPage() {
             <span>{currentTabQuestions.length}</span>
             {filter === 'ALL' && <span style={{ fontSize: 12 }}>🎯</span>}
           </div>
-          <div style={{ fontSize: 11, color: filter === 'ALL' ? 'var(--color-text)' : 'var(--color-text-muted)', marginTop: 4, fontWeight: filter === 'ALL' ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            All {tab === 'ready_for_review' ? 'Pending' : 'Approved'}
+          <div 
+            title={`All ${tab === 'ready_for_review' ? 'Pending Items' : 'Approved Items'}`}
+            style={{ fontSize: 11, color: filter === 'ALL' ? 'var(--color-text)' : 'var(--color-text-muted)', marginTop: 4, fontWeight: filter === 'ALL' ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            All {tab === 'ready_for_review' ? 'Pending Items' : 'Approved Items'}
           </div>
         </div>
 
