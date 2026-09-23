@@ -239,7 +239,14 @@ CRITICAL RULES FOR PASSAGE-BASED GENERATION:
 3. For question types that quote or select text (e.g. SELECT_TEXT, GAP_MATCH, CONSTRUCTED_RESPONSE), target phrases and evidence MUST be taken verbatim from this passage.
 4. For SELECT_TEXT or GAP_MATCH, set "options.passage" to the passage above (or relevant excerpt).
 5. Clean Option Choices: Do NOT append "(Correct)", "(Incorrect)", or any answer labels or status annotations to the option values in "options". The options dictionary must contain ONLY the raw choice text without suffixes or tags (e.g. never append suffixes like "(Correct)" or "[Incorrect]"). The correct option is designated strictly in the "answer" field, and only the "explanation" field should detail why an option is correct or incorrect.
-6. Direct & Natural Question Stems (NO META-REFERENCES): NEVER start or preface questions with meta-referential phrases like "Based on the passage...", "According to the passage...", "Based on the story...", "In the passage...", "As stated in the text...", or "Based on the starting numbers provided in the passage...". State the question DIRECTLY (e.g., write "Which pair of friends has a combined total of exactly 40 cards?" instead of "Based on the starting numbers provided in the passage, which pair of friends has a combined total of exactly 40 cards?").
+6. Self-Contained Question Stems Grounded in the Stimulus:
+   - Grounding: Every question must be fully grounded in the scenarios, concepts, data, and facts from the provided passage.
+   - Self-Containment: The question stem MUST be completely self-contained. Embed all necessary premise context, subject/character names, data values, or situational details directly into the stem so the item can be understood and answered independently.
+   - No Meta-References: NEVER use meta-referential phrases like "Based on the passage...", "According to the text...", "In the story...", or "As stated above...". State the context and the question directly.
+   - Principles:
+     * INCORRECT (Meta-reference): "Based on the passage, what caused the experiment to fail?"
+     * INCORRECT (Incomplete context): "Why did the experiment fail?" (Fails to specify which experiment or what conditions occurred)
+     * CORRECT (Self-contained & direct): "When testing the temperature of the water samples, Sample A heated twice as fast as Sample B. What factor explains this difference?"
 """
 
     visual_block = ""
@@ -394,10 +401,10 @@ def _call_gemini(prompt: str) -> str:
                 prompt,
                 generation_config=genai.GenerationConfig(
                     temperature=0.3,
-                    max_output_tokens=3072,
+                    max_output_tokens=8192,
                     response_mime_type="application/json",
                 ),
-                request_options={"timeout": 25.0},
+                request_options={"timeout": 30.0},
             )
             raw_text = response.text
 
@@ -745,7 +752,14 @@ CRITICAL RULES FOR PASSAGE-BASED GENERATION:
 3. For question types that quote or select text (e.g. SELECT_TEXT, GAP_MATCH, CONSTRUCTED_RESPONSE), target phrases and evidence MUST be taken verbatim from this passage.
 4. For SELECT_TEXT or GAP_MATCH, set "options.passage" to the passage above (or relevant excerpt).
 5. Clean Option Choices: Do NOT append "(Correct)", "(Incorrect)", or any answer labels or status annotations to the option values in "options". The options dictionary must contain ONLY the raw choice text without suffixes or tags (e.g. never append suffixes like "(Correct)" or "[Incorrect]"). The correct option is designated strictly in the "answer" field, and only the "explanation" field should detail why an option is correct or incorrect.
-6. Direct & Natural Question Stems (NO META-REFERENCES): NEVER start or preface questions with meta-referential phrases like "Based on the passage...", "According to the passage...", "Based on the story...", "In the passage...", "As stated in the text...", or "Based on the starting numbers provided in the passage...". State the question DIRECTLY (e.g., write "Which pair of friends has a combined total of exactly 40 cards?" instead of "Based on the starting numbers provided in the passage, which pair of friends has a combined total of exactly 40 cards?").
+6. Self-Contained Question Stems Grounded in the Stimulus:
+   - Grounding: Every question must be fully grounded in the scenarios, concepts, data, and facts from the provided passage.
+   - Self-Containment: The question stem MUST be completely self-contained. Embed all necessary premise context, subject/character names, data values, or situational details directly into the stem so the item can be understood and answered independently.
+   - No Meta-References: NEVER use meta-referential phrases like "Based on the passage...", "According to the text...", "In the story...", or "As stated above...". State the context and the question directly.
+   - Principles:
+     * INCORRECT (Meta-reference): "Based on the passage, what caused the experiment to fail?"
+     * INCORRECT (Incomplete context): "Why did the experiment fail?" (Fails to specify which experiment or what conditions occurred)
+     * CORRECT (Self-contained & direct): "When testing the temperature of the water samples, Sample A heated twice as fast as Sample B. What factor explains this difference?"
 """
 
     visual_block = ""
@@ -1208,6 +1222,29 @@ def validate_and_reconcile_multiple_select(q: dict) -> bool:
             )
             q["answer"] = reconciled_ans
             letters = correct_in_exp
+        elif len(letters) >= 2 and len(letters) < opt_count:
+            # Reconcile: update stem word to match actual answer count instead of dropping valid question
+            target_word = {2: "TWO", 3: "THREE", 4: "FOUR"}.get(len(letters))
+            if target_word:
+                replaced = False
+                for pat in _STEM_COUNT_PATTERNS:
+                    if pat.search(text):
+                        text = pat.sub(lambda m: m.group(0).replace(m.group(1), target_word if m.group(1).isupper() else target_word.lower()), text, count=1)
+                        q["text"] = text
+                        replaced = True
+                        print(
+                            f"[llm] MULTIPLE_SELECT reconciled stem word to '{target_word}' "
+                            f"matching answer count {len(letters)}."
+                        )
+                        break
+                if not replaced:
+                    print(
+                        f"[llm] [WARN] MULTIPLE_SELECT dropped: Question stem asks for {stem_count} answers, "
+                        f"but answer key has {len(letters)} ({ans}). Q: {text[:60]}..."
+                    )
+                    return False
+            else:
+                return False
         else:
             # Contradiction: stem requested stem_count, but answer key has len(letters)
             print(
