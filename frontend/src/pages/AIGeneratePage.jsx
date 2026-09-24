@@ -39,8 +39,7 @@ export default function AIGeneratePage() {
   const [variantStyle, setVariantStyle] = useState('parallel'); // 'parallel' | 'easier' | 'harder' | 'format_shift'
   const [targetType, setTargetType] = useState('SINGLE_SELECT');
   const [variantDifficulty, setVariantDifficulty] = useState('medium');
-  const [variantCount, setVariantCount] = useState(2);
-  const [variantDirectives, setVariantDirectives] = useState('');
+  const [variantCount, setVariantCount] = useState(1);
 
   // Form state
   const [contentArea, setContentArea] = useState(CONTENT_AREAS[0]);

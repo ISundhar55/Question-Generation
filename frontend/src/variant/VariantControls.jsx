@@ -39,7 +39,7 @@ export default function VariantControls({
   targetType = 'SINGLE_SELECT',
   setTargetType,
   onChangeTargetType,
-  count = 2,
+  count = 1,
   setCount,
   variantCount,
   onChangeVariantCount,
