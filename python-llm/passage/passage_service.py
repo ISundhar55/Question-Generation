@@ -88,6 +88,16 @@ The teacher has requested a text-only passage.
 Do NOT include any SVG diagrams or graphics. Set "visual": null in the output.
 """
 
+    context_clues_block = ""
+    combined_notes = f"{req.assessment_target or ''} {req.assessment_boundaries or ''} {req.instructions or ''} {req.custom_prompt or ''}".lower()
+    if any(k in combined_notes for k in ("context clue", "vocabulary", "meaning of a word", "word meaning", "determine the meaning", "connotative", "figurative", "technical meaning")):
+        context_clues_block = """
+📖 CRITICAL CONTEXT-CLUES & VOCABULARY GUIDELINE:
+• Embed rich, inferable context clues (contrasts, cause/effect, descriptive elaboration, illustrative consequences) around key academic and domain-specific words.
+• STRICT ZERO-SPOILER RULE: NEVER provide explicit dictionary-style definitions (e.g. NEVER write ", meaning [definition]", "which means [definition]", or parenthetical definitions).
+• Students must actively deduce and infer the meaning from the surrounding text.
+"""
+
     guardrails_text = get_passage_guardrails()
 
     prompt = f"""You are an expert curriculum developer and assessment stimulus author for {req.grade} {req.content_area}.
@@ -101,7 +111,7 @@ CURRICULUM SPECIFICATIONS:
 • Target Genre: {genre_str}
 • Target Length: {length_desc}
 {assessment_str}
-
+{context_clues_block}
 {guardrails_text}
 {visual_block}
 
