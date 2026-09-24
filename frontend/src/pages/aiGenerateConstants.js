@@ -194,3 +194,25 @@ export function parseMatchingAnswer(answerStr) {
   });
   return result;
 }
+
+export const labelStyle = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: '#1e293b',
+  display: 'block',
+  marginBottom: 8,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+};
+
+export const selectStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 8,
+  border: '1.5px solid #cbd5e1',
+  fontSize: 14,
+  background: 'var(--color-surface)',
+  color: '#0f172a',
+  outline: 'none',
+  cursor: 'pointer',
+};

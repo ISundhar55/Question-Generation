@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import EditQuestionModal from '../components/EditQuestionModal';
+import RegenerateModal from '../components/RegenerateModal';
+import FeedbackModal from '../components/FeedbackModal';
 import { aiAPI, questionsAPI } from '../services/api';
 import PassageDropdown from '../passage/PassageDropdown';
 import PassageGenerator from '../passage/PassageGenerator';
@@ -12,13 +14,15 @@ import {
   QUESTION_TYPES,
   DIFFICULTIES,
   TYPE_META,
-  getRefinementTargetsForType,
   parseMatchingAnswer,
+  labelStyle,
+  selectStyle,
 } from './aiGenerateConstants';
 import { cleanOptionText, sanitizeOptions } from '../utils/questionUtils';
 import ReferenceItemPicker from '../variant/ReferenceItemPicker';
 import ReferenceItemCard from '../variant/ReferenceItemCard';
 import VariantControls from '../variant/VariantControls';
+import './AIGeneratePage.css';
 
 export default function AIGeneratePage() {
   const navigate = useNavigate();
@@ -177,21 +181,9 @@ export default function AIGeneratePage() {
     });
   };
 
-  // Regenerate modal state
+  // Modal states
   const [regenModal, setRegenModal] = useState(null); // null | { idx, question }
-  const [regenInstructions, setRegenInstructions] = useState('');
-  const [refinementTargets, setRefinementTargets] = useState([]); // all unchecked by default
-  const [regenerating, setRegenerating] = useState(false);
-  const [regenError, setRegenError] = useState(null);
-
-  // Feedback modal state
   const [feedbackModal, setFeedbackModal] = useState(null); // null | { question }
-  const [feedbackRating, setFeedbackRating] = useState(0);
-  const [feedbackCategory, setFeedbackCategory] = useState('general');
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
-  const [feedbackError, setFeedbackError] = useState(null);
 
   // Assessment-specific prompt inputs
   const [assessmentTarget, setAssessmentTarget] = useState('');
@@ -571,139 +563,10 @@ export default function AIGeneratePage() {
 
   const openRegenModal = (idx, question) => {
     setRegenModal({ idx, question });
-    setRegenInstructions('');
-    setRefinementTargets([]); // All unchecked by default
-    setRegenError(null);
-  };
-
-  const closeRegenModal = () => {
-    setRegenModal(null);
-    setRegenInstructions('');
-    setRefinementTargets([]);
-    setRegenError(null);
-  };
-
-  const toggleRefinementTarget = (id) => {
-    setRefinementTargets(prev => {
-      if (prev.includes(id)) {
-        return prev.filter(t => t !== id);
-      } else {
-        if (id === 'entire_item') {
-          return ['entire_item'];
-        } else {
-          return [...prev.filter(t => t !== 'entire_item'), id];
-        }
-      }
-    });
-  };
-
-  const handleRegenerate = async () => {
-    if (!regenModal) return;
-    const { idx, question } = regenModal;
-    setRegenerating(true);
-    setRegenError(null);
-    try {
-      const isPassageQuestion = Boolean(question.passage_id || question.passageId || question._passageGrounded || (sourceMode === 'passage' && selectedPassage));
-      const passageTextToUse = isPassageQuestion
-        ? (question.passage_text || (selectedPassage?.text || null))
-        : null;
-      const passageIdToUse = isPassageQuestion
-        ? (question.passage_id || question.passageId || selectedPassage?.id || null)
-        : null;
-      const passageTitleToUse = isPassageQuestion
-        ? (question.passage_title || selectedPassage?.title || null)
-        : null;
-
-      const res = await aiAPI.regenerate({
-        content_area: question.contentArea || contentArea,
-        grade: question.grade || grade,
-        question_type: question.questionType,
-        difficulty: question.difficulty,
-        original_question: question,
-        modification_instructions: regenInstructions.trim(),
-        refinement_targets: refinementTargets,
-        source_chunk_ids: question.sourceChunkIds || [],
-        passage_text: passageTextToUse,
-        passage_id: passageIdToUse,
-        passage_title: passageTitleToUse,
-      });
-      const newQuestion = {
-        ...res.data.question,
-        points: res.data.question.points || question.points || (question.difficulty === 'hard' ? 3 : question.difficulty === 'medium' ? 2 : 1),
-        _internetSource: isPassageQuestion ? false : question._internetSource,
-        _passageGrounded: isPassageQuestion,
-        passage_id: passageIdToUse,
-        passage_title: passageTitleToUse,
-        passage_text: passageTextToUse,
-        status: 'draft',
-      };
-      // Auto-save the regenerated question to DB
-      try {
-        if (question.id) {
-          await questionsAPI.update(question.id, buildSavePayload(newQuestion, 'draft'));
-          newQuestion.id = question.id;
-        } else {
-          const saveRes = await questionsAPI.create(buildSavePayload(newQuestion, 'draft'));
-          if (saveRes.data?.id) newQuestion.id = saveRes.data.id;
-        }
-      } catch (saveErr) {
-        console.warn('Auto-saving regenerated question failed:', saveErr);
-      }
-
-      setQuestions(prev => {
-        const updated = [...prev];
-        updated[idx] = newQuestion;
-        return updated;
-      });
-      closeRegenModal();
-    } catch (err) {
-      setRegenError(err.response?.data?.message || 'Regeneration failed. Please try again.');
-    } finally {
-      setRegenerating(false);
-    }
   };
 
   const openFeedbackModal = (question) => {
     setFeedbackModal({ question });
-    setFeedbackRating(0);
-    setFeedbackCategory('general');
-    setFeedbackText('');
-    setFeedbackError(null);
-    setFeedbackSuccess(false);
-  };
-
-  const closeFeedbackModal = () => {
-    setFeedbackModal(null);
-    setFeedbackSuccess(false);
-    setFeedbackError(null);
-  };
-
-  const handleSubmitFeedback = async () => {
-    if (!feedbackModal || !feedbackText.trim()) return;
-    const { question } = feedbackModal;
-    setFeedbackSubmitting(true);
-    setFeedbackError(null);
-    try {
-      await aiAPI.feedback({
-        content_area: question.contentArea || contentArea,
-        grade: question.grade || grade,
-        question_type: question.questionType,
-        question_text: question.text,
-        options: question.options || null,
-        answer: question.answer || null,
-        sources: question.sources || [],
-        feedback_text: feedbackText.trim(),
-        rating: feedbackRating || null,
-        category: feedbackCategory,
-      });
-      setFeedbackSuccess(true);
-      setFeedbackText('');
-      setFeedbackRating(0);
-    } catch (err) {
-      setFeedbackError(err.response?.data?.message || 'Failed to submit feedback. Please try again.');
-    } finally {
-      setFeedbackSubmitting(false);
-    }
   };
 
   const renderModeToggle = () => (
@@ -863,511 +726,544 @@ export default function AIGeneratePage() {
             </div>
 
             {/* Content Area */}
-          <div style={{ marginBottom: 18, position: 'relative' }} ref={contentAreaDropdownRef}>
-            <label style={labelStyle}>Content Area</label>
-            <div
-              id="ai-content-area-select"
-              onClick={() => setContentAreaOpen(prev => !prev)}
-              style={{
-                ...selectStyle,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                userSelect: 'none',
-                borderColor: contentAreaOpen ? 'var(--color-primary, #4f6ef7)' : '#cbd5e1',
-                boxShadow: contentAreaOpen ? '0 0 0 3px rgba(79, 110, 247, 0.15)' : 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <span style={{ fontWeight: 500 }}>{contentArea}</span>
-              <span style={{ fontSize: 10, color: '#64748b', transition: 'transform 0.15s', transform: contentAreaOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
-            </div>
-
-            {/* Hidden native select for accessibility/testing compatibility */}
-            <select id="ai-content-area" value={contentArea} onChange={e => setContentArea(e.target.value)} style={{ display: 'none' }}>
-              {CONTENT_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
-
-            {contentAreaOpen && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                marginTop: 4,
-                background: 'var(--color-surface, #fff)',
-                border: '1.5px solid #cbd5e1',
-                borderRadius: 8,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                maxHeight: 200,
-                overflowY: 'auto',
-                zIndex: 60,
-              }}>
-                {CONTENT_AREAS.map(a => (
-                  <div
-                    key={a}
-                    id={`ai-content-area-option-${a.replace(/\s+/g, '-').toLowerCase()}`}
-                    onClick={() => {
-                      setContentArea(a);
-                      setContentAreaOpen(false);
-                    }}
-                    style={{
-                      padding: '8px 12px',
-                      fontSize: 13.5,
-                      fontWeight: contentArea === a ? 600 : 400,
-                      background: contentArea === a ? 'rgba(79, 110, 247, 0.08)' : 'transparent',
-                      color: contentArea === a ? 'var(--color-primary, #4f6ef7)' : 'var(--color-text)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={e => { if (contentArea !== a) e.currentTarget.style.background = '#f8fafc'; }}
-                    onMouseLeave={e => { if (contentArea !== a) e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    <span>{a}</span>
-                    {contentArea === a && <span style={{ fontSize: 12, color: 'var(--color-primary, #4f6ef7)' }}>✓</span>}
-                  </div>
-                ))}
+            <div style={{ marginBottom: 18, position: 'relative' }} ref={contentAreaDropdownRef}>
+              <label style={labelStyle}>Content Area</label>
+              <div
+                id="ai-content-area-select"
+                onClick={() => setContentAreaOpen(prev => !prev)}
+                style={{
+                  ...selectStyle,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  userSelect: 'none',
+                  borderColor: contentAreaOpen ? 'var(--color-primary, #4f6ef7)' : '#cbd5e1',
+                  boxShadow: contentAreaOpen ? '0 0 0 3px rgba(79, 110, 247, 0.15)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span style={{ fontWeight: 500 }}>{contentArea}</span>
+                <span style={{ fontSize: 10, color: '#64748b', transition: 'transform 0.15s', transform: contentAreaOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
               </div>
-            )}
-          </div>
 
-          {/* Grade */}
-          <div style={{ marginBottom: 18, position: 'relative' }} ref={gradeDropdownRef}>
-            <label style={labelStyle}>Grade</label>
-            <div
-              id="ai-grade-select"
-              onClick={() => setGradeOpen(prev => !prev)}
-              style={{
-                ...selectStyle,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                userSelect: 'none',
-                borderColor: gradeOpen ? 'var(--color-primary, #4f6ef7)' : '#cbd5e1',
-                boxShadow: gradeOpen ? '0 0 0 3px rgba(79, 110, 247, 0.15)' : 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <span style={{ fontWeight: 500 }}>{grade}</span>
-              <span style={{ fontSize: 10, color: '#64748b', transition: 'transform 0.15s', transform: gradeOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
-            </div>
+              {/* Hidden native select for accessibility/testing compatibility */}
+              <select id="ai-content-area" value={contentArea} onChange={e => setContentArea(e.target.value)} style={{ display: 'none' }}>
+                {CONTENT_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
 
-            {/* Hidden native select for accessibility/testing compatibility */}
-            <select id="ai-grade" value={grade} onChange={e => setGrade(e.target.value)} style={{ display: 'none' }}>
-              {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-
-            {gradeOpen && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                marginTop: 4,
-                background: 'var(--color-surface, #fff)',
-                border: '1.5px solid #cbd5e1',
-                borderRadius: 8,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                maxHeight: 200,
-                overflowY: 'auto',
-                zIndex: 50,
-              }}>
-                {GRADES.map(g => (
-                  <div
-                    key={g}
-                    id={`ai-grade-option-${g.replace(/\s+/g, '-').toLowerCase()}`}
-                    onClick={() => {
-                      setGrade(g);
-                      setGradeOpen(false);
-                    }}
-                    style={{
-                      padding: '8px 12px',
-                      fontSize: 13.5,
-                      fontWeight: grade === g ? 600 : 400,
-                      background: grade === g ? 'rgba(79, 110, 247, 0.08)' : 'transparent',
-                      color: grade === g ? 'var(--color-primary, #4f6ef7)' : 'var(--color-text)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={e => { if (grade !== g) e.currentTarget.style.background = '#f8fafc'; }}
-                    onMouseLeave={e => { if (grade !== g) e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    <span>{g}</span>
-                    {grade === g && <span style={{ fontSize: 12, color: 'var(--color-primary, #4f6ef7)' }}>✓</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Grounded Reading Stimulus Dropdown (when Based on Passage is selected) */}
-          {genMode === 'item' && sourceMode === 'passage' && (
-            <PassageDropdown
-              contentArea={contentArea}
-              grade={grade}
-              selectedPassage={selectedPassage}
-              onSelectPassage={setSelectedPassage}
-            />
-          )}
-
-          {/* Reference Item & Variant Controls (when Based on Reference Item is selected) */}
-          {genMode === 'item' && sourceMode === 'reference' && (
-            <div style={{ marginBottom: 20 }}>
-              <label style={labelStyle}>Reference (Seed) Item</label>
-              {referenceQuestion ? (
-                <ReferenceItemCard
-                  question={referenceQuestion}
-                  referenceQuestion={referenceQuestion}
-                  onPickNew={() => setPickerOpen(true)}
-                  onChangeClick={() => setPickerOpen(true)}
-                  onClear={() => setReferenceQuestion(null)}
-                />
-              ) : (
-                <div
-                  onClick={() => setPickerOpen(true)}
-                  style={{
-                    padding: '18px 16px',
-                    borderRadius: 10,
-                    border: '2px dashed #93c5fd',
-                    background: '#eff6ff',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    transition: 'all 0.15s ease',
-                    marginBottom: 16,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.borderColor = '#3b82f6'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#93c5fd'; }}
-                >
-                  <div style={{ fontSize: 24, marginBottom: 4 }}>🧬</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>
-                    Choose Reference Question
-                  </div>
-                  <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2 }}>
-                    Pick an existing item from Question Bank or paste a custom question
-                  </div>
+              {contentAreaOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: 4,
+                  background: 'var(--color-surface, #fff)',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: 8,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  maxHeight: 200,
+                  overflowY: 'auto',
+                  zIndex: 60,
+                }}>
+                  {CONTENT_AREAS.map(a => (
+                    <div
+                      key={a}
+                      id={`ai-content-area-option-${a.replace(/\s+/g, '-').toLowerCase()}`}
+                      onClick={() => {
+                        setContentArea(a);
+                        setContentAreaOpen(false);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: 13.5,
+                        fontWeight: contentArea === a ? 600 : 400,
+                        background: contentArea === a ? 'rgba(79, 110, 247, 0.08)' : 'transparent',
+                        color: contentArea === a ? 'var(--color-primary, #4f6ef7)' : 'var(--color-text)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={e => { if (contentArea !== a) e.currentTarget.style.background = '#f8fafc'; }}
+                      onMouseLeave={e => { if (contentArea !== a) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <span>{a}</span>
+                      {contentArea === a && <span style={{ fontSize: 12, color: 'var(--color-primary, #4f6ef7)' }}>✓</span>}
+                    </div>
+                  ))}
                 </div>
               )}
-
-              <VariantControls
-                variantStyle={variantStyle}
-                onChangeVariantStyle={setVariantStyle}
-                setVariantStyle={setVariantStyle}
-                targetType={targetType}
-                onChangeTargetType={setTargetType}
-                setTargetType={setTargetType}
-                variantCount={variantCount}
-                onChangeVariantCount={setVariantCount}
-                count={variantCount}
-                setCount={setVariantCount}
-              />
             </div>
-          )}
 
-          {/* Question Types selector (Item Generation only) */}
-          {genMode === 'item' && sourceMode !== 'reference' && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <label style={{ ...labelStyle, marginBottom: 0 }}>
-                  Question Types <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--color-text-muted)', fontSize: 11 }}>(Total: {totalCount} {totalCount === 1 ? 'item' : 'items'})</span>
-                </label>
-              </div>
-
-              <div style={{
-                border: '1.5px solid var(--color-border)',
-                borderRadius: 10,
-                background: 'var(--color-surface)',
-                overflow: 'hidden',
-                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-              }}>
-                {/* Scrollable Question Types List */}
-                <div style={{
-                  maxHeight: 350,
-                  overflowY: 'auto',
-                  padding: '12px 14px',
+            {/* Grade */}
+            <div style={{ marginBottom: 18, position: 'relative' }} ref={gradeDropdownRef}>
+              <label style={labelStyle}>Grade</label>
+              <div
+                id="ai-grade-select"
+                onClick={() => setGradeOpen(prev => !prev)}
+                style={{
+                  ...selectStyle,
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                }}>
-                  {QUESTION_TYPES.map(qt => {
-                    const currentCount = typeCounts[qt.value] || 0;
-                    const isChecked = currentCount > 0;
-                    return (
-                      <div
-                        key={qt.value}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 16,
-                          padding: '6px 8px',
-                          borderRadius: 6,
-                          background: isChecked ? 'var(--color-primary-light, #eff6ff)' : 'transparent',
-                          transition: 'background 0.15s ease',
-                        }}
-                      >
-                        <label style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          cursor: 'pointer',
-                          fontSize: 13,
-                          fontWeight: isChecked ? 600 : 500,
-                          color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
-                          userSelect: 'none',
-                          flex: 1,
-                          minWidth: 0,
-                        }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={e => {
-                              const checked = e.target.checked;
-                              handleTypeCountChange(qt.value, checked ? (lastNonZeroCounts[qt.value] || 1) : 0);
-                            }}
-                            style={{
-                              width: 16,
-                              height: 16,
-                              accentColor: 'var(--color-primary)',
-                              cursor: 'pointer',
-                              flexShrink: 0,
-                            }}
-                          />
-                          <span style={{ lineHeight: 1.35 }}>{qt.label}</span>
-                        </label>
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  userSelect: 'none',
+                  borderColor: gradeOpen ? 'var(--color-primary, #4f6ef7)' : '#cbd5e1',
+                  boxShadow: gradeOpen ? '0 0 0 3px rgba(79, 110, 247, 0.15)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span style={{ fontWeight: 500 }}>{grade}</span>
+                <span style={{ fontSize: 10, color: '#64748b', transition: 'transform 0.15s', transform: gradeOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
+              </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                          <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontWeight: 500 }}>Count:</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={20}
-                            value={currentCount}
-                            onChange={e => {
-                              const val = parseInt(e.target.value, 10);
-                              handleTypeCountChange(qt.value, isNaN(val) ? 0 : Math.max(0, Math.min(20, val)));
-                            }}
-                            style={{
-                              width: 52,
-                              padding: '5px 8px',
-                              borderRadius: 6,
-                              border: `1.5px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                              background: isChecked ? 'var(--color-surface)' : '#f8fafc',
-                              color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
-                              fontSize: 13,
-                              fontWeight: 600,
-                              textAlign: 'center',
-                              outline: 'none',
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              {/* Hidden native select for accessibility/testing compatibility */}
+              <select id="ai-grade" value={grade} onChange={e => setGrade(e.target.value)} style={{ display: 'none' }}>
+                {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
 
-                {/* Fixed Summary Footer */}
+              {gradeOpen && (
                 <div style={{
-                  borderTop: '1.5px solid var(--color-border)',
-                  background: '#f8fafc',
-                  padding: '10px 16px',
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: 4,
+                  background: 'var(--color-surface, #fff)',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: 8,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  maxHeight: 200,
+                  overflowY: 'auto',
+                  zIndex: 50,
                 }}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>Total Items:</span>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-primary)' }}>
-                      {totalCount}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-text-muted)', marginTop: 2 }}>
-                    Max 20 items per type, 50 total
-                    {totalCount > 50 && ' (⚠️ Exceeds 50 total maximum)'}
-                  </div>
+                  {GRADES.map(g => (
+                    <div
+                      key={g}
+                      id={`ai-grade-option-${g.replace(/\s+/g, '-').toLowerCase()}`}
+                      onClick={() => {
+                        setGrade(g);
+                        setGradeOpen(false);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: 13.5,
+                        fontWeight: grade === g ? 600 : 400,
+                        background: grade === g ? 'rgba(79, 110, 247, 0.08)' : 'transparent',
+                        color: grade === g ? 'var(--color-primary, #4f6ef7)' : 'var(--color-text)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={e => { if (grade !== g) e.currentTarget.style.background = '#f8fafc'; }}
+                      onMouseLeave={e => { if (grade !== g) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <span>{g}</span>
+                      {grade === g && <span style={{ fontSize: 12, color: 'var(--color-primary, #4f6ef7)' }}>✓</span>}
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
-          )}
 
-          {/* Difficulty (Item Generation only) */}
-          {genMode === 'item' && sourceMode !== 'reference' && (
-            <div style={{ marginBottom: 18 }}>
-              <label style={labelStyle}>Level of Difficulty</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {DIFFICULTIES.map(d => (
-                  <button
-                    key={d.value}
-                    id={`diff-${d.value}`}
-                    onClick={() => setDifficulty(d.value)}
+            {/* Grounded Reading Stimulus Dropdown (when Based on Passage is selected) */}
+            {genMode === 'item' && sourceMode === 'passage' && (
+              <PassageDropdown
+                contentArea={contentArea}
+                grade={grade}
+                selectedPassage={selectedPassage}
+                onSelectPassage={setSelectedPassage}
+              />
+            )}
+
+            {/* Reference Item & Variant Controls (when Based on Reference Item is selected) */}
+            {genMode === 'item' && sourceMode === 'reference' && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={labelStyle}>Reference (Seed) Item</label>
+                {referenceQuestion ? (
+                  <ReferenceItemCard
+                    question={referenceQuestion}
+                    referenceQuestion={referenceQuestion}
+                    onPickNew={() => setPickerOpen(true)}
+                    onChangeClick={() => setPickerOpen(true)}
+                    onClear={() => setReferenceQuestion(null)}
+                  />
+                ) : (
+                  <div
+                    onClick={() => setPickerOpen(true)}
                     style={{
-                      flex: 1, padding: '8px 4px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                      border: `1.5px solid ${difficulty === d.value ? d.color : 'var(--color-border)'}`,
-                      background: difficulty === d.value ? d.bg : 'var(--color-surface)',
-                      color: difficulty === d.value ? d.color : 'var(--color-text-muted)',
-                      cursor: 'pointer', transition: 'all 0.12s',
+                      padding: '18px 16px',
+                      borderRadius: 10,
+                      border: '2px dashed #93c5fd',
+                      background: '#eff6ff',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.15s ease',
+                      marginBottom: 16,
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.borderColor = '#3b82f6'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#93c5fd'; }}
                   >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+                    <div style={{ fontSize: 24, marginBottom: 4 }}>🧬</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>
+                      Choose Reference Question
+                    </div>
+                    <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2 }}>
+                      Pick an existing item from Question Bank or paste a custom question
+                    </div>
+                  </div>
+                )}
 
-          {/* Assessment Boundaries, Target, and Complexity - Visible during Standard Item Generation */}
-          {sourceMode === 'input' && (
-            <>
-              {/* Assessment Boundaries */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Assessment Boundaries</span>
-                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
-                </label>
-                <input
-                  id="ai-assessment-boundaries"
-                  type="text"
-                  placeholder="e.g. Exclude biochemical mechanisms (Calvin cycle, Krebs cycle)"
-                  value={assessmentBoundaries}
-                  onChange={e => setAssessmentBoundaries(e.target.value)}
-                  style={{
-                    ...selectStyle,
-                    fontFamily: 'inherit',
-                    fontSize: 13,
-                    cursor: 'text',
-                  }}
+                <VariantControls
+                  variantStyle={variantStyle}
+                  onChangeVariantStyle={setVariantStyle}
+                  setVariantStyle={setVariantStyle}
+                  targetType={targetType}
+                  onChangeTargetType={setTargetType}
+                  setTargetType={setTargetType}
+                  variantCount={variantCount}
+                  onChangeVariantCount={setVariantCount}
+                  count={variantCount}
+                  setCount={setVariantCount}
                 />
-              </div>
-
-              {/* Assessment Target */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Assessment Target</span>
-                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
-                </label>
-                <textarea
-                  id="ai-assessment-target"
-                  rows={3}
-                  placeholder="e.g. MS-LS1-6: Construct a scientific explanation based on evidence for the role of photosynthesis in the cycling of matter and flow of energy into and out of organisms."
-                  value={assessmentTarget}
-                  onChange={e => setAssessmentTarget(e.target.value)}
-                  style={{
-                    ...selectStyle,
-                    resize: 'vertical',
-                    minHeight: 70,
-                    fontFamily: 'inherit',
-                    fontSize: 13,
-                    lineHeight: 1.45,
-                    fontStyle: assessmentTarget ? 'normal' : 'italic',
-                    cursor: 'text',
-                  }}
-                />
-              </div>
-
-              {/* Cognitive Complexity */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Cognitive Complexity</span>
-                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
-                </label>
-                <input
-                  id="ai-cognitive-complexity"
-                  type="text"
-                  placeholder="e.g. DOK Level 2 / Bloom's: Analysis (cause-and-effect reasoning)"
-                  value={cognitiveComplexity}
-                  onChange={e => setCognitiveComplexity(e.target.value)}
-                  style={{
-                    ...selectStyle,
-                    fontFamily: 'inherit',
-                    fontSize: 13,
-                    cursor: 'text',
-                  }}
-                />
-              </div>
-            </>
-          )}
-
-          {/* Additional Instructions */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Additional Instructions</span>
-              <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
-            </label>
-            <textarea
-              id="ai-custom-prompt"
-              rows={3}
-              placeholder={`Examples:\n• Create questions with real-world scenarios\n• Focus on fractions and decimals\n• Include word problems only`}
-              value={customPrompt}
-              onChange={e => setCustomPrompt(e.target.value)}
-              style={{
-                ...selectStyle,
-                resize: 'vertical',
-                minHeight: 80,
-                fontFamily: 'inherit',
-                fontSize: 13,
-                lineHeight: 1.5,
-                fontStyle: customPrompt ? 'normal' : 'italic',
-                cursor: 'text',
-              }}
-            />
-            {((sourceMode === 'input' && (assessmentTarget.trim() || assessmentBoundaries.trim() || cognitiveComplexity.trim())) || customPrompt.trim()) && (
-              <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>💡</span> AI will strictly apply these instructions during generation
               </div>
             )}
-          </div>
 
-          {/* Visual Diagrams Toggle (Available for standard and passage generation, not reference) */}
-          {sourceMode !== 'reference' && (
-            <div
-              id="ai-include-visuals-toggle"
-              onClick={() => setIncludeVisuals(!includeVisuals)}
-              style={{
-                marginBottom: 20,
-                padding: '12px 14px',
-                background: includeVisuals ? '#f0fdfa' : '#f8fafc',
-                border: `1.5px solid ${includeVisuals ? '#2dd4bf' : 'var(--color-border)'}`,
-                borderRadius: 8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                transition: 'all 0.18s ease',
-                boxShadow: includeVisuals ? '0 2px 8px rgba(13, 148, 136, 0.12)' : 'none',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 18 }}>🎨</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: includeVisuals ? '#0f766e' : 'var(--color-text)' }}>
-                    Include Visual Diagrams
+            {/* Question Types selector (Item Generation only) */}
+            {genMode === 'item' && sourceMode !== 'reference' && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>
+                    Question Types <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--color-text-muted)', fontSize: 11 }}>(Total: {totalCount} {totalCount === 1 ? 'item' : 'items'})</span>
+                  </label>
+                </div>
+
+                <div style={{
+                  border: '1.5px solid var(--color-border)',
+                  borderRadius: 10,
+                  background: 'var(--color-surface)',
+                  overflow: 'hidden',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                }}>
+                  {/* Scrollable Question Types List */}
+                  <div style={{
+                    maxHeight: 350,
+                    overflowY: 'auto',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}>
+                    {QUESTION_TYPES.map(qt => {
+                      const currentCount = typeCounts[qt.value] || 0;
+                      const isChecked = currentCount > 0;
+                      return (
+                        <div
+                          key={qt.value}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 16,
+                            padding: '6px 8px',
+                            borderRadius: 6,
+                            background: isChecked ? 'var(--color-primary-light, #eff6ff)' : 'transparent',
+                            transition: 'background 0.15s ease',
+                          }}
+                        >
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            cursor: 'pointer',
+                            fontSize: 13,
+                            fontWeight: isChecked ? 600 : 500,
+                            color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
+                            userSelect: 'none',
+                            flex: 1,
+                            minWidth: 0,
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => {
+                                const checked = e.target.checked;
+                                handleTypeCountChange(qt.value, checked ? (lastNonZeroCounts[qt.value] || 1) : 0);
+                              }}
+                              style={{
+                                width: 16,
+                                height: 16,
+                                accentColor: 'var(--color-primary)',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span style={{ lineHeight: 1.35 }}>{qt.label}</span>
+                          </label>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontWeight: 500 }}>Count:</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={currentCount}
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10);
+                                handleTypeCountChange(qt.value, isNaN(val) ? 0 : Math.max(0, Math.min(20, val)));
+                              }}
+                              style={{
+                                width: 52,
+                                padding: '5px 8px',
+                                borderRadius: 6,
+                                border: `1.5px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                background: isChecked ? 'var(--color-surface)' : '#f8fafc',
+                                color: isChecked ? 'var(--color-text)' : 'var(--color-text-muted)',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                textAlign: 'center',
+                                outline: 'none',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
-                    Generate items with vector geometry, circuits, cycles, or charts
+
+                  {/* Fixed Summary Footer */}
+                  <div style={{
+                    borderTop: '1.5px solid var(--color-border)',
+                    background: '#f8fafc',
+                    padding: '10px 16px',
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>Total Items:</span>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-primary)' }}>
+                        {totalCount}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: totalCount > 50 ? 'var(--color-danger)' : 'var(--color-text-muted)', marginTop: 2 }}>
+                      Max 20 items per type, 50 total
+                      {totalCount > 50 && ' (⚠️ Exceeds 50 total maximum)'}
+                    </div>
                   </div>
                 </div>
               </div>
-              <input
-                type="checkbox"
-                id="ai-include-visuals"
-                checked={includeVisuals}
-                onChange={e => setIncludeVisuals(e.target.checked)}
-                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#4f6ef7' }}
-              />
-            </div>
-          )}
+            )}
 
-          {/* Generate Button */}
-          {(() => {
-            if (sourceMode === 'reference') {
-              const isReferenceMissing = !referenceQuestion;
-              const isDisabled = generating || isReferenceMissing || variantCount < 1 || variantCount > 10;
+            {/* Difficulty (Item Generation only) */}
+            {genMode === 'item' && sourceMode !== 'reference' && (
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Level of Difficulty</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {DIFFICULTIES.map(d => (
+                    <button
+                      key={d.value}
+                      id={`diff-${d.value}`}
+                      onClick={() => setDifficulty(d.value)}
+                      style={{
+                        flex: 1, padding: '8px 4px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                        border: `1.5px solid ${difficulty === d.value ? d.color : 'var(--color-border)'}`,
+                        background: difficulty === d.value ? d.bg : 'var(--color-surface)',
+                        color: difficulty === d.value ? d.color : 'var(--color-text-muted)',
+                        cursor: 'pointer', transition: 'all 0.12s',
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assessment Boundaries, Target, and Complexity - Visible during Standard Item Generation */}
+            {sourceMode === 'input' && (
+              <>
+                {/* Assessment Boundaries */}
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Assessment Boundaries</span>
+                    <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
+                  </label>
+                  <input
+                    id="ai-assessment-boundaries"
+                    type="text"
+                    placeholder="e.g. Exclude biochemical mechanisms (Calvin cycle, Krebs cycle)"
+                    value={assessmentBoundaries}
+                    onChange={e => setAssessmentBoundaries(e.target.value)}
+                    style={{
+                      ...selectStyle,
+                      fontFamily: 'inherit',
+                      fontSize: 13,
+                      cursor: 'text',
+                    }}
+                  />
+                </div>
+
+                {/* Assessment Target */}
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Assessment Target</span>
+                    <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
+                  </label>
+                  <textarea
+                    id="ai-assessment-target"
+                    rows={3}
+                    placeholder="e.g. MS-LS1-6: Construct a scientific explanation based on evidence for the role of photosynthesis in the cycling of matter and flow of energy into and out of organisms."
+                    value={assessmentTarget}
+                    onChange={e => setAssessmentTarget(e.target.value)}
+                    style={{
+                      ...selectStyle,
+                      resize: 'vertical',
+                      minHeight: 70,
+                      fontFamily: 'inherit',
+                      fontSize: 13,
+                      lineHeight: 1.45,
+                      fontStyle: assessmentTarget ? 'normal' : 'italic',
+                      cursor: 'text',
+                    }}
+                  />
+                </div>
+
+                {/* Cognitive Complexity */}
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Cognitive Complexity</span>
+                    <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
+                  </label>
+                  <input
+                    id="ai-cognitive-complexity"
+                    type="text"
+                    placeholder="e.g. DOK Level 2 / Bloom's: Analysis (cause-and-effect reasoning)"
+                    value={cognitiveComplexity}
+                    onChange={e => setCognitiveComplexity(e.target.value)}
+                    style={{
+                      ...selectStyle,
+                      fontFamily: 'inherit',
+                      fontSize: 13,
+                      cursor: 'text',
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Additional Instructions */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Additional Instructions</span>
+                <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'none', letterSpacing: 0, background: 'var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>optional</span>
+              </label>
+              <textarea
+                id="ai-custom-prompt"
+                rows={3}
+                placeholder={`Examples:\n• Create questions with real-world scenarios\n• Focus on fractions and decimals\n• Include word problems only`}
+                value={customPrompt}
+                onChange={e => setCustomPrompt(e.target.value)}
+                style={{
+                  ...selectStyle,
+                  resize: 'vertical',
+                  minHeight: 80,
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                  fontStyle: customPrompt ? 'normal' : 'italic',
+                  cursor: 'text',
+                }}
+              />
+              {((sourceMode === 'input' && (assessmentTarget.trim() || assessmentBoundaries.trim() || cognitiveComplexity.trim())) || customPrompt.trim()) && (
+                <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>💡</span> AI will strictly apply these instructions during generation
+                </div>
+              )}
+            </div>
+
+            {/* Visual Diagrams Toggle (Available for standard and passage generation, not reference) */}
+            {sourceMode !== 'reference' && (
+              <div
+                id="ai-include-visuals-toggle"
+                onClick={() => setIncludeVisuals(!includeVisuals)}
+                style={{
+                  marginBottom: 20,
+                  padding: '12px 14px',
+                  background: includeVisuals ? '#f0fdfa' : '#f8fafc',
+                  border: `1.5px solid ${includeVisuals ? '#2dd4bf' : 'var(--color-border)'}`,
+                  borderRadius: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                  boxShadow: includeVisuals ? '0 2px 8px rgba(13, 148, 136, 0.12)' : 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 18 }}>🎨</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: includeVisuals ? '#0f766e' : 'var(--color-text)' }}>
+                      Include Visual Diagrams
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
+                      Generate items with vector geometry, circuits, cycles, or charts
+                    </div>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  id="ai-include-visuals"
+                  checked={includeVisuals}
+                  onChange={e => setIncludeVisuals(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#4f6ef7' }}
+                />
+              </div>
+            )}
+
+            {/* Generate Button */}
+            {(() => {
+              if (sourceMode === 'reference') {
+                const isReferenceMissing = !referenceQuestion;
+                const isDisabled = generating || isReferenceMissing || variantCount < 1 || variantCount > 10;
+
+                return (
+                  <button
+                    id="generate-btn"
+                    className="btn-generate"
+                    onClick={handleGenerate}
+                    disabled={isDisabled}
+                    style={{
+                      width: '100%', padding: '13px',
+                      background: isDisabled ? '#c7d2fe' : 'var(--color-primary)',
+                      border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 700,
+                      cursor: isDisabled ? 'not-allowed' : 'pointer',
+                      boxShadow: isDisabled ? 'none' : '0 4px 14px rgba(79,110,247,0.35)',
+                      transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    {generating ? (
+                      <>
+                        <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                        Generating {variantCount} Variant{variantCount > 1 ? 's' : ''}...
+                      </>
+                    ) : isReferenceMissing ? (
+                      'Select a Reference Question'
+                    ) : (
+                      `🧬 Generate ${variantCount} New ${variantCount === 1 ? 'Variant' : 'Variants'}`
+                    )}
+                  </button>
+                );
+              }
+
+              const isPassageMissing = sourceMode === 'passage' && !selectedPassage;
+              const isItemDisabled = totalCount === 0 || totalCount > 50 || isPassageMissing;
+              const isDisabled = generating || isItemDisabled;
 
               return (
                 <button
@@ -1387,77 +1283,44 @@ export default function AIGeneratePage() {
                   {generating ? (
                     <>
                       <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                      Generating {variantCount} Variant{variantCount > 1 ? 's' : ''}...
+                      Generating {totalCount} Question{totalCount > 1 ? 's' : ''}...
                     </>
-                  ) : isReferenceMissing ? (
-                    'Select a Reference Question'
+                  ) : isPassageMissing ? (
+                    'Select a Stimulus Passage'
+                  ) : totalCount === 0 ? (
+                    'Select a Question Type'
+                  ) : totalCount > 50 ? (
+                    'Exceeds 50 Max Total'
                   ) : (
-                    `🧬 Generate ${variantCount} New ${variantCount === 1 ? 'Variant' : 'Variants'}`
+                    `✨ Generate ${totalCount} Question${totalCount > 1 ? 's' : ''}`
                   )}
                 </button>
               );
-            }
+            })()}
+          </div>
 
-            const isPassageMissing = sourceMode === 'passage' && !selectedPassage;
-            const isItemDisabled = totalCount === 0 || totalCount > 50 || isPassageMissing;
-            const isDisabled = generating || isItemDisabled;
-
-            return (
-              <button
-                id="generate-btn"
-                className="btn-generate"
-                onClick={handleGenerate}
-                disabled={isDisabled}
-                style={{
-                  width: '100%', padding: '13px',
-                  background: isDisabled ? '#c7d2fe' : 'var(--color-primary)',
-                  border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 700,
-                  cursor: isDisabled ? 'not-allowed' : 'pointer',
-                  boxShadow: isDisabled ? 'none' : '0 4px 14px rgba(79,110,247,0.35)',
-                  transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                {generating ? (
-                  <>
-                    <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                    Generating {totalCount} Question{totalCount > 1 ? 's' : ''}...
-                  </>
-                ) : isPassageMissing ? (
-                  'Select a Stimulus Passage'
-                ) : totalCount === 0 ? (
-                  'Select a Question Type'
-                ) : totalCount > 50 ? (
-                  'Exceeds 50 Max Total'
-                ) : (
-                  `✨ Generate ${totalCount} Question${totalCount > 1 ? 's' : ''}`
+          {/* ─── Right Panel: Results ─── */}
+          <div style={{ minWidth: 0, width: '100%' }}>
+            {/* Error */}
+            {error && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
+                padding: '14px 18px', marginBottom: 20, color: 'var(--color-danger)', fontSize: 13,
+              }}>
+                ❌ {error}
+                {error.includes('syllabus') && (
+                  <button
+                    onClick={() => navigate('/syllabus')}
+                    style={{ marginLeft: 12, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, textDecoration: 'underline' }}
+                  >
+                    Upload Syllabus →
+                  </button>
                 )}
-              </button>
-            );
-          })()}
-        </div>
+              </div>
+            )}
 
-        {/* ─── Right Panel: Results ─── */}
-        <div style={{ minWidth: 0, width: '100%' }}>
-          {/* Error */}
-          {error && (
-            <div style={{
-              background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
-              padding: '14px 18px', marginBottom: 20, color: 'var(--color-danger)', fontSize: 13,
-            }}>
-              ❌ {error}
-              {error.includes('syllabus') && (
-                <button
-                  onClick={() => navigate('/syllabus')}
-                  style={{ marginLeft: 12, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, textDecoration: 'underline' }}
-                >
-                  Upload Syllabus →
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Item Generation Results */}
-          <>
+            {/* Item Generation Results */}
+            <>
               {/* Generation meta */}
               {genMeta && questions.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18, minWidth: 0 }}>
@@ -1724,6 +1587,19 @@ export default function AIGeneratePage() {
                             >
                               🔄 Regenerate
                             </button>
+                            {/* Feedback button */}
+                            {/* <button
+                              id={`feedback-q-${idx}`}
+                              onClick={() => openFeedbackModal(q)}
+                              title="Submit feedback to improve future question generation"
+                              style={{
+                                padding: '5px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                                border: '1px solid #e0f2fe', background: '#f0f9ff', color: '#0369a1',
+                                cursor: 'pointer', transition: 'all 0.12s',
+                              }}
+                            >
+                              💬 Feedback
+                            </button> */}
 
                             {/* Accept / Reject Action Buttons */}
                             {isRejected ? (
@@ -3057,504 +2933,42 @@ export default function AIGeneratePage() {
                 </div>
               )}
             </>
+          </div>
         </div>
-      </div>
-    )}
+      )}
 
 
 
       {/* ─── Regenerate Modal ─── */}
       {regenModal && (
-        <div
-          onClick={(e) => { if (e.target === e.currentTarget) closeRegenModal(); }}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(10, 10, 20, 0.55)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
-            animation: 'fadeIn 0.15s ease',
+        <RegenerateModal
+          question={regenModal.question}
+          idx={regenModal.idx}
+          sourceMode={sourceMode}
+          selectedPassage={selectedPassage}
+          contentArea={contentArea}
+          grade={grade}
+          onSuccess={(idx, newQuestion) => {
+            setQuestions(prev => {
+              const updated = [...prev];
+              updated[idx] = newQuestion;
+              return updated;
+            });
           }}
-        >
-          <div style={{
-            background: 'var(--color-surface)',
-            borderRadius: 16,
-            padding: 28,
-            width: '100%',
-            maxWidth: 560,
-            maxHeight: '95vh',
-            overflowY: 'auto',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
-            border: '1px solid var(--color-border)',
-            animation: 'slideUp 0.18s ease',
-            position: 'relative',
-          }}>
-            {/* X close button */}
-            <button
-              onClick={closeRegenModal}
-              aria-label="Close regenerate modal"
-              style={{
-                position: 'absolute', top: 14, right: 14,
-                width: 30, height: 30, borderRadius: '50%',
-                border: '1px solid var(--color-border)',
-                background: 'transparent',
-                color: 'var(--color-text-muted)',
-                fontSize: 16, fontWeight: 700, lineHeight: 1,
-                cursor: 'pointer', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = 'var(--color-text)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-            >
-              &#x2715;
-            </button>
-            {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>🔄 Regenerate / Refine Question</div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span>Q{regenModal.idx + 1} — {regenModal.question.questionType?.replace(/_/g, ' ')} ({regenModal.question.difficulty})</span>
-                  {(regenModal.question.passage_title || regenModal.question.passage_id || regenModal.question._passageGrounded || (sourceMode === 'passage' && selectedPassage)) && (
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      background: '#f0fdfa',
-                      border: '1px solid #99f6e4',
-                      color: '#0f766e',
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                    }}>
-                      📖 Stimulus: {regenModal.question.passage_title || selectedPassage?.title || (regenModal.question.passage_id ? `Passage #${regenModal.question.passage_id}` : 'Reading Passage')}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Original Question Stem Preview */}
-            <div style={{
-              background: '#f8fafc', borderRadius: 10, padding: '12px 16px',
-              marginBottom: 16, border: '1px solid var(--color-border)',
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
-                Original Question Stem
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.5, fontWeight: 600, maxHeight: 72, overflowY: 'auto' }}>
-                {regenModal.question.text}
-              </div>
-            </div>
-
-            {/* What would you like to refine? (Target Checkboxes) */}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>
-                What would you like to refine?
-              </label>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 8,
-              }}>
-                {getRefinementTargetsForType(regenModal.question.questionType).map(target => {
-                  const isChecked = refinementTargets.includes(target.id);
-                  return (
-                    <label
-                      key={target.id}
-                      onClick={() => toggleRefinementTarget(target.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: `1.5px solid ${isChecked ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        background: isChecked ? '#f0f4ff' : 'var(--color-surface)',
-                        color: isChecked ? 'var(--color-primary)' : 'var(--color-text)',
-                        fontSize: 13,
-                        fontWeight: isChecked ? 600 : 500,
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        transition: 'all 0.12s',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => { }} // handled by label onClick
-                        style={{
-                          width: 16,
-                          height: 16,
-                          accentColor: 'var(--color-primary)',
-                          cursor: 'pointer',
-                        }}
-                      />
-                      <span>{target.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Refinement Instructions (Mandatory) */}
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ ...labelStyle, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Refinement Instructions</span>
-              </label>
-              <textarea
-                id="regen-instructions"
-                rows={3}
-                placeholder={`Examples:\n• Change Option C to focus on chloroplasts instead of cell walls\n• Make the question stem more concise and direct\n• Provide more tempting distractors for Grade 8 level`}
-                value={regenInstructions}
-                onChange={e => setRegenInstructions(e.target.value)}
-                style={{
-                  width: '100%', padding: '10px 12px', borderRadius: 8,
-                  border: `1.5px solid ${!regenInstructions.trim() && refinementTargets.length > 0 ? '#fca5a5' : 'var(--color-border)'}`,
-                  fontSize: 13,
-                  background: 'var(--color-surface)', color: 'var(--color-text)',
-                  resize: 'vertical', outline: 'none', lineHeight: 1.5,
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box',
-                }}
-              />
-              {/* Validation helper hints */}
-              {refinementTargets.length === 0 ? (
-                <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 6, fontWeight: 500 }}>
-                  ⚠️ Please select at least one component above to refine.
-                </div>
-              ) : !regenInstructions.trim() ? (
-                <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 6, fontWeight: 500 }}>
-                  ✍️ Please specify what you would like the AI to change in the instructions above.
-                </div>
-              ) : (
-                <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 6, fontWeight: 500 }}>
-                  💡 AI will surgically apply these instructions to the selected component(s).
-                </div>
-              )}
-            </div>
-
-            {/* Error */}
-            {regenError && (
-              <div style={{
-                marginBottom: 16, padding: '10px 14px', borderRadius: 8,
-                background: '#fef2f2', border: '1px solid #fecaca',
-                color: '#991b1b', fontSize: 13,
-              }}>
-                ❌ {regenError}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
-              <button
-                className="btn-modal-cancel"
-                onClick={closeRegenModal}
-                disabled={regenerating}
-                style={{
-                  padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                  border: '1.5px solid #cbd5e1', background: '#f8fafc',
-                  color: '#475569', cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                id="regen-confirm-btn"
-                className="btn-modal-confirm"
-                onClick={handleRegenerate}
-                disabled={regenerating || refinementTargets.length === 0 || !regenInstructions.trim()}
-                style={{
-                  padding: '9px 24px', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                  border: 'none',
-                  background: (regenerating || refinementTargets.length === 0 || !regenInstructions.trim()) ? '#cbd5e1' : '#7c3aed',
-                  color: (regenerating || refinementTargets.length === 0 || !regenInstructions.trim()) ? '#64748b' : '#fff',
-                  cursor: (regenerating || refinementTargets.length === 0 || !regenInstructions.trim()) ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s',
-                  boxShadow: (regenerating || refinementTargets.length === 0 || !regenInstructions.trim()) ? 'none' : '0 4px 14px rgba(124, 58, 237, 0.35)',
-                }}
-              >
-                {regenerating ? (
-                  <>
-                    <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                    Applying Refinement…
-                  </>
-                ) : '✨ Apply Refinement'}
-              </button>
-            </div>
-          </div>
-        </div>
+          onClose={() => setRegenModal(null)}
+        />
       )}
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        .btn-generate:hover:not(:disabled) {
-          background: var(--color-primary-dark, #3a55d4) !important;
-          box-shadow: 0 6px 20px rgba(79,110,247,0.45) !important;
-          transform: translateY(-1px);
-        }
-        .btn-generate:active:not(:disabled) {
-          transform: translateY(0);
-        }
-
-        .btn-save-all:hover:not(:disabled) {
-          background: var(--color-primary-dark, #3a55d4) !important;
-          box-shadow: 0 6px 16px rgba(79,110,247,0.35) !important;
-          transform: translateY(-1px);
-        }
-        .btn-save-all:active:not(:disabled) {
-          transform: translateY(0);
-        }
-
-        .btn-chunks:hover {
-          background: var(--color-primary-light, #eef1fe) !important;
-          border-color: var(--color-primary, #4f6ef7) !important;
-          color: var(--color-primary, #4f6ef7) !important;
-        }
-
-        .btn-regen-card:hover {
-          background: #ebdffd !important;
-          border-color: #7c3aed !important;
-          color: #6d28d9 !important;
-          transform: translateY(-1px);
-        }
-        .btn-regen-card:active {
-          transform: translateY(0);
-        }
-
-        .btn-save-card:hover:not(:disabled) {
-          background: var(--color-primary, #4f6ef7) !important;
-          color: #fff !important;
-          border-color: var(--color-primary, #4f6ef7) !important;
-          transform: translateY(-1px);
-        }
-        .btn-save-card:active:not(:disabled) {
-          transform: translateY(0);
-        }
-
-        .btn-modal-cancel:hover {
-          background: var(--color-border, #f1f5f9) !important;
-          border-color: #94a3b8 !important;
-          color: var(--color-text, #1e293b) !important;
-        }
-
-        .btn-modal-confirm:hover:not(:disabled) {
-          background: #6d28d9 !important;
-          transform: translateY(-1px);
-        }
-        .btn-modal-confirm:active:not(:disabled) {
-          transform: translateY(0);
-        }
-
-        .star-btn:hover { transform: scale(1.2); }
-        .feedback-cat-pill:hover { opacity: 0.85; }
-      `}</style>
 
       {/* ── Feedback Modal ── */}
       {feedbackModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, backdropFilter: 'blur(3px)',
-          animation: 'fadeIn 0.15s ease',
-        }}>
-          <div style={{
-            background: 'var(--color-surface, #fff)', borderRadius: 16,
-            padding: '32px 28px', width: '100%', maxWidth: 520,
-            boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-            animation: 'slideUp 0.2s ease',
-            position: 'relative',
-          }}>
-            {/* X close button */}
-            <button
-              onClick={closeFeedbackModal}
-              aria-label="Close feedback modal"
-              style={{
-                position: 'absolute', top: 14, right: 14,
-                width: 30, height: 30, borderRadius: '50%',
-                border: 'none', background: 'var(--color-border)',
-                color: 'var(--color-text-muted)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 14, fontWeight: 700, lineHeight: 1,
-              }}
-            >
-              &#x2715;
-            </button>
-
-            {feedbackSuccess ? (
-              /* ── Success state ── */
-              <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>
-                  Thank you for your feedback!
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
-                  Your comments have been saved and will be used to improve future question generation for{' '}
-                  <strong>{feedbackModal.question.contentArea} {feedbackModal.question.grade}</strong>.
-                </div>
-                <button
-                  onClick={closeFeedbackModal}
-                  style={{
-                    padding: '10px 28px', borderRadius: 8, fontSize: 14, fontWeight: 600,
-                    background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            ) : (
-              /* ── Form state ── */
-              <>
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)', marginBottom: 4 }}>
-                    💬 Question Feedback
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                    Your feedback helps the AI generate better questions for future sessions.
-                  </div>
-                </div>
-
-                {/* Question preview */}
-                <div style={{
-                  padding: '10px 14px', borderRadius: 8, background: '#f8fafc',
-                  border: '1px solid var(--color-border)', marginBottom: 20,
-                  fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5,
-                }}>
-                  <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>Question: </span>
-                  {feedbackModal.question.text?.slice(0, 160)}{feedbackModal.question.text?.length > 160 ? '…' : ''}
-                </div>
-
-                {/* Star rating */}
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                    Overall Quality Rating
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <button
-                        key={star}
-                        className="star-btn"
-                        onClick={() => setFeedbackRating(star === feedbackRating ? 0 : star)}
-                        style={{
-                          fontSize: 24, background: 'none', border: 'none', cursor: 'pointer',
-                          padding: '2px 4px', transition: 'transform 0.15s',
-                          opacity: star <= feedbackRating ? 1 : 0.3,
-                          filter: star <= feedbackRating ? 'none' : 'grayscale(1)',
-                        }}
-                        title={`${star} star${star > 1 ? 's' : ''}`}
-                      >
-                        ⭐
-                      </button>
-                    ))}
-                    {feedbackRating > 0 && (
-                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)', alignSelf: 'center', marginLeft: 4 }}>
-                        {['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'][feedbackRating]}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Category pills */}
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                    Feedback Category
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {[
-                      { value: 'general', label: 'General' },
-                      { value: 'distractor_quality', label: 'Distractor Quality' },
-                      { value: 'difficulty', label: 'Difficulty' },
-                      { value: 'clarity', label: 'Clarity' },
-                      { value: 'accuracy', label: 'Accuracy' },
-                      { value: 'topic', label: 'Topic / Coverage' },
-                    ].map(cat => {
-                      const active = feedbackCategory === cat.value;
-                      return (
-                        <button
-                          key={cat.value}
-                          className="feedback-cat-pill"
-                          onClick={() => setFeedbackCategory(cat.value)}
-                          style={{
-                            padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                            cursor: 'pointer', transition: 'all 0.15s',
-                            background: active ? '#0369a1' : '#f1f5f9',
-                            color: active ? '#fff' : 'var(--color-text-muted)',
-                            border: active ? '1px solid #0369a1' : '1px solid var(--color-border)',
-                          }}
-                        >
-                          {cat.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Free text */}
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                    Comments <span style={{ color: '#ef4444' }}>*</span>
-                  </div>
-                  <textarea
-                    id="feedback-text"
-                    rows={4}
-                    placeholder="e.g. The distractors were too easy to eliminate. Consider using concepts from the same chapter as plausible wrong answers."
-                    value={feedbackText}
-                    onChange={e => setFeedbackText(e.target.value)}
-                    style={{
-                      width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 13,
-                      border: '1.5px solid var(--color-border)', background: 'var(--color-surface)',
-                      color: 'var(--color-text)', resize: 'vertical', fontFamily: 'inherit',
-                      outline: 'none', boxSizing: 'border-box', lineHeight: 1.5,
-                    }}
-                  />
-                </div>
-
-                {feedbackError && (
-                  <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: '#fef2f2', color: '#b91c1c', fontSize: 12 }}>
-                    {feedbackError}
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                  <button
-                    className="btn-modal-cancel"
-                    onClick={closeFeedbackModal}
-                    disabled={feedbackSubmitting}
-                    style={{
-                      padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                      border: '1.5px solid #cbd5e1', background: '#f8fafc',
-                      color: '#475569', cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    id="submit-feedback-btn"
-                    onClick={handleSubmitFeedback}
-                    disabled={feedbackSubmitting || !feedbackText.trim()}
-                    style={{
-                      padding: '9px 22px', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                      border: 'none',
-                      background: !feedbackText.trim() ? '#e2e8f0' : '#0369a1',
-                      color: !feedbackText.trim() ? '#94a3b8' : '#fff',
-                      cursor: !feedbackText.trim() ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {feedbackSubmitting ? 'Submitting…' : '📤 Submit Feedback'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        <FeedbackModal
+          question={feedbackModal.question}
+          contentArea={contentArea}
+          grade={grade}
+          onClose={() => setFeedbackModal(null)}
+        />
       )}
 
       {/* ─── Edit Question Modal (Encapsulates Save & Update Lifecycle) ─── */}
@@ -3579,15 +2993,3 @@ export default function AIGeneratePage() {
     </Layout>
   );
 }
-
-const labelStyle = {
-  fontSize: 12, fontWeight: 700, color: '#1e293b',
-  display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em',
-};
-
-const selectStyle = {
-  width: '100%', padding: '10px 12px', borderRadius: 8,
-  border: '1.5px solid #cbd5e1', fontSize: 14,
-  background: 'var(--color-surface)', color: '#0f172a',
-  outline: 'none', cursor: 'pointer',
-};
