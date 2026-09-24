@@ -49,6 +49,10 @@ from passage import (
     PassageResult,
     generate_passages,
 )
+from variant import (
+    GenerateFromReferenceRequest,
+    generate_variants,
+)
 from services.pdf_parser import extract_text, chunk_text, extract_images_from_pdf, IMAGES_DIR
 from services.embedder import embed_texts, embed_query
 from services.vector_store import add_vectors, search_within_scored, rebuild_index_without
@@ -728,6 +732,74 @@ async def generate_passage_endpoint(req: GeneratePassageRequest):
         passages=passages,
         count=len(passages),
         prompt_sent=prompt_sent,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /generate-from-reference
+# ---------------------------------------------------------------------------
+
+@app.post("/generate-from-reference", response_model=GenerateResponse, dependencies=[Depends(verify_internal_key), Depends(rate_limit)])
+async def generate_from_reference_endpoint(req: GenerateFromReferenceRequest):
+    """
+    Generate new assessment items (parallel clones, easier/harder variants, format shifts)
+    modeled on an existing reference item.
+    """
+    print(
+        f"[main] 🧬 Reference variant generation requested: {req.content_area} / {req.grade} / "
+        f"style={req.variant_style} / count={req.count}"
+    )
+
+    questions_raw, prompt_sent, raw_response, success, error_msg = await asyncio.to_thread(
+        generate_variants, req
+    )
+
+    if not success:
+        log_generation(
+            request=req.model_dump(),
+            retrieved_chunk_ids=[],
+            prompt_sent=prompt_sent,
+            raw_response=raw_response,
+            parse_success=False,
+            error=error_msg,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=error_msg or "Failed to generate variants from reference item."
+        )
+
+    questions: list[QuestionResult] = []
+    for q in questions_raw:
+        try:
+            questions.append(QuestionResult(
+                **{k: v for k, v in q.items() if k not in ("sources", "imageRefs", "grounded", "groundingScore", "groundingNote")},
+                sources=[],
+                imageRefs=[],
+                grounded=True,
+                groundingScore=1.0,
+                groundingNote="Reference-grounded variant",
+            ))
+        except Exception as e:
+            print(f"[main] ⚠️ [variant] Skipped malformed variant: {e}")
+
+    if not questions:
+        raise HTTPException(status_code=422, detail="AI returned no valid variant questions.")
+
+    log_generation(
+        request=req.model_dump(),
+        retrieved_chunk_ids=[],
+        prompt_sent=prompt_sent,
+        raw_response=raw_response,
+        parse_success=True,
+        error=None,
+    )
+
+    return GenerateResponse(
+        questions=questions,
+        retrieved_chunk_count=0,
+        doc_ids_used=[],
+        ungrounded_dropped=0,
+        duplicate_dropped=0,
     )
 
 

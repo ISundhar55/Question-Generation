@@ -65,6 +65,7 @@ export const aiAPI = {
   generate: (params) => api.post('/ai/generate', params),
   generateFromInternet: (params) => api.post('/ai/generate-internet', params),
   generatePassage: (params) => api.post('/ai/generate-passage', params),
+  generateFromReference: (params) => api.post('/ai/generate-from-reference', params),
   regenerate: (params) => api.post('/ai/regenerate', params),
   feedback: (params) => api.post('/ai/feedback', params),
 };

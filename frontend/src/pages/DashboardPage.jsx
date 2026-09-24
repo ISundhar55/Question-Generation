@@ -809,6 +809,13 @@ export default function DashboardPage() {
                     {/* Actions */}
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                        {tab === 'approved' && !q.passage_id && (
+                          <button
+                            onClick={() => navigate('/generate', { state: { referenceQuestion: q, sourceMode: 'reference' } })}
+                            style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid #bfdbfe', background: '#eff6ff', fontSize: 12, cursor: 'pointer', color: '#1d4ed8' }}
+                            title="Generate Clones / Variants from this Question"
+                          >🧬</button>
+                        )}
                         <button
                           onClick={() => navigate(`/edit/${q.id}`)}
                           style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)' }}

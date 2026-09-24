@@ -171,7 +171,8 @@ function inlineMarkdown(raw) {
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="md-code">$1</code>')
     .replace(/\$\$([^$]+?)\$\$/g, '<span class="md-math-block">$1</span>')
-    .replace(/\$([^$\n]+?)\$/g, '<i class="md-math">$1</i>');
+    .replace(/\$([^$\n]+?)\$/g, '<i class="md-math">$1</i>')
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="md-img" style="max-width:100%; height:auto; border-radius:6px; margin:6px 0; display:block;" />');
 }
 
 /**
@@ -187,13 +188,21 @@ export function markdownToHtml(rawText) {
 
   // Extract any raw <svg ...>...</svg> blocks before escaping
   const svgBlocks = [];
-  const withSvgPlaceholders = rawText.replace(/<svg[\s\S]*?<\/svg>/gi, (match) => {
+  let withPlaceholders = rawText.replace(/<svg[\s\S]*?<\/svg>/gi, (match) => {
     const idx = svgBlocks.length;
     svgBlocks.push(match);
     return `__SVG_DIAGRAM_BLOCK_${idx}__`;
   });
 
-  const text = normalizeTableText(withSvgPlaceholders);
+  // Extract any raw <img ...> tags before escaping
+  const imgBlocks = [];
+  withPlaceholders = withPlaceholders.replace(/<img[\s\S]*?\/?>/gi, (match) => {
+    const idx = imgBlocks.length;
+    imgBlocks.push(match);
+    return `__RAW_IMG_TAG_BLOCK_${idx}__`;
+  });
+
+  const text = normalizeTableText(withPlaceholders);
 
   const parts = [];
   // Split on table blocks: lines starting with |
@@ -232,6 +241,14 @@ export function markdownToHtml(rawText) {
     finalHtml = finalHtml.replace(
       new RegExp(`__SVG_DIAGRAM_BLOCK_${idx}__`, 'g'),
       `<div class="md-diagram-card"><div class="md-diagram-svg">${svg}</div></div>`
+    );
+  });
+
+  // Restore raw <img> tags safely
+  imgBlocks.forEach((imgTag, idx) => {
+    finalHtml = finalHtml.replace(
+      new RegExp(`__RAW_IMG_TAG_BLOCK_${idx}__`, 'g'),
+      imgTag
     );
   });
 
@@ -295,8 +312,9 @@ function renderParagraph(text) {
  * React component — renders Markdown-formatted question text
  * with proper table styling, bold, italic, and code.
  */
-export function MarkdownText({ text, className = '', style = {} }) {
-  const html = markdownToHtml(text || '');
+export function MarkdownText({ text, content, children, className = '', style = {} }) {
+  const raw = text || content || (typeof children === 'string' ? children : '') || '';
+  const html = markdownToHtml(raw);
   return (
     <span
       className={`md-text ${className}`}

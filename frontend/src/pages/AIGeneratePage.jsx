@@ -16,6 +16,9 @@ import {
   parseMatchingAnswer,
 } from './aiGenerateConstants';
 import { cleanOptionText, sanitizeOptions } from '../utils/questionUtils';
+import ReferenceItemPicker from '../variant/ReferenceItemPicker';
+import ReferenceItemCard from '../variant/ReferenceItemCard';
+import VariantControls from '../variant/VariantControls';
 
 export default function AIGeneratePage() {
   const navigate = useNavigate();
@@ -23,8 +26,17 @@ export default function AIGeneratePage() {
 
   // Mode toggles
   const [genMode, setGenMode] = useState('item'); // 'item' | 'passage'
-  const [sourceMode, setSourceMode] = useState('input'); // 'input' | 'passage'
+  const [sourceMode, setSourceMode] = useState('input'); // 'input' | 'passage' | 'reference'
   const [selectedPassage, setSelectedPassage] = useState(null);
+
+  // Reference item variant state
+  const [referenceQuestion, setReferenceQuestion] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [variantStyle, setVariantStyle] = useState('parallel'); // 'parallel' | 'easier' | 'harder' | 'format_shift'
+  const [targetType, setTargetType] = useState('SINGLE_SELECT');
+  const [variantDifficulty, setVariantDifficulty] = useState('medium');
+  const [variantCount, setVariantCount] = useState(2);
+  const [variantDirectives, setVariantDirectives] = useState('');
 
   // Form state
   const [contentArea, setContentArea] = useState(CONTENT_AREAS[0]);
@@ -35,7 +47,7 @@ export default function AIGeneratePage() {
   const [gradeOpen, setGradeOpen] = useState(false);
   const gradeDropdownRef = useRef(null);
 
-  // Auto-select passage if navigated from another view
+  // Auto-select passage or reference question if navigated from another view
   useEffect(() => {
     if (location.state?.passage) {
       setGenMode('item');
@@ -46,6 +58,20 @@ export default function AIGeneratePage() {
       }
       if (location.state.passage.grade) {
         setGrade(location.state.passage.grade);
+      }
+    } else if (location.state?.referenceQuestion) {
+      setGenMode('item');
+      setSourceMode('reference');
+      setReferenceQuestion(location.state.referenceQuestion);
+      const q = location.state.referenceQuestion;
+      if (q.contentArea || q.content_area) {
+        setContentArea(q.contentArea || q.content_area);
+      }
+      if (q.grade) {
+        setGrade(q.grade);
+      }
+      if (q.difficulty) {
+        setVariantDifficulty(q.difficulty);
       }
     }
   }, [location.state]);
@@ -223,6 +249,59 @@ export default function AIGeneratePage() {
   };
 
   const handleGenerate = async () => {
+    // ─── Reference Item Mode ───
+    if (sourceMode === 'reference') {
+      if (!referenceQuestion) {
+        setError('Please select or input a seed reference question first.');
+        return;
+      }
+      setGenerating(true);
+      setError(null);
+      setQuestions([]);
+      setGenMeta(null);
+
+      try {
+        const res = await aiAPI.generateFromReference({
+          content_area: contentArea,
+          grade,
+          reference_question: referenceQuestion,
+          count: variantCount,
+          target_type: variantStyle === 'format_shift' ? targetType : (referenceQuestion.questionType || referenceQuestion.type || 'SINGLE_SELECT'),
+          target_difficulty: variantDifficulty || (variantStyle === 'easier' ? 'easy' : variantStyle === 'harder' ? 'hard' : difficulty),
+          variant_style: variantStyle,
+          custom_instructions: customPrompt.trim() || undefined,
+          include_visuals: includeVisuals,
+        });
+
+        const computeDefaultPoints = (diff) => (diff === 'hard' ? 3 : diff === 'medium' ? 2 : 1);
+        const generated = (res.data?.questions || []).map(q => ({
+          ...q,
+          text: q.text,
+          options: sanitizeOptions(q.options),
+          points: q.points || computeDefaultPoints(q.difficulty || difficulty),
+          status: 'draft',
+          _isVariant: true,
+          _referenceId: referenceQuestion.id,
+        }));
+
+        if (generated.length === 0) {
+          throw new Error('AI returned no valid variant questions. Please try again.');
+        }
+
+        setQuestions(generated);
+        setGenMeta({
+          totalGenerated: generated.length,
+          retrievedChunkCount: 0,
+          ungroundedDropped: 0,
+        });
+      } catch (err) {
+        setError(err.response?.data?.message || err.message || 'Variant generation failed.');
+      } finally {
+        setGenerating(false);
+      }
+      return;
+    }
+
     const activeTypes = Object.entries(typeCounts).filter(([_, count]) => count > 0);
     if (activeTypes.length === 0 || totalCount > 50) return;
     if (sourceMode === 'passage' && !selectedPassage) {
@@ -384,6 +463,12 @@ export default function AIGeneratePage() {
     if (sourceMode === 'passage') return;
     resetFormAndResults();
     setSourceMode('passage');
+  };
+
+  const handleSwitchToReferenceSource = () => {
+    if (sourceMode === 'reference') return;
+    resetFormAndResults();
+    setSourceMode('reference');
   };
 
   const handleGenerateQuestionsFromPassage = (passage) => {
@@ -707,7 +792,7 @@ export default function AIGeneratePage() {
             {/* Toggle 1: Generation Mode (Items vs Passages) */}
             {renderModeToggle()}
 
-            {/* Toggle 2: Item Generation Source (Standard vs Passage Grounding) */}
+            {/* Toggle 2: Item Generation Source (Standard vs Passage vs Reference Item) */}
             <div style={{ marginBottom: 16 }}>
               <div style={{
                 display: 'flex',
@@ -723,18 +808,18 @@ export default function AIGeneratePage() {
                   onClick={handleSwitchToStandardInput}
                   style={{
                     flex: 1,
-                    padding: '6px 8px',
+                    padding: '6px 6px',
                     borderRadius: 5,
                     border: 'none',
                     background: sourceMode === 'input' ? 'var(--color-primary, #4f6ef7)' : 'transparent',
                     color: sourceMode === 'input' ? '#ffffff' : '#64748b',
                     fontWeight: sourceMode === 'input' ? 700 : 500,
-                    fontSize: 11.5,
+                    fontSize: 11,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  ⚡ Standard Input
+                  ⚡ Standard
                 </button>
                 <button
                   type="button"
@@ -742,18 +827,37 @@ export default function AIGeneratePage() {
                   onClick={handleSwitchToPassageSource}
                   style={{
                     flex: 1,
-                    padding: '6px 8px',
+                    padding: '6px 6px',
                     borderRadius: 5,
                     border: 'none',
                     background: sourceMode === 'passage' ? '#0d9488' : 'transparent',
                     color: sourceMode === 'passage' ? '#ffffff' : '#64748b',
                     fontWeight: sourceMode === 'passage' ? 700 : 500,
-                    fontSize: 11.5,
+                    fontSize: 11,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  📖 Based on Passage
+                  📖 Passage
+                </button>
+                <button
+                  type="button"
+                  id="source-reference-item"
+                  onClick={handleSwitchToReferenceSource}
+                  style={{
+                    flex: 1,
+                    padding: '6px 6px',
+                    borderRadius: 5,
+                    border: 'none',
+                    background: sourceMode === 'reference' ? '#7c3aed' : 'transparent',
+                    color: sourceMode === 'reference' ? '#ffffff' : '#64748b',
+                    fontWeight: sourceMode === 'reference' ? 700 : 500,
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  🧬 Reference
                 </button>
               </div>
             </div>
@@ -912,8 +1016,61 @@ export default function AIGeneratePage() {
             />
           )}
 
+          {/* Reference Item & Variant Controls (when Based on Reference Item is selected) */}
+          {genMode === 'item' && sourceMode === 'reference' && (
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Reference (Seed) Item</label>
+              {referenceQuestion ? (
+                <ReferenceItemCard
+                  question={referenceQuestion}
+                  referenceQuestion={referenceQuestion}
+                  onPickNew={() => setPickerOpen(true)}
+                  onChangeClick={() => setPickerOpen(true)}
+                  onClear={() => setReferenceQuestion(null)}
+                />
+              ) : (
+                <div
+                  onClick={() => setPickerOpen(true)}
+                  style={{
+                    padding: '18px 16px',
+                    borderRadius: 10,
+                    border: '2px dashed #93c5fd',
+                    background: '#eff6ff',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all 0.15s ease',
+                    marginBottom: 16,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.borderColor = '#3b82f6'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#93c5fd'; }}
+                >
+                  <div style={{ fontSize: 24, marginBottom: 4 }}>🧬</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>
+                    Choose Reference Question
+                  </div>
+                  <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2 }}>
+                    Pick an existing item from Question Bank or paste a custom question
+                  </div>
+                </div>
+              )}
+
+              <VariantControls
+                variantStyle={variantStyle}
+                onChangeVariantStyle={setVariantStyle}
+                setVariantStyle={setVariantStyle}
+                targetType={targetType}
+                onChangeTargetType={setTargetType}
+                setTargetType={setTargetType}
+                variantCount={variantCount}
+                onChangeVariantCount={setVariantCount}
+                count={variantCount}
+                setCount={setVariantCount}
+              />
+            </div>
+          )}
+
           {/* Question Types selector (Item Generation only) */}
-          {genMode === 'item' && (
+          {genMode === 'item' && sourceMode !== 'reference' && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <label style={{ ...labelStyle, marginBottom: 0 }}>
@@ -1040,7 +1197,7 @@ export default function AIGeneratePage() {
           )}
 
           {/* Difficulty (Item Generation only) */}
-          {genMode === 'item' && (
+          {genMode === 'item' && sourceMode !== 'reference' && (
             <div style={{ marginBottom: 18 }}>
               <label style={labelStyle}>Level of Difficulty</label>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -1065,7 +1222,7 @@ export default function AIGeneratePage() {
           )}
 
           {/* Assessment Boundaries, Target, and Complexity - Visible during Standard Item Generation */}
-          {sourceMode !== 'passage' && (
+          {sourceMode === 'input' && (
             <>
               {/* Assessment Boundaries */}
               <div style={{ marginBottom: 18 }}>
@@ -1145,7 +1302,7 @@ export default function AIGeneratePage() {
             <textarea
               id="ai-custom-prompt"
               rows={3}
-              placeholder={`Examples:\n• Create questions from Trigonometry\n• Focus on Chapter 3 — Algebra\n• Give 5 options instead of 4\n• Include word problems only`}
+              placeholder={`Examples:\n• Create questions with real-world scenarios\n• Focus on fractions and decimals\n• Include word problems only`}
               value={customPrompt}
               onChange={e => setCustomPrompt(e.target.value)}
               style={{
@@ -1159,53 +1316,88 @@ export default function AIGeneratePage() {
                 cursor: 'text',
               }}
             />
-            {((sourceMode !== 'passage' && (assessmentTarget.trim() || assessmentBoundaries.trim() || cognitiveComplexity.trim())) || customPrompt.trim()) && (
+            {((sourceMode === 'input' && (assessmentTarget.trim() || assessmentBoundaries.trim() || cognitiveComplexity.trim())) || customPrompt.trim()) && (
               <div style={{ fontSize: 11, color: 'var(--color-primary)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>💡</span> AI will strictly apply these assessment parameters and instructions
+                <span>💡</span> AI will strictly apply these instructions during generation
               </div>
             )}
           </div>
 
-          {/* Visual Diagrams Toggle (Available for both Item and Passage generation) */}
-          <div
-            id="ai-include-visuals-toggle"
-            onClick={() => setIncludeVisuals(!includeVisuals)}
-            style={{
-              marginBottom: 20,
-              padding: '12px 14px',
-              background: includeVisuals ? '#f0fdfa' : '#f8fafc',
-              border: `1.5px solid ${includeVisuals ? '#2dd4bf' : 'var(--color-border)'}`,
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              transition: 'all 0.18s ease',
-              boxShadow: includeVisuals ? '0 2px 8px rgba(13, 148, 136, 0.12)' : 'none',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 18 }}>🎨</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: includeVisuals ? '#0f766e' : 'var(--color-text)' }}>
-                  Include Visual Diagrams
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
-                  Generate items with vector geometry, circuits, cycles, or charts
+          {/* Visual Diagrams Toggle (Available for standard and passage generation, not reference) */}
+          {sourceMode !== 'reference' && (
+            <div
+              id="ai-include-visuals-toggle"
+              onClick={() => setIncludeVisuals(!includeVisuals)}
+              style={{
+                marginBottom: 20,
+                padding: '12px 14px',
+                background: includeVisuals ? '#f0fdfa' : '#f8fafc',
+                border: `1.5px solid ${includeVisuals ? '#2dd4bf' : 'var(--color-border)'}`,
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                transition: 'all 0.18s ease',
+                boxShadow: includeVisuals ? '0 2px 8px rgba(13, 148, 136, 0.12)' : 'none',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }}>🎨</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: includeVisuals ? '#0f766e' : 'var(--color-text)' }}>
+                    Include Visual Diagrams
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>
+                    Generate items with vector geometry, circuits, cycles, or charts
+                  </div>
                 </div>
               </div>
+              <input
+                type="checkbox"
+                id="ai-include-visuals"
+                checked={includeVisuals}
+                onChange={e => setIncludeVisuals(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#4f6ef7' }}
+              />
             </div>
-            <input
-              type="checkbox"
-              id="ai-include-visuals"
-              checked={includeVisuals}
-              onChange={e => setIncludeVisuals(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#4f6ef7' }}
-            />
-          </div>
+          )}
 
           {/* Generate Button */}
           {(() => {
+            if (sourceMode === 'reference') {
+              const isReferenceMissing = !referenceQuestion;
+              const isDisabled = generating || isReferenceMissing || variantCount < 1 || variantCount > 10;
+
+              return (
+                <button
+                  id="generate-btn"
+                  className="btn-generate"
+                  onClick={handleGenerate}
+                  disabled={isDisabled}
+                  style={{
+                    width: '100%', padding: '13px',
+                    background: isDisabled ? '#c7d2fe' : 'var(--color-primary)',
+                    border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 700,
+                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                    boxShadow: isDisabled ? 'none' : '0 4px 14px rgba(79,110,247,0.35)',
+                    transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  {generating ? (
+                    <>
+                      <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                      Generating {variantCount} Variant{variantCount > 1 ? 's' : ''}...
+                    </>
+                  ) : isReferenceMissing ? (
+                    'Select a Reference Question'
+                  ) : (
+                    `🧬 Generate ${variantCount} New ${variantCount === 1 ? 'Variant' : 'Variants'}`
+                  )}
+                </button>
+              );
+            }
+
             const isPassageMissing = sourceMode === 'passage' && !selectedPassage;
             const isItemDisabled = totalCount === 0 || totalCount > 50 || isPassageMissing;
             const isDisabled = generating || isItemDisabled;
@@ -3374,6 +3566,16 @@ export default function AIGeneratePage() {
           onClose={closeEditModal}
         />
       )}
+
+      {/* ─── Reference Item Picker Modal ─── */}
+      <ReferenceItemPicker
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(q) => {
+          setReferenceQuestion(q);
+          setPickerOpen(false);
+        }}
+      />
     </Layout>
   );
 }

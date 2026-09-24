@@ -388,12 +388,74 @@ async function generatePassage(req, res) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// POST /api/ai/generate-from-reference
+// ---------------------------------------------------------------------------
+async function generateFromReference(req, res) {
+  try {
+    const {
+      content_area,
+      grade,
+      reference_question,
+      count,
+      target_type,
+      target_difficulty,
+      variant_style,
+      custom_instructions,
+      include_visuals,
+    } = req.body;
+
+    if (!content_area || !grade || !reference_question) {
+      return res.status(400).json({
+        message: 'content_area, grade, and reference_question are required.',
+      });
+    }
+
+    let pyRes;
+    try {
+      pyRes = await fetch(`${PYTHON_SERVICE}/generate-from-reference`, {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({
+          content_area,
+          grade,
+          reference_question,
+          count: count ? parseInt(count, 10) : 1,
+          target_type: target_type || null,
+          target_difficulty: target_difficulty || null,
+          variant_style: variant_style || 'parallel',
+          custom_instructions: custom_instructions || null,
+          include_visuals: Boolean(include_visuals),
+        }),
+      });
+    } catch (err) {
+      return res.status(503).json({
+        message: 'Python LLM service is unavailable.',
+        detail: err.message,
+      });
+    }
+
+    const pyData = await pyRes.json();
+    if (!pyRes.ok) {
+      return res.status(pyRes.status).json({
+        message: cleanErrorMessage(pyData.detail),
+      });
+    }
+
+    res.json(pyData);
+  } catch (err) {
+    console.error('[aiController] generateFromReference error:', err);
+    res.status(500).json({ message: 'Server error during reference variant generation.' });
+  }
+}
+
 module.exports = {
   generateQuestions,
   regenerateQuestion,
   submitFeedback,
   generateFromInternet,
   generatePassage,
+  generateFromReference,
 };
 
 
