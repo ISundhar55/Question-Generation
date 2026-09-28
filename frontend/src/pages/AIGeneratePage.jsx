@@ -668,58 +668,67 @@ export default function AIGeneratePage() {
                   type="button"
                   id="source-standard-input"
                   onClick={handleSwitchToStandardInput}
+                  title="Direct Item Generation"
                   style={{
                     flex: 1,
-                    padding: '6px 6px',
+                    padding: '6px 4px',
                     borderRadius: 5,
                     border: 'none',
                     background: sourceMode === 'input' ? 'var(--color-primary, #4f6ef7)' : 'transparent',
                     color: sourceMode === 'input' ? '#ffffff' : '#64748b',
                     fontWeight: sourceMode === 'input' ? 700 : 500,
-                    fontSize: 11,
+                    fontSize: 10.5,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
+                    textAlign: 'center',
+                    lineHeight: 1.2,
                   }}
                 >
-                  ⚡ Standard
+                  ⚡ Direct Item
                 </button>
                 <button
                   type="button"
                   id="source-passage-grounded"
                   onClick={handleSwitchToPassageSource}
+                  title="Passage Reference Generation"
                   style={{
                     flex: 1,
-                    padding: '6px 6px',
+                    padding: '6px 4px',
                     borderRadius: 5,
                     border: 'none',
                     background: sourceMode === 'passage' ? '#0d9488' : 'transparent',
                     color: sourceMode === 'passage' ? '#ffffff' : '#64748b',
                     fontWeight: sourceMode === 'passage' ? 700 : 500,
-                    fontSize: 11,
+                    fontSize: 10.5,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
+                    textAlign: 'center',
+                    lineHeight: 1.2,
                   }}
                 >
-                  📖 Passage
+                  📖 Passage Reference
                 </button>
                 <button
                   type="button"
                   id="source-reference-item"
                   onClick={handleSwitchToReferenceSource}
+                  title="Item Reference Generation"
                   style={{
                     flex: 1,
-                    padding: '6px 6px',
+                    padding: '6px 4px',
                     borderRadius: 5,
                     border: 'none',
                     background: sourceMode === 'reference' ? '#7c3aed' : 'transparent',
                     color: sourceMode === 'reference' ? '#ffffff' : '#64748b',
                     fontWeight: sourceMode === 'reference' ? 700 : 500,
-                    fontSize: 11,
+                    fontSize: 10.5,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
+                    textAlign: 'center',
+                    lineHeight: 1.2,
                   }}
                 >
-                  🧬 Reference
+                  🧬 Item Reference
                 </button>
               </div>
             </div>
@@ -1229,7 +1238,7 @@ export default function AIGeneratePage() {
             {(() => {
               if (sourceMode === 'reference') {
                 const isReferenceMissing = !referenceQuestion;
-                const isDisabled = generating || isReferenceMissing || variantCount < 1 || variantCount > 10;
+                const isDisabled = generating || isReferenceMissing || variantCount < 1 || variantCount > 5;
 
                 return (
                   <button
@@ -1253,6 +1262,10 @@ export default function AIGeneratePage() {
                       </>
                     ) : isReferenceMissing ? (
                       'Select a Reference Question'
+                    ) : variantCount < 1 ? (
+                      'Enter at least 1 variant'
+                    ) : variantCount > 5 ? (
+                      'Exceeds 5 Max Variants'
                     ) : (
                       `🧬 Generate ${variantCount} New ${variantCount === 1 ? 'Variant' : 'Variants'}`
                     )}
