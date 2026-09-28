@@ -684,7 +684,7 @@ export default function AIGeneratePage() {
                     lineHeight: 1.2,
                   }}
                 >
-                  ⚡ Direct Item
+                  ⚡ Direct
                 </button>
                 <button
                   type="button"
