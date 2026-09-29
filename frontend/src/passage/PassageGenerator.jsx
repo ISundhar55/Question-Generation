@@ -71,21 +71,6 @@ export default function PassageGenerator({
     setError(null);
     setPassages([]);
 
-    const promptParts = [];
-    if (assessmentTarget.trim()) {
-      promptParts.push(`🎯 Assessment Target:\n${assessmentTarget.trim()}`);
-    }
-    if (assessmentBoundaries.trim()) {
-      promptParts.push(`🛑 Assessment Boundaries:\n${assessmentBoundaries.trim()}`);
-    }
-    if (cognitiveComplexity.trim()) {
-      promptParts.push(`🧠 Cognitive Complexity:\n${cognitiveComplexity.trim()}`);
-    }
-    if (customPrompt.trim()) {
-      promptParts.push(`Additional Instructions:\n${customPrompt.trim()}`);
-    }
-    const combinedCustomPrompt = promptParts.length > 0 ? promptParts.join('\n\n') : undefined;
-
     try {
       const res = await aiAPI.generatePassage({
         content_area: contentArea,
@@ -97,7 +82,6 @@ export default function PassageGenerator({
         assessment_boundaries: assessmentBoundaries.trim() || undefined,
         cognitive_complexity: cognitiveComplexity.trim() || undefined,
         instructions: customPrompt.trim() || undefined,
-        custom_prompt: customPrompt.trim() || combinedCustomPrompt || undefined,
       });
 
       const genPassages = (res.data?.passages || []).map(p => ({

@@ -60,7 +60,14 @@ def build_passage_prompt(req: GeneratePassageRequest) -> str:
         assessment_block.append(f"• Cognitive Complexity: {sanitize_user_text(req.cognitive_complexity, 'cognitive_complexity')}")
     additional_notes = (req.instructions or req.custom_prompt or "").strip()
     if additional_notes:
-        assessment_block.append(f"• Additional Instructions / Topic: {sanitize_user_text(additional_notes, 'instructions')}")
+        # Prevent repeating assessment target/boundaries if additional_notes is just echoing them
+        is_echo = bool(
+            (req.assessment_target and req.assessment_target.strip() in additional_notes) or
+            (req.assessment_boundaries and req.assessment_boundaries.strip() in additional_notes) or
+            ("Assessment Target:" in additional_notes or "Assessment Boundaries:" in additional_notes)
+        )
+        if not is_echo:
+            assessment_block.append(f"• Additional Instructions / Topic: {sanitize_user_text(additional_notes, 'instructions')}")
 
     assessment_str = "\n".join(assessment_block) if assessment_block else "• Educational Scope: Core grade-level curriculum topics and skills."
 
@@ -100,7 +107,7 @@ Do NOT include any SVG diagrams or graphics. Set "visual": null in the output.
 
     guardrails_text = get_passage_guardrails()
 
-    prompt = f"""You are an expert curriculum developer and assessment stimulus author for {req.grade} {req.content_area}.
+    prompt = f"""You are an expert assessment developer for state and classroom assessments in {req.grade} {req.content_area}.
 
 TASK:
 Write {count} completely original, engaging, high-quality assessment reading passage(s) designed to serve as test stimuli for downstream student evaluation items.
@@ -115,6 +122,14 @@ CURRICULUM SPECIFICATIONS:
 {guardrails_text}
 {visual_block}
 
+BEFORE FINALIZING YOUR RESPONSE, CONFIRM:
+1. Grade & Complexity: Text readability, syntactic flow, and word count ({length_desc}) strictly match {req.grade}.
+2. Assessment Quality: Clear organization, natural authentic language; NO overly familiar plots, formulaic openings, artificial-sounding language, or didactic endings that summarize a moral/lesson for the reader.
+3. Fairness & Bias: Zero stereotypes, assumptions, or bias across race, gender, disability, socioeconomic status, religion, or culture.
+4. Content Safety: Zero traumatic events, violence, illness, death, disaster, family distress, or political/religious persuasion.
+5. Vocabulary & Context: Target words can be inferred through surrounding clues without giveaway dictionary definitions.
+6. JSON Schema: Valid JSON array only, with exact keys matching the required schema below.
+
 OUTPUT FORMAT:
 Return a JSON array of {count} passage object(s) with this exact schema:
 [
@@ -122,14 +137,8 @@ Return a JSON array of {count} passage object(s) with this exact schema:
     "title": "<Engaging Title>",
     "text": "<Full passage text with proper paragraph breaks using \\n\\n>",
     "visual": <complete <svg> markup string if visual requested, or null>,
-    "genre": "{req.genre or 'informational'}",
-    "grade": "{req.grade}",
-    "contentArea": "{req.content_area}",
-    "wordCount": <integer word count>,
-    "assessmentTarget": "{sanitize_user_text(req.assessment_target, 'target') if req.assessment_target else ''}",
-    "assessmentBoundaries": "{sanitize_user_text(req.assessment_boundaries, 'boundaries') if req.assessment_boundaries else ''}",
-    "cognitiveComplexity": "{sanitize_user_text(req.cognitive_complexity, 'complexity') if getattr(req, 'cognitive_complexity', None) else ''}",
-    "readingLevel": "{req.grade}"
+    "genre": "<'informational' or 'literary'>",
+    "wordCount": <integer word count>
   }}
 ]
 
@@ -203,14 +212,14 @@ def generate_passages(req: GeneratePassageRequest) -> Tuple[List[PassageResult],
                 title=title,
                 text=text,
                 visual=visual_str,
-                genre=str(item.get("genre", req.genre or "informational")),
-                grade=str(item.get("grade", req.grade)),
-                contentArea=str(item.get("contentArea", req.content_area)),
+                genre=str(item.get("genre") or req.genre or "informational").lower(),
+                grade=req.grade,
+                contentArea=req.content_area,
                 wordCount=computed_words,
                 assessmentTarget=req.assessment_target,
                 assessmentBoundaries=req.assessment_boundaries,
                 cognitiveComplexity=getattr(req, "cognitive_complexity", None),
-                readingLevel=str(item.get("readingLevel", req.grade)),
+                readingLevel=req.grade,
             ))
 
         if results:
