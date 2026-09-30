@@ -2118,7 +2118,7 @@ export default function AIGeneratePage() {
                                               boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                                             }}
                                           >
-                                            {opt}
+                                            <MarkdownText text={String(opt)} inline />
                                           </span>
                                         ))}
                                       </div>
@@ -2214,7 +2214,7 @@ export default function AIGeneratePage() {
                                                     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                                                   }}
                                                 >
-                                                  {opt}
+                                                  <MarkdownText text={String(opt)} inline />
                                                 </span>
                                               ))}
                                             </div>
@@ -2284,7 +2284,7 @@ export default function AIGeneratePage() {
                                                         fontWeight: 600,
                                                       }}
                                                     >
-                                                      {item}
+                                                      <MarkdownText text={String(item)} inline />
                                                     </span>
                                                   ))}
                                                 </div>

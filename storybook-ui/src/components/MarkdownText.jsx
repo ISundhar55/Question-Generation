@@ -167,6 +167,18 @@ function inlineMarkdown(raw) {
     .replace(/&lt;\/sup&gt;/g, '</sup>')
     .replace(/&lt;sub&gt;/g, '<sub>')
     .replace(/&lt;\/sub&gt;/g, '</sub>')
+    .replace(/&lt;u&gt;/gi, '<u>')
+    .replace(/&lt;\/u&gt;/gi, '</u>')
+    .replace(/&lt;b&gt;/gi, '<b>')
+    .replace(/&lt;\/b&gt;/gi, '</b>')
+    .replace(/&lt;i&gt;/gi, '<i>')
+    .replace(/&lt;\/i&gt;/gi, '</i>')
+    .replace(/&lt;strong&gt;/gi, '<strong>')
+    .replace(/&lt;\/strong&gt;/gi, '</strong>')
+    .replace(/&lt;em&gt;/gi, '<em>')
+    .replace(/&lt;\/em&gt;/gi, '</em>')
+    .replace(/&lt;mark&gt;/gi, '<mark>')
+    .replace(/&lt;\/mark&gt;/gi, '</mark>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="md-code">$1</code>')
@@ -312,9 +324,9 @@ function renderParagraph(text) {
  * React component — renders Markdown-formatted question text
  * with proper table styling, bold, italic, and code.
  */
-export function MarkdownText({ text, content, children, className = '', style = {} }) {
+export function MarkdownText({ text, content, children, className = '', style = {}, inline = false }) {
   const raw = text || content || (typeof children === 'string' ? children : '') || '';
-  const html = markdownToHtml(raw);
+  const html = inline ? inlineMarkdown(raw) : markdownToHtml(raw);
   return (
     <span
       className={`md-text ${className}`}
@@ -324,4 +336,5 @@ export function MarkdownText({ text, content, children, className = '', style = 
   );
 }
 
+export { inlineMarkdown };
 export default MarkdownText;

@@ -343,7 +343,11 @@ IMPORTANT for GAP_MATCH:
 
 IMPORTANT for MULTIPLE_DROP_BUCKET:
 - "text" contains the prompt/instruction stem (e.g. "Categorize the items from the option buckets into their appropriate category drop buckets."). Do NOT include labels like 'stem instruction -' in the text.
-- "options.option_buckets": List of 1 to 2 source option buckets. Each has "id" ("opt_bucket_1", "opt_bucket_2"), "title" (e.g. "Energy Sources"), and "options" (list of 3 to 6 distinct item strings).
+- MULTI-ITEM CATEGORIZATION (MINIMUM 2 ITEMS PER DROP BUCKET): Every target drop bucket MUST contain AT LEAST 2 items. Never create a 1-to-1 matching question where each bucket receives only 1 item. For 2 drop buckets, provide 4 to 8 total items to categorize (2 to 4 per bucket). For 3 drop buckets, provide 6 to 9 total items (2 to 3 per bucket).
+- CONCISE TARGET ITEMS (NO NARRATIVE SENTENCES IN OPTIONS): The items in "options.option_buckets" must be concise concepts, terms, vocabulary words, objects, or short phrases (e.g. 'Photosynthesis', 'Evaporation', 'Solar Panel', 'Coal', 'Carnivore'). Do NOT put entire multi-clause narrative sentences into draggable option items.
+- CONTEXT CLUE VOCABULARY GUIDELINE: If context sentences are needed to deduce the meaning of vocabulary words, place the sentences or stimulus text in the question stem ("text") or a reading passage, and place only the target words or terms in the draggable option buckets.
+- STEM-ITEM GRAIN AGREEMENT: Ensure the stem instruction matches what is being sorted (e.g., if sorting words, the items in the bucket must be words, not entire sentences).
+- "options.option_buckets": List of 1 to 2 source option buckets. Each has "id" ("opt_bucket_1", "opt_bucket_2"), "title" (e.g. "Energy Sources"), and "options" (list of 4 to 8 distinct item strings).
 - "options.drop_buckets": List of 2 to 4 target drop buckets / categories. Each has "id" ("drop_bucket_1", "drop_bucket_2"), "name" (category title), and "rationale" (educational rationale for this bucket).
 - "answer": JSON dictionary mapping each drop_bucket id to the list of correct item strings that belong in that bucket.
 - Every item across all "options.option_buckets" MUST be assigned to its correct drop bucket in "answer".
