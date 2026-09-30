@@ -22,12 +22,18 @@ Apply these universal standards to every assessment item generated from a seed r
 * **Harder (Advanced)**: Elevate cognitive complexity (Webb's DOK / Bloom's Taxonomy) through deeper inference, multi-step analysis, synthesis of multiple conditions, or closer distractor discrimination.
 * **Different Format**: Translate the core competency into the requested target question type (e.g., Single Choice, Multi-Select, Dropdown, Ordering, Matching Lines, Gap Match, or Constructed Response) while strictly following that format's schema.
 
-5. Distractor Quality & Rationale Completeness
-* Ensure there is exactly ONE definitively correct answer (or the exact required count for multiple-select).
-* Every distractor must be unambiguously incorrect yet plausible, representing authentic student misconceptions or common reasoning errors.
-* The explanation field must provide a clear, bulleted rationale for every option, blank, or matched pair.
+5. Misconception-Driven Distractors, Option Symmetry & Rationale
+* Ensure there is exactly ONE definitively correct answer (or the exact required count for multiple-select) with strong defensibility.
+* Every distractor must be definitively incorrect yet plausible, representing authentic student misconceptions, procedural errors, or partial understandings (no throwaways).
+* Option Symmetry & Length Neutrality: Options must be parallel in structure and similar in length (the correct answer must NOT be noticeably longer, more detailed, or grammatically distinct).
+* Low Linguistic Load: Vocabulary and sentence complexity must strictly match the grade level with minimal unnecessary reading burden.
+* The explanation field must provide a clear rationale explaining the key reasoning and the specific misconception/error reflected by each distractor.
 
-6. Mandatory Teacher Directives & Structural Modifiers
+6. Equity, Safety & Bias Review
+* Items must be accessible and fair for all students, free from cultural, regional, socioeconomic, or gender bias.
+* Content must remain safe, respectful, and pedagogically sound.
+
+7. Mandatory Teacher Directives & Structural Modifiers
 * Any teacher-supplied additional instructions (such as "create a table based question", specific scenarios, constraints, or contextual themes) are mandatory top-priority directives.
 * When a table or data presentation is requested, embed a clean Markdown table (`| Column 1 | Column 2 |\n|---|---|...`) in the question stem to represent the data, observations, or categories.
 * Teacher directives take precedence over any default tendency to replicate the superficial structure of the seed item.

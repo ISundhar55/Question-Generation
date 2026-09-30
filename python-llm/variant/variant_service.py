@@ -17,6 +17,7 @@ from services.llm import (
     _clean_response,
     normalize_question,
     validate_and_reconcile_multiple_select,
+    get_formatting_guidelines,
     LLM_PROVIDER,
     GROQ_MODEL,
     sanitize_user_text,
@@ -142,8 +143,24 @@ STRICT COMPLIANCE REQUIREMENTS:
             "The teacher has requested visual diagram-based variants. Include an inline self-contained SVG diagram in the 'visual' property.\n"
         )
 
-    prompt = f"""You are an elite educational assessment author and psychometrician.
-Your mission is to generate {req.count} brand-new, high-quality assessment item(s) derived from an existing REFERENCE ITEM.
+    formatting_guidelines = get_formatting_guidelines(
+        content_area=req.content_area or "",
+        question_type=target_type,
+    )
+
+    checklist_items = [
+        "1. Alignment & Defensibility: Directly measures the target standard with one and only one defensible correct answer.",
+        "2. Distractor Plausibility: Distractors are based on common student misconceptions, procedural errors, or partial understandings (no throwaways).",
+        "3. Option Symmetry & Neutrality: Options are parallel in structure and similar in length (correct answer is NOT noticeably longer or more detailed; no grammatical clues).",
+        f"4. Low Linguistic Load: Vocabulary and sentence complexity strictly match {req.grade} with minimal unnecessary reading burden.",
+        "5. Rationale Integrity: Explanation provides the key rationale and explains the specific misconception/error reflected by each distractor.",
+        "6. Equity & Safety: Passes bias, sensitivity, and accessibility review.",
+        "7. JSON Schema: Valid JSON array only, starting with [ and ending with ].",
+    ]
+    checklist_str = "\n".join(checklist_items)
+
+    prompt = f"""Role: You are an expert assessment item writer and psychometrician for state and classroom assessments in {req.grade} {req.content_area}.
+Task: Generate {req.count} brand-new, high-quality assessment item(s) derived from an existing SEED REFERENCE ITEM while strictly adhering to professional assessment standards.
 
 {custom_block}
 
@@ -184,12 +201,17 @@ CRITICAL UNIVERSAL RULES (ZERO-TOLERANCE):
 
 {guardrails_text}
 
+{formatting_guidelines}
+
 {visual_instruction}
 
 SCHEMA SPECIFICATION FOR TARGET TYPE ({target_type}):
 --------------------------------------------------------------------------------
 {format_instruction}
 --------------------------------------------------------------------------------
+
+BEFORE FINALIZING YOUR RESPONSE, CONFIRM:
+{checklist_str}
 
 OUTPUT INSTRUCTION:
 Return ONLY a valid JSON array of exactly {req.count} question object(s). Do not wrap in markdown quotes or preamble.

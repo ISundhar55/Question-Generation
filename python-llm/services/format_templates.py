@@ -15,12 +15,13 @@ FORMAT_BY_TYPE = {
   "text": "<question text>",
   "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>"},
   "answer": "<correct letter, e.g. A, B, C, or D>",
-  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
+  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct, OR the specific student misconception / procedural error reflected by this distractor>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
 }
 IMPORTANT for SINGLE_SELECT:
 - Default: 4 options (A, B, C, D). If the teacher instructs a different count, add or remove letters accordingly. Always use consecutive letters starting from A.
 - Vary the correct answer across available letters (A, B, C, D) — do not always pick Option A.
-- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options', explaining why the correct choice is right and why each incorrect distractor is wrong.""",
+- Ensure all options are parallel in grammatical structure and similar in length; the correct answer must not be noticeably longer or more detailed.
+- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options', explaining why the correct choice is right and identifying the specific student misconception or procedural error reflected by each distractor.""",
 
     "MULTIPLE_SELECT": """Each question object must follow this exact format:
 {
@@ -31,7 +32,7 @@ IMPORTANT for SINGLE_SELECT:
   "text": "<question text>",
   "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>", "E": "<option E>"},
   "answer": "<pipe-separated list of more than one correct letters, e.g. B|D or A|C|E>",
-  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D, E...)",
+  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct, OR the specific student misconception / procedural error reflected by this distractor>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D, E...)",
 }
 IMPORTANT for MULTIPLE_SELECT:
 - MANDATORY 5 OPTIONS: Always provide exactly 5 options (A, B, C, D, E). Always use consecutive letters starting from A.
@@ -45,7 +46,7 @@ IMPORTANT for MULTIPLE_SELECT:
   * Distractors must be UNAMBIGUOUSLY FALSE and factually flawed; they must NEVER accidentally be true.
   * COMPARATIVE DISTRACTORS (CRITICAL): When drafting comparative options (e.g. 'A has fewer than B'), verify the actual values. If the comparison is true, you MUST invert it (e.g. 'A has more than B') so it is definitively FALSE.
 - The answer field must list all correct letters in alphabetical order, joined with | (pipe). Distribute correct answers across all options (A through E) without favoring specific letters.
-- MANDATORY RATIONALE FOR ALL OPTIONS: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options' (A, B, C, D, E without omitting any letter), explaining why each correct choice is right and why each distractor is wrong.""",
+- MANDATORY RATIONALE FOR ALL OPTIONS: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option in 'options' (A, B, C, D, E without omitting any letter), explaining why each correct choice is right and identifying the specific misconception or procedural error for each distractor.""",
 
     "MCQ": """Each question object must follow this exact format:
 {
@@ -56,12 +57,13 @@ IMPORTANT for MULTIPLE_SELECT:
   "text": "<question text>",
   "options": {"A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>"},
   "answer": "<correct letter, e.g. A, B, C, or D>",
-  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct or incorrect>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
+  "explanation": "• Option <Letter> (<Correct or Incorrect>): <Clear reason why this option is correct, OR the specific student misconception / procedural error reflected by this distractor>\\n• (Include a bullet for EVERY option letter present in options: A, B, C, D...)",
 }
 IMPORTANT for MCQ:
 - Default: 4 options (A, B, C, D). Always use consecutive letters starting from A.
 - Vary the correct answer across available letters (A, B, C, D).
-- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option, explaining why each is correct or incorrect.""",
+- Ensure all options are parallel in grammatical structure and similar in length; the correct answer must not be noticeably longer or more detailed.
+- MANDATORY RATIONALE: The explanation field MUST contain a bulleted item (• Option <Letter> (<Correct/Incorrect>)) for EVERY option, explaining why each is correct or identifying the specific misconception or error for each distractor.""",
 
     "TRUE_FALSE": """Each question object must follow this exact format:
 {
@@ -107,6 +109,7 @@ IMPORTANT for TRUE_FALSE:
 IMPORTANT for CONSTRUCTED_RESPONSE:
 - Create 1-3 blanks using ___ in the text. Use EXACTLY three underscores (___) for EVERY blank.
   Do NOT use ____ (4), _____ (5), or any other count — always exactly three underscores.
+- Do not put numbers or digits inside blanks (always write '___', never '___1___').
 - Provide legitimate acceptable alternatives inside the array ONLY when true synonyms, spelling variations, or grammatical variants (singular/plural) exist (e.g. ["solid", "solids"] or ["mitochondria", "mitochondrion"]). Never force scientifically distinct terms or different concepts as interchangeable alternatives (e.g. never treat "boiling" and "evaporation" as interchangeable).
 - The first string in each array is the primary correct answer.
 - The answer field must list only the primary correct answers joined with | (pipe).
@@ -131,6 +134,7 @@ IMPORTANT for CONSTRUCTED_RESPONSE:
 
 IMPORTANT for DROPDOWN:
 - Create 2-3 blanks using ___ in the text.
+- Do not put numbers or digits inside blanks (always write '___', never '___1___').
 - The number of objects in options.blanks must match the number of ___ in the text.
 - Each blank must have exactly 4 choices (1 correct + 3 plausible distractors).
 - The correct field must be identical to one of the choices strings.
