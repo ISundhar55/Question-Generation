@@ -1282,61 +1282,51 @@ def validate_and_reconcile_multiple_select(q: dict) -> bool:
         )
         return False
 
-    # Check for count requested in question stem (e.g. "which TWO statements")
-    stem_count = None
+    # Check for count requested in question stem (e.g. "which TWO statements", "Select TWO correct answers")
+    stem_counts = []
     for pat in _STEM_COUNT_PATTERNS:
-        m = pat.search(text)
-        if m:
+        for m in pat.finditer(text):
             val = m.group(1).lower()
             if val in _NUM_WORD_MAP:
-                stem_count = _NUM_WORD_MAP[val]
-                break
+                stem_counts.append(_NUM_WORD_MAP[val])
 
-    if stem_count is not None and len(letters) != stem_count:
-        # Check if explanation has explicit (Correct) annotations that match stem_count
-        exp = str(q.get("explanation", ""))
-        correct_in_exp = re.findall(r'[•\*\-]?\s*Option\s+([A-Ea-e])\s*\((?:Correct)\)', exp, re.IGNORECASE)
-        correct_in_exp = sorted(list(set(c.upper() for c in correct_in_exp)))
+    # Check if explanation has explicit (Correct) annotations that match a stem count
+    exp = str(q.get("explanation", ""))
+    correct_in_exp = re.findall(r'[•\*\-]?\s*Option\s+([A-Ea-e])\s*\((?:Correct)\)', exp, re.IGNORECASE)
+    correct_in_exp = sorted(list(set(c.upper() for c in correct_in_exp)))
 
-        if len(correct_in_exp) == stem_count:
-            # Reconcile: explanation correctly designated the exact options intended
-            reconciled_ans = "|".join(correct_in_exp)
-            print(
-                f"[llm] MULTIPLE_SELECT reconciled answer from '{ans}' to '{reconciled_ans}' "
-                f"matching stem count of {stem_count} based on explanation."
+    if stem_counts and len(correct_in_exp) == stem_counts[0] and len(correct_in_exp) != len(letters):
+        # Reconcile: explanation correctly designated the exact options intended
+        reconciled_ans = "|".join(correct_in_exp)
+        print(
+            f"[llm] MULTIPLE_SELECT reconciled answer from '{ans}' to '{reconciled_ans}' "
+            f"matching stem count of {stem_counts[0]} based on explanation."
+        )
+        q["answer"] = reconciled_ans
+        letters = correct_in_exp
+
+    # Now harmonize ALL stem count references to match the final actual answer count (len(letters))
+    target_count = len(letters)
+    target_word = {2: "TWO", 3: "THREE", 4: "FOUR"}.get(target_count)
+    if target_word:
+        # 1. Update all general stem count patterns (e.g. "Which TWO", "THREE statements")
+        for pat in _STEM_COUNT_PATTERNS:
+            text = pat.sub(
+                lambda m: m.group(0).replace(
+                    m.group(1),
+                    target_word if m.group(1).isupper() else target_word.lower()
+                ),
+                text
             )
-            q["answer"] = reconciled_ans
-            letters = correct_in_exp
-        elif len(letters) >= 2 and len(letters) < opt_count:
-            # Reconcile: update stem word to match actual answer count instead of dropping valid question
-            target_word = {2: "TWO", 3: "THREE", 4: "FOUR"}.get(len(letters))
-            if target_word:
-                replaced = False
-                for pat in _STEM_COUNT_PATTERNS:
-                    if pat.search(text):
-                        text = pat.sub(lambda m: m.group(0).replace(m.group(1), target_word if m.group(1).isupper() else target_word.lower()), text, count=1)
-                        q["text"] = text
-                        replaced = True
-                        print(
-                            f"[llm] MULTIPLE_SELECT reconciled stem word to '{target_word}' "
-                            f"matching answer count {len(letters)}."
-                        )
-                        break
-                if not replaced:
-                    print(
-                        f"[llm] [WARN] MULTIPLE_SELECT dropped: Question stem asks for {stem_count} answers, "
-                        f"but answer key has {len(letters)} ({ans}). Q: {text[:60]}..."
-                    )
-                    return False
-            else:
-                return False
-        else:
-            # Contradiction: stem requested stem_count, but answer key has len(letters)
-            print(
-                f"[llm] [WARN] MULTIPLE_SELECT dropped: Question stem asks for {stem_count} answers, "
-                f"but answer key has {len(letters)} ({ans}). Q: {text[:60]}..."
-            )
-            return False
+
+        # 2. Specifically update "Select/Choose/Pick TWO/THREE correct answers"
+        text = re.sub(
+            r'\b(select|choose|pick|identify)\s+(?:the\s+)?(two|three|four|\d+)\s+correct\s+answers?\b',
+            lambda m: f"{m.group(1)} {target_word if m.group(2).isupper() else target_word.lower()} correct answers",
+            text,
+            flags=re.IGNORECASE
+        )
+        q["text"] = text
 
     # Ensure explanation covers all options present
     if isinstance(opts, dict):

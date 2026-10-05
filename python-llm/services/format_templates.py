@@ -37,9 +37,10 @@ IMPORTANT for SINGLE_SELECT:
 IMPORTANT for MULTIPLE_SELECT:
 - MANDATORY 5 OPTIONS: Always provide exactly 5 options (A, B, C, D, E). Always use consecutive letters starting from A.
 - STRICT CORRECT ANSWER COUNT: The answer field MUST contain more than one correct letter (e.g. 2 or 3 correct letters). Never create a multiple-select question with only 1 correct answer.
-- STEM-ANSWER COUNT AGREEMENT (ZERO-TOLERANCE): The number specified in the question text MUST EXACTLY MATCH the number of correct options in the 'answer' field.
+- STEM-ANSWER COUNT AGREEMENT (ZERO-TOLERANCE): The number specified in the question text MUST EXACTLY MATCH the number of correct options in the 'answer' field across the entire stem.
+  * Never contradict yourself in the stem (e.g. NEVER write 'Which THREE statements... Select TWO correct answers'). State the count consistently once throughout the entire stem.
   * If the question asks for TWO (e.g. 'Which TWO...', 'Select TWO...'): There MUST be EXACTLY 2 correct letters in the 'answer' field (e.g. 'A|C'), and EXACTLY 3 incorrect distractors. NEVER output 3 correct answers or mark 3 options as Correct when asking for TWO.
-  * If the question asks for THREE (e.g. 'Which THREE...', 'Select THREE...'): There MUST be EXACTLY 3 correct letters in the 'answer' field (e.g. 'A|C|E'), and EXACTLY 2 incorrect distractors.
+  * If the question asks for THREE (e.g. 'Which THREE...', 'Select THREE...'): There MUST be EXACTLY 3 correct letters in the 'answer' field (e.g. 'A|C|E'), and EXACTLY 2 incorrect distractors. NEVER write 'Select TWO' when asking for THREE.
   * In 'Which TWO...', there must be EXACTLY 2 true options (matching the answer field) and all other 3 options must be definitively FALSE.
 - PASSAGE GROUNDING & CHARACTER NAMES: In passage-based mode, every statement must be strictly verifiable from the provided passage. NEVER invent outside actions, card rules, or bonus mechanics, and spell character names exactly as they appear in the passage text.
 - MANDATORY DISTRACTORS & ZERO ACCIDENTAL TRUE OPTIONS:

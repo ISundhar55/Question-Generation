@@ -81,24 +81,27 @@ def _build_variant_prompt(req: GenerateFromReferenceRequest) -> str:
     if style == "parallel":
         directive_lines.append(
             "• VARIANT GOAL: SIMILAR (SAME LEVEL)\n"
-            "  - Assess the EXACT SAME underlying skill, standard, and cognitive competency.\n"
-            "  - Maintain the SAME difficulty level and cognitive depth.\n"
-            "  - Change the superficial context: use fresh scenarios, alternative subjects/entities, new character names, or different domain examples.\n"
-            "  - Do NOT copy the exact text, sentences, or quantitative values from the reference item."
+            "  - Assess the EXACT SAME skill, standard, and difficulty level as the reference question.\n"
+            "  - Keep the same number of reasoning, calculation, or logical steps.\n"
+            "  - Completely change the surface scenario: use fresh context, new character names, different numbers, or new texts.\n"
+            "  - NEVER duplicate sentences or phrasing from the reference item.\n"
+            "  - Keep the same level of distractor plausibility and logic."
         )
     elif style == "easier":
         directive_lines.append(
             "• VARIANT GOAL: EASIER (FOUNDATIONAL)\n"
             "  - Assess the foundational or prerequisite concept of the reference item.\n"
-            "  - Reduce cognitive friction: provide direct context clues, use accessible vocabulary and premises, or focus on single-step deductions.\n"
-            "  - Calibrate the item to an accessible, supportive difficulty."
+            "  - Simplify structure: focus on a single direct step or core definition instead of multi-step processes.\n"
+            "  - Lower reading burden: use clear, simple sentence structures and provide direct context clues or helpful hints in the stem.\n"
+            "  - Clear choices: distractors must represent basic, clear misunderstandings rather than tricky traps."
         )
     elif style == "harder":
         directive_lines.append(
             "• VARIANT GOAL: HARDER (ADVANCED)\n"
-            "  - Elevate cognitive complexity (Webb's DOK / Bloom's Taxonomy): require deeper inference, synthesis of multiple conditions/variables, or subtler evaluation.\n"
-            "  - Design sophisticated, highly plausible distractors that challenge common misconceptions or nuanced misinterpretations.\n"
-            "  - Calibrate the item to a rigorous, mastery-level difficulty."
+            "  - Challenge students with deeper reasoning, multi-step problem-solving, or combining multiple concepts/conditions.\n"
+            "  - Require students to analyze complex scenarios, work backwards, or filter out unnecessary information independently.\n"
+            "  - Minimal scaffolding: provide fewer direct clues.\n"
+            "  - Sophisticated choices: distractors must target common intermediate mistakes, subtle misconceptions, or partial-step traps."
         )
     elif style == "format_shift" or target_type != ref_type:
         directive_lines.append(

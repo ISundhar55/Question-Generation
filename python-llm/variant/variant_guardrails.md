@@ -16,10 +16,29 @@ Apply these universal standards to every assessment item generated from a seed r
 * Embed all necessary premises, given facts, character names, and context directly into the question stem.
 * NEVER make meta-references to the reference question (e.g. NEVER write "In the question above...", "Similar to the earlier problem...", "In the previous scenario...", or "Based on the reference item...").
 
-4. Universal Transformation Directives
-* **Similar (Same Level)**: Maintain the exact same cognitive demand, skill depth, and difficulty level with a fresh scenario and new context.
-* **Easier (Foundational)**: Scaffold the core concept by reducing cognitive load, providing direct context clues, using accessible vocabulary, or isolating single-step deductions.
-* **Harder (Advanced)**: Elevate cognitive complexity (Webb's DOK / Bloom's Taxonomy) through deeper inference, multi-step analysis, synthesis of multiple conditions, or closer distractor discrimination.
+4. Universal Transformation Directives (The 3 Difficulty Layers)
+
+* **Similar (Same Level)**:
+  - **Primary Goal**: Create a parallel question testing the exact same skill and standard at equal difficulty.
+  - **What Stays the Same**: Core concept, grade level, curriculum standard, and difficulty level.
+  - **What Changes**: Story, context, characters, and narrative setting. Completely fresh phrasing (zero copying).
+  - **Reasoning Steps**: Identical number of computational or reasoning steps as the reference item.
+  - **Answer Options & Logic**: Options maintain the same logical plausibility and misconception profiles as the original item.
+
+* **Easier (Foundational)**:
+  - **Primary Goal**: Support students struggling with the reference item by testing foundational or prerequisite concepts.
+  - **What Stays the Same**: Target subject domain and the underlying foundational concept.
+  - **What Changes**: Simplified context, lower reading burden, shorter sentences, and direct contextual clues or hints.
+  - **Reasoning Steps**: Reduces multi-step complexity down to a single, direct deduction or core definition.
+  - **Answer Options & Logic**: Distractors represent basic, clear conceptual misunderstandings rather than subtle or tricky traps.
+
+* **Harder (Advanced)**:
+  - **Primary Goal**: Challenge high-performing students by demanding deeper reasoning and advanced problem-solving.
+  - **What Stays the Same**: Target curriculum standard and overarching subject domain.
+  - **What Changes**: Richer, more complex scenarios, multiple variables, or scenarios requiring domain transfer.
+  - **Reasoning Steps**: Multi-step problem solving, combining 2+ concepts, analyzing extra data, or working backwards. Minimal clues.
+  - **Answer Options & Logic**: Distractors are highly sophisticated and specifically target common intermediate calculation errors and subtle misconceptions.
+
 * **Different Format**: Translate the core competency into the requested target question type (e.g., Single Choice, Multi-Select, Dropdown, Ordering, Matching Lines, Gap Match, or Constructed Response) while strictly following that format's schema.
 
 5. Misconception-Driven Distractors, Option Symmetry & Rationale
