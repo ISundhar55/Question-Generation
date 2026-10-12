@@ -11,6 +11,7 @@ from services.llm import (
     _call_clap,
     _call_gemini,
     _call_groq,
+    _call_ollama,
     _clean_response,
     LLM_PROVIDER,
     GROQ_MODEL,
@@ -161,12 +162,14 @@ def generate_passages(req: GeneratePassageRequest) -> Tuple[List[PassageResult],
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
+            elif LLM_PROVIDER == "ollama":
+                raw = _call_ollama(prompt)
             else:
                 raw = _call_gemini(prompt)
             print(f"[passage] Generated via {provider_used} (attempt {attempt})")
         except Exception as primary_err:
             err_str = str(primary_err)
-            if LLM_PROVIDER in ("gemini", "clap"):
+            if LLM_PROVIDER in ("gemini", "clap", "ollama"):
                 print(f"[passage] {provider_used} error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})")
                 try:
                     raw = _call_groq(prompt)

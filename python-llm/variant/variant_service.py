@@ -14,6 +14,7 @@ from services.llm import (
     _call_clap,
     _call_gemini,
     _call_groq,
+    _call_ollama,
     _clean_response,
     normalize_question,
     validate_and_reconcile_multiple_select,
@@ -244,6 +245,8 @@ def generate_variants(
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
+            elif LLM_PROVIDER == "ollama":
+                raw = _call_ollama(prompt)
             else:
                 raw = _call_gemini(prompt)
             print(f"[variant] Generated via {provider_used} (attempt {attempt})")
@@ -264,6 +267,13 @@ def generate_variants(
                     provider_used = "groq (auto-fallback)"
                 except Exception as fallback_err:
                     return [], prompt, "", False, f"CLAP failed ({err_str[:60]}) AND Groq fallback failed: {fallback_err}"
+            elif LLM_PROVIDER == "ollama":
+                print(f"[variant] Ollama error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})")
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                except Exception as fallback_err:
+                    return [], prompt, "", False, f"Ollama failed ({err_str[:60]}) AND Groq fallback failed: {fallback_err}"
             else:
                 return [], prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"
 

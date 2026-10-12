@@ -150,6 +150,10 @@ GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GROQ_API_KEY   = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL     = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 
+# Ollama settings (Local or Cloud bridge via Ollama desktop / server)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1/chat/completions")
+OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "gpt-oss:120b-cloud")
+
 # Quota/rate-limit error patterns that trigger automatic failover
 _QUOTA_PATTERNS = (
     "429",
@@ -632,6 +636,75 @@ def _call_clap(prompt: str) -> str:
     raise RuntimeError("CLAP call failed with unknown error.")
 
 
+def _call_ollama(prompt: str) -> str:
+    import time
+    import requests
+
+    endpoint = OLLAMA_BASE_URL.strip()
+    endpoint = re.sub(r'(?<!:)//+', '/', endpoint)
+    if not endpoint.endswith("/chat/completions"):
+        if endpoint.endswith("/v1"):
+            endpoint = endpoint + "/chat/completions"
+        else:
+            endpoint = endpoint.rstrip("/") + "/v1/chat/completions"
+
+    headers = {
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": OLLAMA_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert assessment question generator. "
+                    "Follow all instructions exactly. Return only valid JSON."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.3,
+    }
+
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            print(f"\n{'=' * 40} [LLM INPUT PROMPT - OLLAMA ({OLLAMA_MODEL}) (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(prompt, flush=True)
+            print(f"{'=' * 115}\n", flush=True)
+
+            resp = requests.post(endpoint, headers=headers, json=payload, timeout=180)
+            if resp.status_code != 200:
+                raise RuntimeError(f"Ollama API returned HTTP {resp.status_code}: {resp.text}")
+
+            res_json = resp.json()
+            raw_text = res_json["choices"][0]["message"]["content"]
+
+            print(f"\n{'=' * 40} [LLM RAW OUTPUT - OLLAMA (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(raw_text, flush=True)
+            print(f"{'=' * 115}\n", flush=True)
+
+            usage = res_json.get("usage")
+            if usage:
+                prompt_tok = usage.get("prompt_tokens", "?")
+                output_tok = usage.get("completion_tokens", "?")
+                total_tok = usage.get("total_tokens", "?")
+                print(f"[llm] Token usage (Ollama) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
+
+            return raw_text
+        except Exception as e:
+            last_err = e
+            print(f"[llm] Ollama attempt {attempt + 1} failed: {e}")
+            if attempt == 0:
+                time.sleep(2.0)
+                continue
+            raise e
+
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("Ollama call failed with unknown error.")
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -675,6 +748,8 @@ def generate_questions(
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
+            elif LLM_PROVIDER == "ollama":
+                raw = _call_ollama(prompt)
             else:
                 raw = _call_gemini(prompt)
             print(f"[llm] Generated via {provider_used} (attempt {attempt})")
@@ -709,6 +784,19 @@ def generate_questions(
                 except Exception as fallback_err:
                     return [], prompt, "", False, (
                         f"CLAP failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
+                    )
+            elif LLM_PROVIDER == "ollama":
+                print(
+                    f"[llm] [WARNING] Ollama error ({err_str[:80]}) — "
+                    f"automatically switching to Groq ({GROQ_MODEL})"
+                )
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                    print(f"[llm] [SUCCESS] Fallback to Groq succeeded")
+                except Exception as fallback_err:
+                    return [], prompt, "", False, (
+                        f"Ollama failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
                     )
             else:
                 return [], prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"
@@ -939,6 +1027,8 @@ def generate_questions_from_internet(
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
+            elif LLM_PROVIDER == "ollama":
+                raw = _call_ollama(prompt)
             else:
                 raw = _call_gemini(prompt)
             print(f"[llm] [internet] Generated via {provider_used} (attempt {attempt})")
@@ -968,6 +1058,17 @@ def generate_questions_from_internet(
                 except Exception as fallback_err:
                     return [], prompt, "", False, (
                         f"CLAP failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
+                    )
+            elif LLM_PROVIDER == "ollama":
+                print(
+                    f"[llm] [internet] Ollama error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})"
+                )
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                except Exception as fallback_err:
+                    return [], prompt, "", False, (
+                        f"Ollama failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
                     )
             else:
                 return [], prompt, "", False, f"{provider_used.capitalize()} API error: {err_str}"
@@ -2067,13 +2168,15 @@ def regenerate_question(
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
+            elif LLM_PROVIDER == "ollama":
+                raw = _call_ollama(prompt)
             else:
                 raw = _call_gemini(prompt)
             print(f"[llm] Regenerated via {provider_used} (attempt {attempt})")
 
         except Exception as primary_err:
             err_str = str(primary_err)
-            if (LLM_PROVIDER == "gemini" and _is_quota_error(err_str)) or LLM_PROVIDER == "clap":
+            if (LLM_PROVIDER == "gemini" and _is_quota_error(err_str)) or LLM_PROVIDER in ("clap", "ollama"):
                 print(f"[llm] [WARNING] {provider_used} error during regen — switching to Groq")
                 try:
                     raw = _call_groq(prompt)
@@ -2260,14 +2363,16 @@ Return ONLY a JSON array, one object per item in the same order and same
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
+            elif LLM_PROVIDER == "ollama":
+                raw = _call_ollama(prompt)
             else:
                 raw = _call_gemini(prompt)
         except Exception as primary_err:
             if LLM_PROVIDER == "gemini" and _is_quota_error(str(primary_err)):
                 print("[llm] [WARNING] Gemini quota hit during grounding check — switching to Groq")
                 raw = _call_groq(prompt)
-            elif LLM_PROVIDER == "clap":
-                print("[llm] [WARNING] CLAP error during grounding check — switching to Groq")
+            elif LLM_PROVIDER in ("clap", "ollama"):
+                print(f"[llm] [WARNING] {LLM_PROVIDER.upper()} error during grounding check — switching to Groq")
                 raw = _call_groq(prompt)
             else:
                 raise
