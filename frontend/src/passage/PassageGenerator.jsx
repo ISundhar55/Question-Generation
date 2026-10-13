@@ -138,8 +138,10 @@ export default function PassageGenerator({
 
   const handlePassageStatusUpdate = async (p, newStatus, idx) => {
     try {
+      let updatedPassage = { ...p, status: newStatus };
       if (p.id) {
-        await passagesAPI.updateStatus(p.id, newStatus);
+        const res = await passagesAPI.updateStatus(p.id, newStatus);
+        if (res.data) updatedPassage = res.data;
       } else {
         const res = await passagesAPI.create({
           title: p.title,
@@ -153,16 +155,52 @@ export default function PassageGenerator({
           assessment_boundaries: p.assessment_boundaries,
           status: newStatus,
         });
-        if (res.data?.id) p = { ...p, id: res.data.id };
+        if (res.data) updatedPassage = res.data;
       }
       setPassages(prev => {
         const next = [...prev];
-        next[idx] = { ...next[idx], id: p.id, status: newStatus };
+        next[idx] = updatedPassage;
         return next;
       });
     } catch (err) {
       console.error('Update passage status error:', err);
       alert(err.response?.data?.message || 'Failed to update passage status');
+    }
+  };
+
+  const handlePassageReview = async (p, reviewType, approved, idx) => {
+    try {
+      let updatedPassage;
+      if (p.id) {
+        const res = await passagesAPI.review(p.id, reviewType, approved);
+        updatedPassage = res.data;
+      } else {
+        const cApp = reviewType === 'content' ? approved : false;
+        const fApp = reviewType === 'fairness' ? approved : false;
+        const res = await passagesAPI.create({
+          title: p.title,
+          text: p.text,
+          visual: p.visual || null,
+          genre: p.genre || 'Informational',
+          grade: p.grade || grade,
+          content_area: p.content_area || contentArea,
+          word_count: p.word_count || (p.text ? p.text.trim().split(/\s+/).length : 0),
+          assessment_target: p.assessment_target,
+          assessment_boundaries: p.assessment_boundaries,
+          status: 'approved',
+          content_approved: cApp,
+          fairness_approved: fApp,
+        });
+        updatedPassage = res.data;
+      }
+      setPassages(prev => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...updatedPassage };
+        return next;
+      });
+    } catch (err) {
+      console.error('Review passage error:', err);
+      alert(err.response?.data?.message || 'Failed to update review status');
     }
   };
 
@@ -533,6 +571,7 @@ export default function PassageGenerator({
                 passage={p}
                 index={idx}
                 onUpdateStatus={(pass, status) => handlePassageStatusUpdate(pass, status, idx)}
+                onReview={(pass, reviewType, approved) => handlePassageReview(pass, reviewType, approved, idx)}
                 onDelete={null}
                 onEdit={() => setEditingPassage(p)}
                 onGenerateQuestions={onGenerateQuestions}

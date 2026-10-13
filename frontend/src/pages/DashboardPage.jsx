@@ -129,13 +129,15 @@ export default function DashboardPage() {
     }
   };
 
-  const handlePassageStatus = async (id, status) => {
+  const handlePassageReview = async (id, reviewType, approved = true) => {
     try {
-      await passagesAPI.updateStatus(id, status);
-      setPassages(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+      const res = await passagesAPI.review(id, reviewType, approved);
+      if (res.data) {
+        setPassages(prev => prev.map(p => p.id === id ? { ...p, ...res.data } : p));
+      }
     } catch (err) {
-      console.error('Failed to update passage status:', err);
-      alert(err.response?.data?.message || 'Failed to update passage status.');
+      console.error('Failed to review passage:', err);
+      alert(err.response?.data?.message || 'Failed to update passage review.');
     }
   };
 
@@ -428,7 +430,7 @@ export default function DashboardPage() {
                   for (const p of toApprove) {
                     try { await passagesAPI.updateStatus(p.id, 'approved'); } catch (_) {}
                   }
-                  setPassages(prev => prev.map(p => toApprove.some(a => a.id === p.id) ? { ...p, status: 'approved' } : p));
+                  setPassages(prev => prev.map(p => toApprove.some(a => a.id === p.id) ? { ...p, status: 'approved', content_approved: true, fairness_approved: true } : p));
                 }}
                 style={{
                   padding: '9px 18px',
@@ -523,8 +525,8 @@ export default function DashboardPage() {
               }}>
                 <th style={{ padding: '12px 16px', width: 65, textAlign: 'left' }}>ID</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Stimulus Name</th>
-                <th style={{ padding: '12px 16px', width: 160, textAlign: 'left' }}>Type</th>
-                <th style={{ padding: '12px 16px', width: 150, textAlign: 'left' }}>Grade / Subject</th>
+                <th style={{ padding: '12px 16px', width: 170, textAlign: 'left' }}>Review Status</th>
+                <th style={{ padding: '12px 16px', width: 140, textAlign: 'left' }}>Grade / Subject</th>
                 <th style={{ padding: '12px 16px', width: 85, textAlign: 'center' }}>Preview</th>
                 <th style={{ padding: '12px 16px', width: 95, textAlign: 'center' }}>Actions</th>
               </tr>
@@ -579,17 +581,33 @@ export default function DashboardPage() {
                       </div>
                     </td>
 
-                    {/* Type */}
+                    {/* Review Status */}
                     <td style={{
                       padding: '12px 16px',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#0d9488',
+                      fontSize: 12.5,
                       whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
                     }}>
-                      Test Stimulus
+                      {p.content_approved && p.fairness_approved ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#15803d', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 12, padding: '3px 9px', display: 'inline-block' }}>
+                          ⭐ Fully Approved
+                        </span>
+                      ) : p.content_approved ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#0f766e', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 12, padding: '3px 9px', display: 'inline-block' }}>
+                          🟢 Content Approved
+                        </span>
+                      ) : p.fairness_approved ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#4338ca', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 12, padding: '3px 9px', display: 'inline-block' }}>
+                          🟣 Fairness Approved
+                        </span>
+                      ) : p.status === 'ready_for_review' ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', background: '#f0f9ff', border: '1px solid #7dd3fc', borderRadius: 12, padding: '3px 9px', display: 'inline-block' }}>
+                          🔵 Ready for Review
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 12, padding: '3px 9px', display: 'inline-block' }}>
+                          Draft
+                        </span>
+                      )}
                     </td>
 
                     {/* Grade / Subject */}
@@ -993,23 +1011,64 @@ export default function DashboardPage() {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               background: '#f8fafc', flexWrap: 'wrap', gap: 10,
             }}>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                {tab === 'ready_for_review' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handlePassageStatus(previewPassage.id, 'approved');
-                      setPreviewPassage(null);
-                    }}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* 1. Approve By Content */}
+                {previewPassage.content_approved ? (
+                  <span
                     style={{
-                      padding: '7px 18px', borderRadius: 6, border: 'none',
-                      background: '#16a34a', fontSize: 12.5, fontWeight: 600,
-                      color: '#ffffff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', borderRadius: 6, border: '1.5px solid #99f6e4',
+                      background: '#f0fdfa', color: '#0d9488', fontSize: 12, fontWeight: 700,
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
                     }}
                   >
-                    ✓ Approve Stimulus
-                  </button>
+                    ✅ Content Approved
+                  </span>
                 ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handlePassageReview(previewPassage.id, 'content', true);
+                      setPreviewPassage(prev => prev ? ({ ...prev, content_approved: true, status: 'approved' }) : null);
+                    }}
+                    style={{
+                      padding: '7px 14px', borderRadius: 6, border: '1.5px solid #0d9488',
+                      background: '#f0fdfa', fontSize: 12, fontWeight: 700,
+                      color: '#0f766e', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    📘 Approve By Content
+                  </button>
+                )}
+
+                {/* 2. Approve By Fairness */}
+                {previewPassage.fairness_approved ? (
+                  <span
+                    style={{
+                      padding: '6px 12px', borderRadius: 6, border: '1.5px solid #c7d2fe',
+                      background: '#eef2ff', color: '#4f46e5', fontSize: 12, fontWeight: 700,
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    ✅ Fairness Approved
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handlePassageReview(previewPassage.id, 'fairness', true);
+                      setPreviewPassage(prev => prev ? ({ ...prev, fairness_approved: true, status: 'approved' }) : null);
+                    }}
+                    style={{
+                      padding: '7px 14px', borderRadius: 6, border: '1.5px solid #6366f1',
+                      background: '#eef2ff', fontSize: 12, fontWeight: 700,
+                      color: '#4338ca', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    ⚖️ Approve By Fairness
+                  </button>
+                )}
+
+                {(previewPassage.status === 'approved' || previewPassage.content_approved || previewPassage.fairness_approved) && (
                   <button
                     type="button"
                     onClick={() => {

@@ -16,6 +16,7 @@ router.get('/:id', authMiddleware, getPassageById);
 router.post('/', authMiddleware, createPassage);
 router.post('/bulk', authMiddleware, bulkCreatePassages);
 router.patch('/:id/status', authMiddleware, updatePassageStatus);
+router.patch('/:id/review', authMiddleware, updatePassageStatus);
 router.put('/:id', authMiddleware, updatePassage);
 router.delete('/:id', authMiddleware, deletePassage);
 

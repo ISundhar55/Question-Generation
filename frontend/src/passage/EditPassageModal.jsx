@@ -7,12 +7,14 @@ export default function EditPassageModal({ passage, onSaveSuccess, onClose }) {
   const [title, setTitle] = useState(passage.title || '');
   const [text, setText] = useState(passage.text || '');
   const [genre, setGenre] = useState(passage.genre || 'informational');
+  const contentApproved = Boolean(passage.content_approved);
+  const fairnessApproved = Boolean(passage.fairness_approved);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
 
-  const handleSave = async (e, forceStatus = null) => {
+  const handleSave = async (e, reviewToApprove = null) => {
     e && e.preventDefault();
     if (!title.trim()) {
       setError('Title is required.');
@@ -26,7 +28,11 @@ export default function EditPassageModal({ passage, onSaveSuccess, onClose }) {
     setSaving(true);
     setError(null);
 
-    const targetStatus = forceStatus || passage.status || 'ready_for_review';
+    const nextContentApproved = reviewToApprove === 'content' ? true : contentApproved;
+    const nextFairnessApproved = reviewToApprove === 'fairness' ? true : fairnessApproved;
+    const isEitherApproved = nextContentApproved || nextFairnessApproved;
+    const targetStatus = isEitherApproved ? 'approved' : (passage.status || 'ready_for_review');
+
     const updatePayload = {
       title: title.trim(),
       text: text.trim(),
@@ -37,6 +43,8 @@ export default function EditPassageModal({ passage, onSaveSuccess, onClose }) {
       assessment_target: passage.assessment_target,
       assessment_boundaries: passage.assessment_boundaries,
       status: targetStatus,
+      content_approved: nextContentApproved,
+      fairness_approved: nextFairnessApproved,
       visual: passage.visual || null,
     };
 
@@ -100,14 +108,26 @@ export default function EditPassageModal({ passage, onSaveSuccess, onClose }) {
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 20 }}>✏️</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
-                Edit Stimulus Passage
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                  Edit Stimulus Passage
+                </h3>
+                {contentApproved && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: '#f0fdfa', color: '#0d9488', border: '1px solid #99f6e4' }}>
+                    Content Approved ✓
+                  </span>
+                )}
+                {fairnessApproved && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe' }}>
+                    Fairness Approved ✓
+                  </span>
+                )}
+              </div>
               <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>
-                Update title, genre, or reading text
+                Update title, genre, or reading text and review passage quality
               </div>
             </div>
           </div>
@@ -291,27 +311,88 @@ export default function EditPassageModal({ passage, onSaveSuccess, onClose }) {
           >
             {saving ? 'Saving...' : '💾 Save Changes'}
           </button>
-          {passage.status !== 'approved' && (
-            <button
-              type="button"
-              onClick={(e) => handleSave(e, 'approved')}
-              disabled={saving}
+
+          {/* 1. Approve By Content */}
+          {contentApproved ? (
+            <span
               style={{
-                padding: '8px 20px',
+                padding: '8px 14px',
                 borderRadius: 6,
-                border: 'none',
-                background: saving ? '#86efac' : '#16a34a',
+                border: '1.5px solid #99f6e4',
+                background: '#f0fdfa',
+                color: '#0d9488',
                 fontSize: 13,
                 fontWeight: 700,
-                color: '#ffffff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              ✅ Content Approved
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => handleSave(e, 'content')}
+              disabled={saving}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 6,
+                border: '1.5px solid #0d9488',
+                background: '#f0fdfa',
+                color: '#0f766e',
+                fontSize: 13,
+                fontWeight: 700,
                 cursor: saving ? 'wait' : 'pointer',
-                boxShadow: saving ? 'none' : '0 2px 8px rgba(22, 163, 74, 0.25)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
+                boxShadow: '0 2px 6px rgba(13, 148, 136, 0.15)',
               }}
             >
-              {saving ? 'Saving...' : '✓ Save & Approve'}
+              📘 Approve By Content
+            </button>
+          )}
+
+          {/* 2. Approve By Fairness */}
+          {fairnessApproved ? (
+            <span
+              style={{
+                padding: '8px 14px',
+                borderRadius: 6,
+                border: '1.5px solid #c7d2fe',
+                background: '#eef2ff',
+                color: '#4f46e5',
+                fontSize: 13,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              ✅ Fairness Approved
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => handleSave(e, 'fairness')}
+              disabled={saving}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 6,
+                border: '1.5px solid #6366f1',
+                background: '#eef2ff',
+                color: '#4338ca',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: saving ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.15)',
+              }}
+            >
+              ⚖️ Approve By Fairness
             </button>
           )}
         </div>

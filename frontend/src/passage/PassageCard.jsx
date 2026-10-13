@@ -12,6 +12,7 @@ export default function PassageCard({
   passage,
   index,
   onUpdateStatus,
+  onReview,
   onDelete,
   onGenerateQuestions,
   onEdit,
@@ -23,7 +24,47 @@ export default function PassageCard({
   const [expanded, setExpanded] = useState(true);
 
   const status = passage.status || 'draft';
-  const statusMeta = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
+  const isContentApproved = Boolean(passage.content_approved);
+  const isFairnessApproved = Boolean(passage.fairness_approved);
+  const isAnyApproved = isContentApproved || isFairnessApproved || status === 'approved';
+
+  const getStatusMeta = () => {
+    if (isContentApproved && isFairnessApproved) {
+      return {
+        label: '⭐ Fully Approved (Content & Fairness)',
+        bg: '#f0fdf4',
+        color: '#15803d',
+        border: '#86efac',
+      };
+    }
+    if (isContentApproved) {
+      return {
+        label: '🟢 Approved (Content)',
+        bg: '#f0fdfa',
+        color: '#0d9488',
+        border: '#99f6e4',
+      };
+    }
+    if (isFairnessApproved) {
+      return {
+        label: '🟣 Approved (Fairness)',
+        bg: '#eef2ff',
+        color: '#4f46e5',
+        border: '#c7d2fe',
+      };
+    }
+    return STATUS_CONFIG[status] || STATUS_CONFIG.draft;
+  };
+
+  const statusMeta = getStatusMeta();
+
+  const handleReviewAction = (reviewType, approved = true) => {
+    if (onReview) {
+      onReview(passage, reviewType, approved);
+    } else if (onUpdateStatus) {
+      onUpdateStatus(passage, 'approved', { reviewType, approved });
+    }
+  };
 
   const handleCopy = () => {
     const textToCopy = `${passage.title}\n\n${passage.text}`;
@@ -180,7 +221,7 @@ export default function PassageCard({
             </button>
           )}
 
-          {onGenerateQuestions && status === 'approved' && (
+          {onGenerateQuestions && (status === 'approved' || isAnyApproved) && (
             <button
               type="button"
               onClick={() => onGenerateQuestions(passage)}
@@ -223,33 +264,100 @@ export default function PassageCard({
         </div>
 
         {/* Right side review/status buttons */}
-        {!readOnly && onUpdateStatus && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {status !== 'approved' && (
+        {!readOnly && (onUpdateStatus || onReview) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {/* 1. Approve By Content */}
+            {isContentApproved ? (
+              <span
+                style={{
+                  padding: '5px 11px',
+                  borderRadius: 6,
+                  border: '1.5px solid #99f6e4',
+                  background: '#f0fdfa',
+                  color: '#0d9488',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+                title="Content review passed"
+              >
+                ✅ Content Approved
+              </span>
+            ) : (
               <button
                 type="button"
-                onClick={() => onUpdateStatus(passage, 'approved')}
+                onClick={() => handleReviewAction('content', true)}
                 style={{
-                  padding: '6px 14px',
+                  padding: '6px 13px',
                   borderRadius: 6,
-                  border: '1.5px solid #86efac',
-                  background: '#f0fdf4',
-                  color: '#15803d',
+                  border: '1.5px solid #0d9488',
+                  background: '#f0fdfa',
+                  color: '#0f766e',
                   fontSize: 12,
                   fontWeight: 700,
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  boxShadow: '0 1px 3px rgba(13, 148, 136, 0.1)',
                 }}
+                title="Approve passage text and academic content"
               >
-                ✓ Approve
+                📘 Approve By Content
               </button>
             )}
 
-            {status !== 'ready_for_review' && status !== 'approved' && (
+            {/* 2. Approve By Fairness */}
+            {isFairnessApproved ? (
+              <span
+                style={{
+                  padding: '5px 11px',
+                  borderRadius: 6,
+                  border: '1.5px solid #c7d2fe',
+                  background: '#eef2ff',
+                  color: '#4f46e5',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+                title="Fairness & bias review passed"
+              >
+                ✅ Fairness Approved
+              </span>
+            ) : (
               <button
                 type="button"
-                onClick={() => onUpdateStatus(passage, 'ready_for_review')}
+                onClick={() => handleReviewAction('fairness', true)}
                 style={{
-                  padding: '6px 14px',
+                  padding: '6px 13px',
+                  borderRadius: 6,
+                  border: '1.5px solid #6366f1',
+                  background: '#eef2ff',
+                  color: '#4338ca',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  boxShadow: '0 1px 3px rgba(99, 102, 241, 0.1)',
+                }}
+                title="Approve passage fairness, cultural neutrality and accessibility"
+              >
+                ⚖️ Approve By Fairness
+              </button>
+            )}
+
+            {status !== 'ready_for_review' && !isAnyApproved && (
+              <button
+                type="button"
+                onClick={() => onUpdateStatus && onUpdateStatus(passage, 'ready_for_review')}
+                style={{
+                  padding: '6px 12px',
                   borderRadius: 6,
                   border: '1.5px solid #7dd3fc',
                   background: '#f0f9ff',

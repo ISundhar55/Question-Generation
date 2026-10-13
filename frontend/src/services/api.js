@@ -48,7 +48,8 @@ export const passagesAPI = {
   create: (data) => api.post('/passages', data),
   bulkCreate: (passages) => api.post('/passages/bulk', { passages }),
   update: (id, data) => api.put(`/passages/${id}`, data),
-  updateStatus: (id, status) => api.patch(`/passages/${id}/status`, { status }),
+  updateStatus: (id, status, extra = {}) => api.patch(`/passages/${id}/status`, { status, ...extra }),
+  review: (id, reviewType, approved = true) => api.patch(`/passages/${id}/review`, { reviewType, approved }),
   delete: (id) => api.delete(`/passages/${id}`),
 };
 

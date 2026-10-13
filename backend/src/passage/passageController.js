@@ -123,21 +123,32 @@ const createPassage = async (req, res) => {
     standard,
     learning_objective,
     status,
+    content_approved,
+    fairness_approved,
   } = req.body;
 
   if (!title || !text || !grade || !content_area) {
     return res.status(400).json({ message: 'title, text, grade, and content_area are required' });
   }
 
-  const pStatus = (status && VALID_STATUSES.includes(status)) ? status : 'draft';
+  let cApp = content_approved !== undefined ? Boolean(content_approved) : false;
+  let fApp = fairness_approved !== undefined ? Boolean(fairness_approved) : false;
+  let pStatus = (status && VALID_STATUSES.includes(status)) ? status : 'draft';
+  if (pStatus === 'approved' && !cApp && !fApp) {
+    cApp = true;
+    fApp = true;
+  } else if (cApp || fApp) {
+    pStatus = 'approved';
+  }
   const computedWords = word_count || countWords(text);
 
   try {
     const result = await pool.query(
       `INSERT INTO passages (
         user_id, title, text, visual, genre, grade, content_area, word_count,
-        assessment_target, assessment_boundaries, standard, learning_objective, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        assessment_target, assessment_boundaries, standard, learning_objective, status,
+        content_approved, fairness_approved
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *`,
       [
         req.user.id,
@@ -153,6 +164,8 @@ const createPassage = async (req, res) => {
         standard || null,
         learning_objective || null,
         pStatus,
+        cApp,
+        fApp,
       ]
     );
 
@@ -232,22 +245,69 @@ const bulkCreatePassages = async (req, res) => {
   }
 };
 
-// PATCH /api/passages/:id/status
+// PATCH /api/passages/:id/status or PATCH /api/passages/:id/review
 const updatePassageStatus = async (req, res) => {
-  const { status } = req.body;
-  if (!status || !VALID_STATUSES.includes(status)) {
-    return res.status(400).json({
-      message: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`,
-    });
-  }
+  const { status, review_type, reviewType, approved } = req.body;
+  const type = (review_type || reviewType || '').toLowerCase();
 
   try {
+    // 1. Independent Review Flow: 'content' or 'fairness'
+    if (type === 'content' || type === 'fairness') {
+      const isApproved = approved !== undefined ? Boolean(approved) : true;
+      const current = await pool.query(
+        `SELECT content_approved, fairness_approved, status FROM passages WHERE id = $1 AND user_id = $2`,
+        [req.params.id, req.user.id]
+      );
+      if (current.rows.length === 0) {
+        return res.status(404).json({ message: 'Passage not found' });
+      }
+
+      const newContent = type === 'content' ? isApproved : Boolean(current.rows[0].content_approved);
+      const newFairness = type === 'fairness' ? isApproved : Boolean(current.rows[0].fairness_approved);
+      
+      // Rule: Approving EITHER ONE is enough to unlock the passage (status = 'approved')!
+      const newStatus = (newContent || newFairness) ? 'approved' : 'ready_for_review';
+
+      const result = await pool.query(
+        `UPDATE passages 
+         SET content_approved = $1, fairness_approved = $2, status = $3, updated_at = NOW() 
+         WHERE id = $4 AND user_id = $5 
+         RETURNING *`,
+        [newContent, newFairness, newStatus, req.params.id, req.user.id]
+      );
+
+      return res.json(result.rows[0]);
+    }
+
+    // 2. Direct Status Update Flow (e.g. 'rejected', 'ready_for_review', or legacy 'approved')
+    if (!status || !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({
+        message: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`,
+      });
+    }
+
+    let setContent = null;
+    let setFairness = null;
+
+    if (status === 'approved') {
+      // Legacy blanket approve: mark both as approved
+      setContent = true;
+      setFairness = true;
+    } else if (status === 'rejected' || status === 'draft' || status === 'ready_for_review') {
+      setContent = false;
+      setFairness = false;
+    }
+
     const result = await pool.query(
       `UPDATE passages 
-       SET status = $1, updated_at = NOW() 
-       WHERE id = $2 AND user_id = $3 
+       SET 
+         status = $1, 
+         content_approved = COALESCE($2, content_approved),
+         fairness_approved = COALESCE($3, fairness_approved),
+         updated_at = NOW() 
+       WHERE id = $4 AND user_id = $5 
        RETURNING *`,
-      [status, req.params.id, req.user.id]
+      [status, setContent, setFairness, req.params.id, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -263,10 +323,32 @@ const updatePassageStatus = async (req, res) => {
 
 // PUT /api/passages/:id
 const updatePassage = async (req, res) => {
-  const { title, text, visual, genre, grade, content_area, assessment_target, assessment_boundaries, status } = req.body;
+  const {
+    title,
+    text,
+    visual,
+    genre,
+    grade,
+    content_area,
+    assessment_target,
+    assessment_boundaries,
+    status,
+    content_approved,
+    fairness_approved,
+  } = req.body;
 
   try {
     const computedWords = text ? countWords(text) : undefined;
+
+    let computedStatus = (status && VALID_STATUSES.includes(status)) ? status : null;
+    if (content_approved !== undefined || fairness_approved !== undefined) {
+      const cApp = content_approved !== undefined ? Boolean(content_approved) : false;
+      const fApp = fairness_approved !== undefined ? Boolean(fairness_approved) : false;
+      if (cApp || fApp) {
+        computedStatus = 'approved';
+      }
+    }
+
     const result = await pool.query(
       `UPDATE passages 
        SET 
@@ -280,8 +362,10 @@ const updatePassage = async (req, res) => {
          assessment_boundaries = COALESCE($8, assessment_boundaries),
          status = COALESCE($9, status),
          visual = COALESCE($10, visual),
+         content_approved = COALESCE($11, content_approved),
+         fairness_approved = COALESCE($12, fairness_approved),
          updated_at = NOW()
-       WHERE id = $11 AND user_id = $12
+       WHERE id = $13 AND user_id = $14
        RETURNING *`,
       [
         title ? title.trim() : null,
@@ -292,8 +376,10 @@ const updatePassage = async (req, res) => {
         computedWords,
         assessment_target || null,
         assessment_boundaries || null,
-        (status && VALID_STATUSES.includes(status)) ? status : null,
+        computedStatus,
         visual !== undefined ? visual : null,
+        content_approved !== undefined ? Boolean(content_approved) : null,
+        fairness_approved !== undefined ? Boolean(fairness_approved) : null,
         req.params.id,
         req.user.id,
       ]

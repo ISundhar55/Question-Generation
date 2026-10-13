@@ -135,5 +135,8 @@ DO $$ BEGIN
   ALTER TABLE passages ADD COLUMN IF NOT EXISTS visual TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-
-
+-- Two-stage passage review: Content Approval & Fairness Approval
+DO $$ BEGIN
+  ALTER TABLE passages ADD COLUMN IF NOT EXISTS content_approved BOOLEAN DEFAULT FALSE;
+  ALTER TABLE passages ADD COLUMN IF NOT EXISTS fairness_approved BOOLEAN DEFAULT FALSE;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;

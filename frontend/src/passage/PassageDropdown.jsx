@@ -99,15 +99,39 @@ export default function PassageDropdown({
             boxSizing: 'border-box',
           }}
         >
-          <span style={{ fontWeight: selectedPassage ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {loading
-              ? 'Loading approved passages…'
-              : selectedPassage
-                ? selectedPassage.title
-                : passages.length === 0
-                  ? `No approved passages found for ${contentArea || 'current subject'} (${grade || 'current grade'})`
-                  : '— Select an Approved Reading Passage —'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }} title={selectedPassage?.title || ''}>
+            <span
+              title={selectedPassage?.title || ''}
+              style={{ fontWeight: selectedPassage ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {loading
+                ? 'Loading approved passages…'
+                : selectedPassage
+                  ? selectedPassage.title
+                  : passages.length === 0
+                    ? `No approved passages found for ${contentArea || 'current subject'} (${grade || 'current grade'})`
+                    : '— Select an Approved Reading Passage —'}
+            </span>
+            {selectedPassage && (
+              <span style={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                padding: '1.5px 6px',
+                borderRadius: 4,
+                flexShrink: 0,
+                background: (selectedPassage.content_approved && selectedPassage.fairness_approved) ? '#dcfce7' : selectedPassage.content_approved ? '#ccfbf1' : '#e0e7ff',
+                color: (selectedPassage.content_approved && selectedPassage.fairness_approved) ? '#15803d' : selectedPassage.content_approved ? '#0d9488' : '#4338ca',
+              }}>
+                {selectedPassage.content_approved && selectedPassage.fairness_approved
+                  ? 'Content & Fairness ✓'
+                  : selectedPassage.content_approved
+                    ? 'Content ✓'
+                    : selectedPassage.fairness_approved
+                      ? 'Fairness ✓'
+                      : 'Approved ✓'}
+              </span>
+            )}
+          </div>
           <span style={{
             fontSize: 10,
             color: '#64748b',
@@ -143,6 +167,7 @@ export default function PassageDropdown({
             top: '100%',
             left: 0,
             right: 0,
+            width: '100%',
             marginTop: 4,
             background: '#ffffff',
             border: '1.5px solid #cbd5e1',
@@ -151,6 +176,7 @@ export default function PassageDropdown({
             maxHeight: 220,
             overflowY: 'auto',
             zIndex: 70,
+            boxSizing: 'border-box',
           }}>
             {selectedPassage && (
               <div
@@ -187,13 +213,14 @@ export default function PassageDropdown({
                   <div
                     key={p.id}
                     id={`ai-passage-option-${p.id}`}
+                    title={p.title}
                     onClick={() => {
                       onSelectPassage(p);
                       setDropdownOpen(false);
                     }}
                     style={{
-                      padding: '9px 12px',
-                      fontSize: 13.5,
+                      padding: '8px 12px',
+                      fontSize: 13,
                       fontWeight: isSelected ? 600 : 400,
                       background: isSelected ? 'rgba(79, 110, 247, 0.08)' : 'transparent',
                       color: isSelected ? 'var(--color-primary, #4f6ef7)' : 'var(--color-text, #0f172a)',
@@ -201,13 +228,40 @@ export default function PassageDropdown({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
+                      gap: 8,
                       transition: 'background 0.1s',
                     }}
                     onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
                     onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                   >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
-                    {isSelected && <span style={{ fontSize: 12, color: 'var(--color-primary, #4f6ef7)', marginLeft: 8 }}>✓</span>}
+                    <span
+                      title={p.title}
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      {p.title}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, marginLeft: 'auto' }}>
+                      {p.content_approved && p.fairness_approved ? (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: '#dcfce7', color: '#15803d', whiteSpace: 'nowrap' }}>
+                          Content & Fairness ✓
+                        </span>
+                      ) : p.content_approved ? (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: '#ccfbf1', color: '#0d9488', whiteSpace: 'nowrap' }}>
+                          Content ✓
+                        </span>
+                      ) : p.fairness_approved ? (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: '#e0e7ff', color: '#4338ca', whiteSpace: 'nowrap' }}>
+                          Fairness ✓
+                        </span>
+                      ) : null}
+                      {isSelected && <span style={{ fontSize: 12, color: 'var(--color-primary, #4f6ef7)' }}>✓</span>}
+                    </div>
                   </div>
                 );
               })
