@@ -225,14 +225,17 @@ export default function AIGeneratePage() {
         payloadOptions = { visual: visualSvg };
       }
     }
+    const rawDiff = String(q.difficulty || difficulty || 'medium').toLowerCase().trim();
+    const safeDiff = ['easy', 'medium', 'hard'].includes(rawDiff) ? rawDiff : 'medium';
+
     return {
       type: q.questionType || q.type,
       text: q.text,
       options: payloadOptions || null,
       visual: visualSvg || undefined,
       answer: q.answer,
-      difficulty: q.difficulty || difficulty,
-      points: q.points || (q.difficulty === 'hard' ? 3 : q.difficulty === 'medium' ? 2 : 1),
+      difficulty: safeDiff,
+      points: q.points || (safeDiff === 'hard' ? 3 : safeDiff === 'medium' ? 2 : 1),
       explanation: resolveExplanation(q),
       status: targetStatus,
       passage_id: q.passage_id || (sourceMode === 'passage' && selectedPassage ? selectedPassage.id : undefined),
@@ -265,15 +268,20 @@ export default function AIGeneratePage() {
         });
 
         const computeDefaultPoints = (diff) => (diff === 'hard' ? 3 : diff === 'medium' ? 2 : 1);
-        const generated = (res.data?.questions || []).map(q => ({
-          ...q,
-          text: q.text,
-          options: sanitizeOptions(q.options),
-          points: q.points || computeDefaultPoints(q.difficulty || difficulty),
-          status: 'draft',
-          _isVariant: true,
-          _referenceId: referenceQuestion.id,
-        }));
+        const generated = (res.data?.questions || []).map(q => {
+          const rawDiff = String(q.difficulty || difficulty || 'medium').toLowerCase().trim();
+          const safeDiff = ['easy', 'medium', 'hard'].includes(rawDiff) ? rawDiff : 'medium';
+          return {
+            ...q,
+            difficulty: safeDiff,
+            text: q.text,
+            options: sanitizeOptions(q.options),
+            points: q.points || computeDefaultPoints(safeDiff),
+            status: 'draft',
+            _isVariant: true,
+            _referenceId: referenceQuestion.id,
+          };
+        });
 
         if (generated.length === 0) {
           throw new Error('AI returned no valid variant questions. Please try again.');
@@ -348,18 +356,23 @@ export default function AIGeneratePage() {
       const computeDefaultPoints = (diff) => (diff === 'hard' ? 3 : diff === 'medium' ? 2 : 1);
 
       const allQuestions = successfulResponses.flatMap(res =>
-        (res.data?.questions || []).map(q => ({
-          ...q,
-          text: q.text,
-          options: sanitizeOptions(q.options),
-          points: q.points || computeDefaultPoints(q.difficulty || difficulty),
-          _internetSource: sourceMode === 'passage' ? false : true,
-          _passageGrounded: Boolean(sourceMode === 'passage' && selectedPassage),
-          status: 'draft',
-          passage_id: q.passage_id || (sourceMode === 'passage' && selectedPassage ? selectedPassage.id : undefined),
-          passage_title: q.passage_title || (sourceMode === 'passage' && selectedPassage ? selectedPassage.title : undefined),
-          passage_text: (sourceMode === 'passage' && selectedPassage) ? selectedPassage.text : undefined,
-        }))
+        (res.data?.questions || []).map(q => {
+          const rawDiff = String(q.difficulty || difficulty || 'medium').toLowerCase().trim();
+          const safeDiff = ['easy', 'medium', 'hard'].includes(rawDiff) ? rawDiff : 'medium';
+          return {
+            ...q,
+            difficulty: safeDiff,
+            text: q.text,
+            options: sanitizeOptions(q.options),
+            points: q.points || computeDefaultPoints(safeDiff),
+            _internetSource: sourceMode === 'passage' ? false : true,
+            _passageGrounded: Boolean(sourceMode === 'passage' && selectedPassage),
+            status: 'draft',
+            passage_id: q.passage_id || (sourceMode === 'passage' && selectedPassage ? selectedPassage.id : undefined),
+            passage_title: q.passage_title || (sourceMode === 'passage' && selectedPassage ? selectedPassage.title : undefined),
+            passage_text: (sourceMode === 'passage' && selectedPassage) ? selectedPassage.text : undefined,
+          };
+        })
       );
 
       if (allQuestions.length === 0) {
@@ -527,33 +540,53 @@ export default function AIGeneratePage() {
   };
 
   const handleAcceptAll = async () => {
-    const unaccepted = questions.map((q, idx) => ({ q, idx })).filter(({ q }) => q.status !== 'ready_for_review');
-    for (const { q, idx } of unaccepted) {
+    const updated = [...questions];
+    let hasError = false;
+    for (let i = 0; i < updated.length; i++) {
+      const q = updated[i];
+      if (q.status === 'ready_for_review') continue;
       try {
         if (q.id) {
           await questionsAPI.updateStatus(q.id, 'ready_for_review');
+          updated[i] = { ...q, status: 'ready_for_review' };
         } else {
           const res = await questionsAPI.create(buildSavePayload(q, 'ready_for_review'));
-          if (res.data?.id) q.id = res.data.id;
+          updated[i] = { ...q, id: res.data?.id || q.id, status: 'ready_for_review' };
         }
-      } catch (_) { }
+      } catch (err) {
+        console.error('Accept all error for question index', i, err);
+        hasError = true;
+      }
     }
-    setQuestions(prev => prev.map(q => ({ ...q, status: 'ready_for_review' })));
+    setQuestions(updated);
+    if (hasError) {
+      alert('Some questions could not be saved to the database. Check console for details.');
+    }
   };
 
   const handleRejectAll = async () => {
-    const unrejected = questions.map((q, idx) => ({ q, idx })).filter(({ q }) => q.status !== 'rejected');
-    for (const { q, idx } of unrejected) {
+    const updated = [...questions];
+    let hasError = false;
+    for (let i = 0; i < updated.length; i++) {
+      const q = updated[i];
+      if (q.status === 'rejected') continue;
       try {
         if (q.id) {
           await questionsAPI.updateStatus(q.id, 'rejected');
+          updated[i] = { ...q, status: 'rejected' };
         } else {
           const res = await questionsAPI.create(buildSavePayload(q, 'rejected'));
-          if (res.data?.id) q.id = res.data.id;
+          updated[i] = { ...q, id: res.data?.id || q.id, status: 'rejected' };
         }
-      } catch (_) { }
+      } catch (err) {
+        console.error('Reject all error for question index', i, err);
+        hasError = true;
+      }
     }
-    setQuestions(prev => prev.map(q => ({ ...q, status: 'rejected' })));
+    setQuestions(updated);
+    if (hasError) {
+      alert('Some questions could not be updated. Check console for details.');
+    }
   };
 
   const toggleSource = (idx) => {

@@ -1,6 +1,13 @@
 const pool = require('../db');
 
 const VALID_STATUSES = ['draft', 'ready_for_review', 'approved', 'rejected'];
+const VALID_DIFFICULTIES = ['easy', 'medium', 'hard'];
+
+const normalizeDifficulty = (diff) => {
+  if (!diff) return 'medium';
+  const cleaned = String(diff).toLowerCase().trim();
+  return VALID_DIFFICULTIES.includes(cleaned) ? cleaned : 'medium';
+};
 
 // GET /api/questions?status=ready_for_review|approved|draft|rejected
 const getQuestions = async (req, res) => {
@@ -86,7 +93,7 @@ const createQuestion = async (req, res) => {
         text,
         finalOptions ? JSON.stringify(finalOptions) : null,
         answerVal,
-        difficulty || 'medium',
+        normalizeDifficulty(difficulty),
         points || 1,
         explanation || null,
         qStatus,
@@ -131,7 +138,7 @@ const bulkCreateQuestions = async (req, res) => {
           text,
           finalOptions ? JSON.stringify(finalOptions) : null,
           answerVal,
-          difficulty || 'medium',
+          normalizeDifficulty(difficulty),
           points || 1,
           explanation || null,
           qStatus,
@@ -157,6 +164,7 @@ const updateQuestion = async (req, res) => {
   const { type, text, options, visual, answer, difficulty, points, explanation, status, passage_id } = req.body;
   const answerVal = typeof answer === 'object' ? JSON.stringify(answer) : String(answer);
   const finalOptions = formatOptionsWithVisual(options, visual);
+  const safeDifficulty = normalizeDifficulty(difficulty);
 
   try {
     let query;
@@ -173,7 +181,7 @@ const updateQuestion = async (req, res) => {
         text,
         finalOptions ? JSON.stringify(finalOptions) : null,
         answerVal,
-        difficulty,
+        safeDifficulty,
         points,
         explanation || null,
         status,
@@ -192,7 +200,7 @@ const updateQuestion = async (req, res) => {
         text,
         finalOptions ? JSON.stringify(finalOptions) : null,
         answerVal,
-        difficulty,
+        safeDifficulty,
         points,
         explanation || null,
         passage_id !== undefined ? passage_id : null,

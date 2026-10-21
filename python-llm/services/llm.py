@@ -1794,6 +1794,12 @@ def normalize_question(q: dict, allow_visuals: bool = True, passage_id: int | No
         q["explanation"] = _clean_explanation(q["explanation"])
         q = _sync_rationale_tags_and_distractors(q)
 
+    # 12. Normalize difficulty to standard lowercase enum ('easy', 'medium', 'hard')
+    diff_val = str(q.get("difficulty") or "medium").strip().lower()
+    if diff_val not in ["easy", "medium", "hard"]:
+        diff_val = "medium"
+    q["difficulty"] = diff_val
+
     if passage_id is not None:
         q["passage_id"] = passage_id
 
