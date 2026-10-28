@@ -13,6 +13,7 @@ pymupdf==1.28.0
 # LLM providers
 google-generativeai==0.7.2   # Gemini (also used for embeddings — see services/embedder.py)
 groq>=0.9.0                  # Groq (Llama, Mixtral etc.)
+anthropic>=0.34.0            # Claude (Sonnet, Haiku, Opus)
 
 # Utilities
 numpy==1.26.4

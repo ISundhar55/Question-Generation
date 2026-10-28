@@ -11,6 +11,7 @@ import re
 from typing import List, Tuple, Optional, Dict, Any
 
 from services.llm import (
+    _call_claude,
     _call_clap,
     _call_gemini,
     _call_groq,
@@ -241,7 +242,9 @@ def generate_variants(
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            if LLM_PROVIDER == "clap":
+            if LLM_PROVIDER in ("claude", "anthropic"):
+                raw = _call_claude(prompt)
+            elif LLM_PROVIDER == "clap":
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
@@ -260,6 +263,13 @@ def generate_variants(
                     provider_used = "groq (auto-fallback)"
                 except Exception as fallback_err:
                     return [], prompt, "", False, f"Gemini failed ({err_str[:60]}) AND Groq fallback failed: {fallback_err}"
+            elif LLM_PROVIDER in ("claude", "anthropic"):
+                print(f"[variant] Claude error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})")
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                except Exception as fallback_err:
+                    return [], prompt, "", False, f"Claude failed ({err_str[:60]}) AND Groq fallback failed: {fallback_err}"
             elif LLM_PROVIDER == "clap":
                 print(f"[variant] CLAP error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})")
                 try:

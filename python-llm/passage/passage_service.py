@@ -8,6 +8,7 @@ import json
 import re
 from typing import List, Tuple, Optional
 from services.llm import (
+    _call_claude,
     _call_clap,
     _call_gemini,
     _call_groq,
@@ -158,7 +159,9 @@ def generate_passages(req: GeneratePassageRequest) -> Tuple[List[PassageResult],
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            if LLM_PROVIDER == "clap":
+            if LLM_PROVIDER in ("claude", "anthropic"):
+                raw = _call_claude(prompt)
+            elif LLM_PROVIDER == "clap":
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
@@ -169,7 +172,7 @@ def generate_passages(req: GeneratePassageRequest) -> Tuple[List[PassageResult],
             print(f"[passage] Generated via {provider_used} (attempt {attempt})")
         except Exception as primary_err:
             err_str = str(primary_err)
-            if LLM_PROVIDER in ("gemini", "clap", "ollama"):
+            if LLM_PROVIDER in ("claude", "anthropic", "gemini", "clap", "ollama"):
                 print(f"[passage] {provider_used} error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})")
                 try:
                     raw = _call_groq(prompt)

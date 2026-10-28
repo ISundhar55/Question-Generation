@@ -4,8 +4,11 @@ llm.py
 Multi-provider LLM service for assessment question generation.
 
 Supported providers (set LLM_PROVIDER in .env):
+  - claude  → Anthropic Claude (default: claude-sonnet-5-5)
   - gemini  → Google Gemini (default: gemini-2.5-flash)
   - groq    → Groq API     (default: llama-3.3-70b-versatile)
+  - ollama  → Ollama API   (default: gpt-oss:120b-cloud)
+  - clap    → CLAP API
 
 Key design principles:
 - STRICT: model is forbidden from using outside knowledge.
@@ -131,8 +134,13 @@ load_dotenv()
 # Provider configuration — controlled entirely from .env
 # ---------------------------------------------------------------------------
 
-# Primary provider: "clap" | "gemini" | "groq"  (default: gemini)
+# Primary provider: "claude" | "clap" | "gemini" | "groq" | "ollama"  (default: gemini)
 LLM_PROVIDER   = os.getenv("LLM_PROVIDER", "gemini").lower()
+
+# Anthropic Claude settings
+ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1/messages")
 
 # CLAP settings (Changepond Large Language Model Platform)
 CLAP_API_KEY    = os.getenv("CLAP_API_KEY", "")
@@ -705,6 +713,74 @@ def _call_ollama(prompt: str) -> str:
     raise RuntimeError("Ollama call failed with unknown error.")
 
 
+def _call_claude(prompt: str) -> str:
+    import time
+    import requests
+
+    api_key = ANTHROPIC_API_KEY.strip()
+    if not api_key:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is not set. "
+            "Please set ANTHROPIC_API_KEY in python-llm/.env"
+        )
+
+    endpoint = ANTHROPIC_BASE_URL.strip() if ANTHROPIC_BASE_URL else "https://api.anthropic.com/v1/messages"
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+    }
+    # Note: Do not pass 'temperature' because newer Claude models reject it with "temperature is deprecated"
+    payload = {
+        "model": ANTHROPIC_MODEL.strip(),
+        "max_tokens": 8192,
+        "system": "You are an expert assessment question generator. Follow all instructions exactly. Return only valid JSON.",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+    }
+
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            print(f"\n{'=' * 40} [LLM INPUT PROMPT - CLAUDE ({ANTHROPIC_MODEL}) (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(prompt, flush=True)
+            print(f"{'=' * 115}\n", flush=True)
+
+            http_resp = requests.post(endpoint, headers=headers, json=payload, timeout=180)
+            if http_resp.status_code != 200:
+                raise RuntimeError(f"Anthropic API returned HTTP {http_resp.status_code}: {http_resp.text}")
+
+            res_json = http_resp.json()
+            raw_text = "".join([block.get("text", "") for block in res_json.get("content", []) if block.get("type") == "text"])
+
+            usage = res_json.get("usage", {})
+            prompt_tok = usage.get("input_tokens", "?")
+            output_tok = usage.get("output_tokens", "?")
+            total_tok = (prompt_tok + output_tok) if isinstance(prompt_tok, int) and isinstance(output_tok, int) else "?"
+
+            print(f"\n{'=' * 40} [LLM RAW OUTPUT - CLAUDE (Attempt {attempt + 1})] {'=' * 40}", flush=True)
+            print(raw_text, flush=True)
+            print(f"{'=' * 115}\n", flush=True)
+
+            if prompt_tok is not None:
+                print(f"[llm] Token usage (Claude) - prompt: {prompt_tok}, output: {output_tok}, total: {total_tok}")
+
+            return raw_text
+        except Exception as e:
+            last_err = e
+            print(f"[llm] Claude attempt {attempt + 1} failed: {e}")
+            if attempt == 0 and ("429" in str(e) or "rate_limit" in str(e).lower()):
+                time.sleep(2.0)
+                continue
+            raise e
+
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("Claude call failed with unknown error.")
+
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -744,7 +820,9 @@ def generate_questions(
     for attempt in range(1, MAX_RETRIES + 1):
         # ── Primary call ─────────────────────────────────────────────────────
         try:
-            if LLM_PROVIDER == "clap":
+            if LLM_PROVIDER in ("claude", "anthropic"):
+                raw = _call_claude(prompt)
+            elif LLM_PROVIDER == "clap":
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
@@ -771,6 +849,19 @@ def generate_questions(
                     return [], prompt, "", False, (
                         f"Gemini failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}. "
                         f"Check GROQ_API_KEY in python-llm/.env"
+                    )
+            elif LLM_PROVIDER in ("claude", "anthropic"):
+                print(
+                    f"[llm] [WARNING] Claude error ({err_str[:80]}) — "
+                    f"automatically switching to Groq ({GROQ_MODEL})"
+                )
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                    print(f"[llm] [SUCCESS] Fallback to Groq succeeded")
+                except Exception as fallback_err:
+                    return [], prompt, "", False, (
+                        f"Claude failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
                     )
             elif LLM_PROVIDER == "clap":
                 print(
@@ -1023,7 +1114,9 @@ def generate_questions_from_internet(
     for attempt in range(1, MAX_RETRIES + 1):
         # ── Primary call ──────────────────────────────────────────────────────
         try:
-            if LLM_PROVIDER == "clap":
+            if LLM_PROVIDER in ("claude", "anthropic"):
+                raw = _call_claude(prompt)
+            elif LLM_PROVIDER == "clap":
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
@@ -1047,6 +1140,17 @@ def generate_questions_from_internet(
                 except Exception as fallback_err:
                     return [], prompt, "", False, (
                         f"Gemini failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
+                    )
+            elif LLM_PROVIDER in ("claude", "anthropic"):
+                print(
+                    f"[llm] [internet] Claude error ({err_str[:80]}) — switching to Groq ({GROQ_MODEL})"
+                )
+                try:
+                    raw = _call_groq(prompt)
+                    provider_used = "groq (auto-fallback)"
+                except Exception as fallback_err:
+                    return [], prompt, "", False, (
+                        f"Claude failed ({err_str[:60]}) AND Groq fallback failed: {str(fallback_err)}."
                     )
             elif LLM_PROVIDER == "clap":
                 print(
@@ -2170,7 +2274,9 @@ def regenerate_question(
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            if LLM_PROVIDER == "clap":
+            if LLM_PROVIDER in ("claude", "anthropic"):
+                raw = _call_claude(prompt)
+            elif LLM_PROVIDER == "clap":
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
@@ -2182,7 +2288,7 @@ def regenerate_question(
 
         except Exception as primary_err:
             err_str = str(primary_err)
-            if (LLM_PROVIDER == "gemini" and _is_quota_error(err_str)) or LLM_PROVIDER in ("clap", "ollama"):
+            if (LLM_PROVIDER == "gemini" and _is_quota_error(err_str)) or LLM_PROVIDER in ("claude", "anthropic", "clap", "ollama"):
                 print(f"[llm] [WARNING] {provider_used} error during regen — switching to Groq")
                 try:
                     raw = _call_groq(prompt)
@@ -2365,7 +2471,9 @@ Return ONLY a JSON array, one object per item in the same order and same
     raw = ""
     try:
         try:
-            if LLM_PROVIDER == "clap":
+            if LLM_PROVIDER in ("claude", "anthropic"):
+                raw = _call_claude(prompt)
+            elif LLM_PROVIDER == "clap":
                 raw = _call_clap(prompt)
             elif LLM_PROVIDER == "groq":
                 raw = _call_groq(prompt)
@@ -2377,7 +2485,7 @@ Return ONLY a JSON array, one object per item in the same order and same
             if LLM_PROVIDER == "gemini" and _is_quota_error(str(primary_err)):
                 print("[llm] [WARNING] Gemini quota hit during grounding check — switching to Groq")
                 raw = _call_groq(prompt)
-            elif LLM_PROVIDER in ("clap", "ollama"):
+            elif LLM_PROVIDER in ("claude", "anthropic", "clap", "ollama"):
                 print(f"[llm] [WARNING] {LLM_PROVIDER.upper()} error during grounding check — switching to Groq")
                 raw = _call_groq(prompt)
             else:
